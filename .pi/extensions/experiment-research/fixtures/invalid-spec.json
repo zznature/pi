@@ -1,0 +1,24 @@
+{
+	"objective": "",
+	"mode": "free_text",
+	"allowedInstruments": [],
+	"limits": {
+		"motion": {
+			"xUm": { "minUm": 100, "maxUm": 0 },
+			"yUm": { "minUm": 0, "maxUm": 100 }
+		},
+		"powerEnergy": {
+			"maxLaserPowerMw": -1
+		},
+		"acquisition": {
+			"maxExposureMs": 0,
+			"maxPoints": 0
+		}
+	},
+	"stoppingRules": {
+		"maxRuntimeMinutes": 5,
+		"maxPoints": 9,
+		"stopOnError": true
+	},
+	"operatorApprovalRequired": false
+}
