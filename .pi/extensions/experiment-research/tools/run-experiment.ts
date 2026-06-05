@@ -5,9 +5,12 @@ import { RunExperimentParamsSchema, type ToolResult } from "../schemas.ts";
 export const runExperimentTool = {
 	name: "run_experiment",
 	label: "Run Experiment",
-	description: "Execute a validated simulation ExperimentSpec using the deterministic simulation kernel.",
-	promptSnippet: "Execute a simulation ExperimentSpec and return run records and summary",
-	promptGuidelines: ["Use run_experiment only for simulation mode ExperimentSpec values that passed preflight."],
+	description: "Execute a validated simulation ExperimentSpec or an approved Phase 4 stage-only hardware pilot.",
+	promptSnippet: "Execute a simulation or approved hardware ExperimentSpec and return run records and summary",
+	promptGuidelines: [
+		"Use run_experiment for simulation specs that passed preflight.",
+		"For hardware specs, require a matching dry-run preflight report and explicit operator approval.",
+	],
 	parameters: RunExperimentParamsSchema,
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("run_experiment", params, { cwd: ctx.cwd });

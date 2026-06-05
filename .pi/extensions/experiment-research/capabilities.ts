@@ -23,6 +23,7 @@ const InstrumentCapabilitySchema = Type.Object(
 		hazards: Type.Array(Type.String()),
 		simulationAvailable: Type.Boolean(),
 		dryRunAvailable: Type.Boolean(),
+		hardwarePilotAvailable: Type.Optional(Type.Boolean()),
 	},
 	{ additionalProperties: false },
 );
@@ -83,7 +84,7 @@ const SIMULATION_CAPABILITIES = {
 const DRY_RUN_CAPABILITIES = {
 	instruments: [
 		{
-			id: "lab-stage",
+			id: "mc-newton-xyz-stage",
 			kind: "stage",
 			units: ["um"],
 			coordinateConvention: "right-handed sample coordinates, origin at calibrated hardware home",
@@ -95,6 +96,7 @@ const DRY_RUN_CAPABILITIES = {
 			hazards: ["real stage adapter probed read-only"],
 			simulationAvailable: false,
 			dryRunAvailable: true,
+			hardwarePilotAvailable: true,
 		},
 		{
 			id: "lab-camera",
@@ -107,6 +109,7 @@ const DRY_RUN_CAPABILITIES = {
 			hazards: ["real camera adapter probed read-only"],
 			simulationAvailable: false,
 			dryRunAvailable: true,
+			hardwarePilotAvailable: false,
 		},
 		{
 			id: "lab-acquirer",
@@ -120,15 +123,16 @@ const DRY_RUN_CAPABILITIES = {
 			hazards: ["real acquirer adapter probed read-only"],
 			simulationAvailable: false,
 			dryRunAvailable: true,
+			hardwarePilotAvailable: false,
 		},
 	],
 } satisfies Capabilities;
 
-export type CapabilityMode = "all" | "simulation" | "dry_run";
+export type CapabilityMode = "all" | "simulation" | "dry_run" | "hardware";
 
 export function loadCapabilities(mode: CapabilityMode = "all"): Capabilities {
 	if (mode === "simulation") return SIMULATION_CAPABILITIES;
-	if (mode === "dry_run") return DRY_RUN_CAPABILITIES;
+	if (mode === "dry_run" || mode === "hardware") return DRY_RUN_CAPABILITIES;
 
 	return {
 		instruments: [...SIMULATION_CAPABILITIES.instruments, ...DRY_RUN_CAPABILITIES.instruments],

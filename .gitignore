@@ -12,6 +12,11 @@ packages/*/dist-firefox/
 # Environment
 .env
 
+# Python
+.venv/
+__pycache__/
+*.pyc
+
 # Editor files
 .vscode/
 .zed/

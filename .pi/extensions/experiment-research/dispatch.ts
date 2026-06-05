@@ -1,18 +1,31 @@
 import { loadCapabilities } from "./capabilities.ts";
 import { getLabState } from "./lab-state.ts";
+import { runHardwarePilotKernel } from "./kernel/hardware-pilot.ts";
 import { runLabAgentKernel } from "./kernel/lab-agent-kernel.ts";
+import { createStageAdapter } from "./kernel/stage-adapter.ts";
 import { planNextExperiment } from "./planning.ts";
 import { validatePolicy } from "./policy.ts";
 import { preflight } from "./preflight.ts";
-import { appendPreflightReport, appendRunRecords, readRecordedSummary } from "./records.ts";
+import {
+	appendHardwareRunRecords,
+	appendOperatorIntent,
+	appendPreflightReport,
+	appendRunRecords,
+	createHardwareRunRecordPaths,
+	type OperatorIntentType,
+	readRecordedSummary,
+	validateHardwareGate,
+} from "./records.ts";
 import { createErrorResult, createSuccessResult, issuesState } from "./results.ts";
 import { getRun, saveRun } from "./runs.ts";
 import {
 	AnalyzeRunParamsSchema,
+	OperatorIntentParamsSchema,
 	PlanNextExperimentParamsSchema,
 	RunExperimentParamsSchema,
 	RunPreflightParamsSchema,
 	type ExperimentSpec,
+	type OperatorIntentParams,
 	type PlanNextExperimentParams,
 	type RunExperimentParams,
 	type RunPreflightParams,
@@ -66,7 +79,7 @@ function policyResult(
 		commandId,
 		`ExperimentSpec failed policy validation with ${validation.issues.length} issue(s).`,
 		"policy_rejected",
-		["Change the ExperimentSpec to simulation mode and keep it within Phase 1 limits."],
+		["Change the ExperimentSpec to a supported mode and keep it within current phase limits."],
 		issuesState(validation.issues),
 		true,
 	);
@@ -79,7 +92,7 @@ function runPreflight(commandId: string, params: RunPreflightParams, ctx?: Dispa
 	const policy = policyResult(commandId, specOrResult, "run_preflight");
 	if (policy) return policy;
 
-	const capabilityMode = specOrResult.mode === "dry_run" ? "dry_run" : "simulation";
+	const capabilityMode = specOrResult.mode === "simulation" ? "simulation" : "dry_run";
 	const result = preflight(specOrResult, loadCapabilities(capabilityMode), getLabState());
 	if (!result.valid) {
 		return createErrorResult(
@@ -92,7 +105,10 @@ function runPreflight(commandId: string, params: RunPreflightParams, ctx?: Dispa
 		);
 	}
 
-	const records = result.mode === "dry_run" ? appendPreflightReport(specOrResult, result, getCwd(ctx)) : undefined;
+	const records =
+		result.mode === "dry_run" || result.mode === "hardware"
+			? appendPreflightReport(specOrResult, result, getCwd(ctx))
+			: undefined;
 
 	return createSuccessResult(
 		commandId,
@@ -105,13 +121,80 @@ function runPreflight(commandId: string, params: RunPreflightParams, ctx?: Dispa
 	);
 }
 
-function runExperiment(commandId: string, params: RunExperimentParams, ctx?: DispatchContext): ToolResult {
-	if (params.resumeFrom !== undefined) {
+function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: RunExperimentParams, ctx?: DispatchContext): ToolResult {
+	if (!params.hardwarePilot) {
 		return createErrorResult(
 			commandId,
-			"Phase 1 does not support run resume.",
-			"resume_not_supported",
-			["Remove resumeFrom and start a new simulation run."],
+			"hardware mode requires hardwarePilot parameters.",
+			"hardware_pilot_params_required",
+			["Provide hardwarePilot approval, watchdog, and stage adapter parameters."],
+			{ mode: spec.mode },
+			true,
+		);
+	}
+
+	const cwd = getCwd(ctx);
+	const gate = validateHardwareGate(spec, params.hardwarePilot.approval, cwd);
+	if (!gate.valid) {
+		return createErrorResult(
+			commandId,
+			`Hardware gate failed with ${gate.issues.length} issue(s).`,
+			"hardware_gate_failed",
+			["Run dry-run preflight for the same spec and provide an explicit operator approval."],
+			{ valid: false, issues: gate.issues, dryRunReportPath: gate.dryRunReportPath },
+			true,
+		);
+	}
+
+	const preflightResult = preflight(spec, loadCapabilities("hardware"), getLabState());
+	if (!preflightResult.valid) {
+		return createErrorResult(
+			commandId,
+			`Preflight failed with ${preflightResult.issues.length} issue(s).`,
+			"preflight_failed",
+			["Fix the preflight issues before retrying hardware run."],
+			{ ...issuesState(preflightResult.issues), pointCount: preflightResult.pointCount },
+			true,
+		);
+	}
+
+	const paths = createHardwareRunRecordPaths(cwd);
+	const pilot = {
+		...params.hardwarePilot,
+		intentsPath: params.hardwarePilot.intentsPath ?? paths.intentsPath,
+	};
+	const stage = createStageAdapter(pilot, cwd);
+	const run = runHardwarePilotKernel(spec, {
+		runId: paths.runId,
+		stage,
+		pilot,
+		eventsPath: paths.eventsPath,
+		startPointIndex: params.resumeFrom === undefined ? undefined : Number(params.resumeFrom),
+	});
+	const records = appendHardwareRunRecords(run, pilot, paths);
+
+	const status = run.summary.status === "completed" ? "success" : "warning";
+	return {
+		...createSuccessResult(
+			commandId,
+			`Hardware run ${run.runId} ${run.summary.status} with ${run.summary.completedPoints}/${run.summary.pointCount} completed point(s).`,
+			{ summary: run.summary, pointRecords: run.points, records },
+			["Review hardware events, approval, and summary records before any next run."],
+			records.artifacts,
+			run.runId,
+		),
+		status,
+		stopConditionMet: run.summary.stopConditionMet,
+	};
+}
+
+function runExperiment(commandId: string, params: RunExperimentParams, ctx?: DispatchContext): ToolResult {
+	if (params.resumeFrom !== undefined && Number.isNaN(Number(params.resumeFrom))) {
+		return createErrorResult(
+			commandId,
+			"resumeFrom must be a completed point index for hardware resume.",
+			"invalid_resume_from",
+			["Use the last completed hardware point index plus one, or omit resumeFrom."],
 			{ resumeFrom: params.resumeFrom },
 			true,
 		);
@@ -133,6 +216,21 @@ function runExperiment(commandId: string, params: RunExperimentParams, ctx?: Dis
 
 	const policy = policyResult(commandId, specOrResult, "run_experiment");
 	if (policy) return policy;
+
+	if (specOrResult.mode === "hardware") {
+		return runHardwareExperiment(commandId, specOrResult, params, ctx);
+	}
+
+	if (params.resumeFrom !== undefined) {
+		return createErrorResult(
+			commandId,
+			"Simulation resume is not supported.",
+			"resume_not_supported",
+			["Remove resumeFrom and start a new simulation run."],
+			{ resumeFrom: params.resumeFrom },
+			true,
+		);
+	}
 
 	const preflightResult = preflight(specOrResult, loadCapabilities("simulation"), getLabState());
 	if (!preflightResult.valid) {
@@ -209,34 +307,67 @@ function planNext(commandId: string, params: PlanNextExperimentParams, ctx?: Dis
 	);
 }
 
+function operatorIntent(
+	commandId: string,
+	toolName: "pause_run" | "abort_run" | "request_operator",
+	params: OperatorIntentParams,
+	ctx?: DispatchContext,
+): ToolResult {
+	const intent: OperatorIntentType =
+		toolName === "pause_run" ? "pause" : toolName === "abort_run" ? "abort" : "request_operator";
+	const ref = appendOperatorIntent(params.runId, intent, params.reason, getCwd(ctx));
+	return createSuccessResult(
+		commandId,
+		`Recorded operator ${intent} intent for ${params.runId}.`,
+		{ runId: params.runId, intent, reason: params.reason },
+		[
+			"The hardware kernel reads this intent at the next safe point boundary.",
+			intent === "abort"
+				? "Resume only after the operator clears the cause and approves a new bounded run."
+				: "Review run records before resuming or starting a new bounded run.",
+		],
+		[{ uri: ref.relativeIntentsPath, label: "Operator intents", kind: "intents" }],
+		params.runId,
+	);
+}
+
 export function dispatch(toolName: string, params: unknown, ctx?: DispatchContext): ToolResult {
 	switch (toolName) {
 		case "run_preflight": {
 			const validation = validateSchema(RunPreflightParamsSchema, params);
-			if (!validation.valid) return invalidParamsResult("phase1-run-preflight", issuesState(validation.issues));
-			return runPreflight("phase1-run-preflight", validation.value, ctx);
+			if (!validation.valid) return invalidParamsResult("run-preflight", issuesState(validation.issues));
+			return runPreflight("run-preflight", validation.value, ctx);
 		}
 		case "run_experiment": {
 			const validation = validateSchema(RunExperimentParamsSchema, params);
-			if (!validation.valid) return invalidParamsResult("phase1-run-experiment", issuesState(validation.issues));
-			return runExperiment("phase1-run-experiment", validation.value, ctx);
+			if (!validation.valid) return invalidParamsResult("run-experiment", issuesState(validation.issues));
+			return runExperiment("run-experiment", validation.value, ctx);
 		}
 		case "analyze_run": {
 			const validation = validateSchema(AnalyzeRunParamsSchema, params);
-			if (!validation.valid) return invalidParamsResult("phase1-analyze-run", issuesState(validation.issues));
-			return analyzeRun("phase1-analyze-run", validation.value.runId, ctx);
+			if (!validation.valid) return invalidParamsResult("analyze-run", issuesState(validation.issues));
+			return analyzeRun("analyze-run", validation.value.runId, ctx);
 		}
 		case "plan_next_experiment": {
 			const validation = validateSchema(PlanNextExperimentParamsSchema, params);
-			if (!validation.valid) return invalidParamsResult("phase2-plan-next-experiment", issuesState(validation.issues));
-			return planNext("phase2-plan-next-experiment", validation.value, ctx);
+			if (!validation.valid) return invalidParamsResult("plan-next-experiment", issuesState(validation.issues));
+			return planNext("plan-next-experiment", validation.value, ctx);
+		}
+		case "pause_run":
+		case "abort_run":
+		case "request_operator": {
+			const validation = validateSchema(OperatorIntentParamsSchema, params);
+			if (!validation.valid) return invalidParamsResult(`${toolName}-intent`, issuesState(validation.issues));
+			return operatorIntent(`${toolName}-intent`, toolName, validation.value, ctx);
 		}
 		default:
 			return createErrorResult(
-				"phase1-dispatch",
+				"dispatch",
 				`Unknown experiment tool: ${toolName}`,
 				"tool_not_found",
-				["Call one of: run_preflight, run_experiment, analyze_run, plan_next_experiment."],
+				[
+					"Call one of: run_preflight, run_experiment, analyze_run, plan_next_experiment, pause_run, abort_run, request_operator.",
+				],
 				{ toolName },
 				false,
 			);

@@ -3,6 +3,7 @@ import { EXPERIMENT_RESEARCH_PROMPT } from "./prompt.ts";
 import type { ToolResult } from "./schemas.ts";
 import { analyzeRunTool } from "./tools/analyze-run.ts";
 import { getLabStateTool } from "./tools/lab-state.ts";
+import { abortRunTool, pauseRunTool, requestOperatorTool } from "./tools/operator.ts";
 import { planNextExperimentTool } from "./tools/plan-next.ts";
 import { runPreflightTool } from "./tools/preflight.ts";
 import { runExperimentTool } from "./tools/run-experiment.ts";
@@ -16,6 +17,10 @@ const PLANNER_TOOL_NAMES = [
 	"analyze_run",
 	"plan_next_experiment",
 ];
+
+// Operator/watchdog tools are registered so they can be invoked out-of-band, but
+// are intentionally kept out of the planner default active set per the design.
+const OPERATOR_TOOL_NAMES = ["pause_run", "abort_run", "request_operator"];
 
 const LOW_LEVEL_TOOL_NAMES = new Set(["move_relative", "move_z", "snap_image", "serial_send", "set_laser_power"]);
 
@@ -44,11 +49,18 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 	pi.registerTool(runExperimentTool);
 	pi.registerTool(analyzeRunTool);
 	pi.registerTool(planNextExperimentTool);
+	pi.registerTool(pauseRunTool);
+	pi.registerTool(abortRunTool);
+	pi.registerTool(requestOperatorTool);
 
 	pi.on("session_start", () => {
 		const activeTools = new Set(pi.getActiveTools());
 		for (const toolName of PLANNER_TOOL_NAMES) {
 			activeTools.add(toolName);
+		}
+		// Operator/watchdog tools stay out of the planner default active set.
+		for (const toolName of OPERATOR_TOOL_NAMES) {
+			activeTools.delete(toolName);
 		}
 		pi.setActiveTools([...activeTools]);
 	});
@@ -64,14 +76,16 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 
 		if (event.toolName === "run_experiment") {
 			const mode = getSpecMode(event.input);
-			if (mode !== undefined && mode !== "simulation") {
-				return { block: true, reason: "run_experiment only accepts simulation mode in this extension." };
+			if (mode !== undefined && mode !== "simulation" && mode !== "hardware") {
+				return { block: true, reason: "run_experiment accepts simulation or approved hardware mode only." };
 			}
 		}
 	});
 
 	pi.on("tool_result", (event) => {
-		if (!PLANNER_TOOL_NAMES.includes(event.toolName)) return;
+		const isPlannerTool = PLANNER_TOOL_NAMES.includes(event.toolName);
+		const isOperatorTool = OPERATOR_TOOL_NAMES.includes(event.toolName);
+		if (!isPlannerTool && !isOperatorTool) return;
 		if (!isExperimentToolResult(event.details)) return;
 
 		if (event.toolName === "run_experiment" && event.details.status === "success") {
