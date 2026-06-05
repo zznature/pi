@@ -1,0 +1,19 @@
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { dispatch } from "../dispatch.ts";
+import { RunPreflightParamsSchema, type ToolResult } from "../schemas.ts";
+
+export const runPreflightTool = {
+	name: "run_preflight",
+	label: "Run Preflight",
+	description: "Run Phase 3 simulation or dry-run readiness preflight checks for an ExperimentSpec.",
+	promptSnippet: "Check whether a simulation or dry-run ExperimentSpec is ready",
+	promptGuidelines: ["Use run_preflight after validate_experiment_spec succeeds and before run_experiment."],
+	parameters: RunPreflightParamsSchema,
+	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+		const result = dispatch("run_preflight", params, { cwd: ctx.cwd });
+		return {
+			content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+			details: result,
+		};
+	},
+} satisfies ToolDefinition<typeof RunPreflightParamsSchema, ToolResult>;

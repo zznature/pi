@@ -105,7 +105,7 @@ agent calls; medium and micro sit on the same gateway but are caller-gated.
 
 | Layer  | Examples                                                                  | Callable by                | Why this layer                                                  |
 | ------ | ------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------- |
-| Macro  | `run_raman_mapping(spec)`, `analyze_run(id)`, `recommend_next_experiment` | Agent (default, exclusive) | A run takes hours; LLM round-trip must not happen inside        |
+| Macro  | `run_raman_mapping(spec)`, `analyze_run(id)`, `plan_next_experiment` | Agent (default, exclusive) | A run takes hours; LLM round-trip must not happen inside        |
 | Medium | `pause_run(id)`, `abort_run(id)`, `request_operator(reason)`              | Watchdog and Operator UI   | High-risk, must react faster than an LLM round-trip             |
 | Micro  | `move_z(um)`, `snap_image()`, `serial_send(cmd)`                          | Operator maintenance       | Debugging only; not in agent registry                           |
 
@@ -251,7 +251,7 @@ Use several small agents or agent modes instead of one free-form lab agent.
 | Research planner  | Converts scientific goal into experiment plan, stopping criteria, analysis metrics | No                    |
 | Protocol compiler | Converts the plan into a typed `ExperimentSpec`                                    | No                    |
 | Safety reviewer   | Reviews `ExperimentSpec` before approval; checks limits and abnormal preconditions | No                    |
-| Data analyst      | Parses spectra / images after a run, computes metrics, recommends next bounded run | No                    |
+| Data analyst      | Parses spectra / images after a run, computes metrics, plans the next bounded run | No                    |
 | Watchdog          | Rule-based, non-LLM. Monitors live event log; can pause / abort but not re-plan    | Pause / abort only    |
 
 There is no "run supervisor" agent. Per-point execution is owned by the
@@ -425,7 +425,7 @@ Expose coarse, safe tools rather than raw device commands.
 - `calibrate_xy_transform(spec)`
 - `run_raman_mapping(spec, resume_from=None)`
 - `analyze_run(run_id)`
-- `recommend_next_experiment(run_id, objective)`
+- `plan_next_experiment(run_id, objective)`
 
 `pause_run(run_id)` and `abort_run(run_id)` live on the same gateway surface
 but are reserved for the watchdog and the operator UI. The planner agent
@@ -467,7 +467,7 @@ Offline end-to-end agent loop with no real hardware.
 ### Phase 4: LLM-driven outer loop
 
 - Bind tools to the chosen harness (Claude tool-use first).
-- Implement `recommend_next_experiment` as a constrained-choice tool:
+- Implement `plan_next_experiment` as a constrained-choice tool:
   enumeration of replan strategies, not free generation.
 - Add operator approval UI hook.
 - End-to-end run on a real sample with operator in the loop.

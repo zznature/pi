@@ -1,37 +1,17 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { STATIC_CAPABILITIES, type Capabilities } from "../capabilities.ts";
+import { getLabState, type LabState } from "../lab-state.ts";
 import { EmptyParamsSchema, type ToolResult } from "../schemas.ts";
-
-export interface LabState {
-	mode: "simulation";
-	capabilities: Capabilities;
-	activeRunId: null;
-	dryRunAvailable: false;
-	hardwareAvailable: false;
-	notes: string[];
-}
-
-export function getLabState(): LabState {
-	return {
-		mode: "simulation",
-		capabilities: STATIC_CAPABILITIES,
-		activeRunId: null,
-		dryRunAvailable: false,
-		hardwareAvailable: false,
-		notes: [
-			"Phase 0 exposes schema validation and static simulation capabilities only.",
-			"No kernel, dry run, records, watchdog, or hardware adapter is connected.",
-		],
-	};
-}
 
 function createLabStateResult(state: LabState): ToolResult {
 	return {
 		status: "success",
-		summary: "Static Phase 0 lab state loaded. Only simulation capabilities are available.",
-		nextActions: ["Draft an ExperimentSpec in simulation mode.", "Call validate_experiment_spec before any run."],
+		summary: "Static Phase 3 lab state loaded. Simulation and dry-run preflight capabilities are available.",
+		nextActions: [
+			"Draft an ExperimentSpec in simulation or dry_run mode.",
+			"Call validate_experiment_spec before any preflight or run.",
+		],
 		artifacts: [],
-		commandId: "phase0-get-lab-state",
+		commandId: "phase3-get-lab-state",
 		stateBefore: null,
 		stateAfter: state,
 		stopConditionMet: false,
@@ -41,8 +21,8 @@ function createLabStateResult(state: LabState): ToolResult {
 export const getLabStateTool = {
 	name: "get_lab_state",
 	label: "Get Lab State",
-	description: "Return static Phase 0 lab state and simulated instrument capabilities.",
-	promptSnippet: "Inspect static Phase 0 lab state and simulated capabilities",
+	description: "Return static Phase 3 lab state, simulation capabilities, and dry-run readiness capabilities.",
+	promptSnippet: "Inspect static Phase 3 lab state and dry-run readiness capabilities",
 	promptGuidelines: [
 		"Use get_lab_state before planning an experiment when current lab capabilities or mode matter.",
 	],
