@@ -1,0 +1,315 @@
+"""MC.NewtonLT-06 multi-channel XYZ stage controller."""
+
+from __future__ import annotations
+
+import time
+
+import serial
+
+from stage.exceptions import StageCommandError, StageConnectionError, StageTimeoutError
+from stage.models import StagePosition
+
+
+class MCNewtonXYZStageController:
+    """XYZStage implementation for one MC.Newton controller with per-axis channels."""
+
+    def __init__(
+        self,
+        port: str,
+        *,
+        baudrate: int = 115200,
+        x_channel: int = 1,
+        y_channel: int = 2,
+        z_channel: int = 3,
+        read_timeout: float = 1.0,
+        default_cmd_wait_ms: float = 5.0,
+        idn_wait_ms: float = 100.0,
+        idn_retries: int = 3,
+        move_cmd_wait_ms: float = 30.0,
+        channel_switch_wait_ms: float = 100.0,
+        disable_on_disconnect: bool = True,
+        exclusive_channel: bool = True,
+        x_target_tolerance_um: float = 1.0,
+        y_target_tolerance_um: float = 1.0,
+        z_target_tolerance_um: float = 1.0,
+        stability_tolerance_um: float = 0.2,
+        settle_correction_attempts: int = 20,
+        settle_correction_threshold_um: float = 100.0,
+    ) -> None:
+        self._port = port
+        self._baudrate = baudrate
+        self._channels = {
+            "x": int(x_channel),
+            "y": int(y_channel),
+            "z": int(z_channel),
+        }
+        self._read_timeout = read_timeout
+        self._default_cmd_wait_ms = default_cmd_wait_ms
+        self._idn_wait_ms = idn_wait_ms
+        self._idn_retries = idn_retries
+        self._move_cmd_wait_ms = move_cmd_wait_ms
+        self._channel_switch_wait_ms = channel_switch_wait_ms
+        self._disable_on_disconnect = disable_on_disconnect
+        self._exclusive_channel = exclusive_channel
+        self._target_tolerances_um = {
+            "x": float(x_target_tolerance_um),
+            "y": float(y_target_tolerance_um),
+            "z": float(z_target_tolerance_um),
+        }
+        self._stability_tolerance_um = float(stability_tolerance_um)
+        self._settle_correction_attempts = int(settle_correction_attempts)
+        self._settle_correction_threshold_um = float(settle_correction_threshold_um)
+        self._ser = None
+        self._connected = False
+        self._enabled_channels: set[int] = set()
+        self._last_targets_um: dict[str, float] = {}
+        self._last_pulse_axes: set[str] = set()
+
+    def __enter__(self) -> "MCNewtonXYZStageController":
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.disconnect()
+
+    def connect(self) -> None:
+        self._ser = serial.Serial(
+            port=self._port,
+            baudrate=self._baudrate,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=self._read_timeout,
+        )
+
+        idn = ""
+        for _ in range(max(1, self._idn_retries)):
+            idn = self._send("[*IDN?]", wait_ms=self._idn_wait_ms)
+            if idn and "Newton" in idn:
+                break
+        if not idn or "Newton" not in idn:
+            self._ser.close()
+            raise StageConnectionError(f"IDN check failed: unexpected response '{idn}'")
+
+        self._connected = True
+
+    def disconnect(self) -> None:
+        if not self._connected:
+            return
+        if self._disable_on_disconnect:
+            for channel in sorted(self._enabled_channels):
+                try:
+                    self._send(f"[ch{channel}:0]")
+                except Exception:
+                    pass
+        if self._ser is not None:
+            self._ser.close()
+        self._connected = False
+
+    def get_position_um(self) -> StagePosition:
+        return StagePosition(
+            x_um=self.get_axis_position_um("x"),
+            y_um=self.get_axis_position_um("y"),
+            z_um=self.get_axis_position_um("z"),
+        )
+
+    def get_axis_position_um(self, axis: str) -> float:
+        self._select_axis(axis)
+        response = self._send("[check:pos?]")
+        try:
+            pos_str = response.replace("[pos:", "").replace("]", "")
+            return float(pos_str) * 1000.0
+        except (ValueError, AttributeError) as exc:
+            raise StageCommandError(f"Cannot parse {axis.upper()} position response: '{response}'") from exc
+
+    def move_absolute_um(
+        self,
+        *,
+        x_um: float | None = None,
+        y_um: float | None = None,
+        z_um: float | None = None,
+    ) -> None:
+        targets = {"x": x_um, "y": y_um, "z": z_um}
+        self._last_targets_um = {}
+        for axis, target_um in targets.items():
+            if target_um is None:
+                continue
+            self._move_axis_absolute_um(axis, float(target_um))
+
+    def move_relative_um(
+        self,
+        *,
+        dx_um: float = 0.0,
+        dy_um: float = 0.0,
+        dz_um: float = 0.0,
+    ) -> None:
+        shifts = {"x": dx_um, "y": dy_um, "z": dz_um}
+        self._last_targets_um = {}
+        for axis, delta_um in shifts.items():
+            if delta_um == 0:
+                continue
+            current_um = self.get_axis_position_um(axis)
+            self._move_axis_absolute_um(axis, current_um + float(delta_um))
+
+    def wait_settled(self, timeout_ms: int, axes: set[str] | None = None) -> None:
+        if not self._last_targets_um:
+            return
+
+        target_axes = self._normalize_wait_axes(axes)
+        t_start = time.monotonic()
+        corrections = {axis: 0 for axis in target_axes}
+        previous = {axis: self.get_axis_position_um(axis) for axis in target_axes}
+        while True:
+            time.sleep(0.050)
+            current = {axis: self.get_axis_position_um(axis) for axis in target_axes}
+
+            all_stable = all(
+                abs(current[axis] - previous[axis]) < self._stability_tolerance_um
+                for axis in current
+            )
+            all_reached = all(
+                abs(current[axis] - target) < self._target_tolerances_um.get(axis, 1.0)
+                for axis, target in self._last_targets_um.items()
+                if axis in target_axes
+            )
+            if all_stable and all_reached:
+                return
+            if all_stable and not all_reached:
+                corrected = self._try_correct_stable_target_error(current, corrections)
+                if corrected:
+                    previous = {axis: self.get_axis_position_um(axis) for axis in target_axes}
+                    continue
+
+            previous = current
+            elapsed_ms = (time.monotonic() - t_start) * 1000.0
+            if elapsed_ms > timeout_ms:
+                current_text = ", ".join(f"{axis}={value:.3f}" for axis, value in current.items())
+                target_text = ", ".join(f"{axis}={value:.3f}" for axis, value in self._last_targets_um.items())
+                delta_text = ", ".join(
+                    f"{axis}={current[axis] - target:.3f}"
+                    for axis, target in self._last_targets_um.items()
+                )
+                tolerance_text = ", ".join(
+                    f"{axis}={self._target_tolerances_um.get(axis, 1.0):.3f}"
+                    for axis in self._last_targets_um
+                )
+                raise StageTimeoutError(
+                    f"Stage did not settle within {timeout_ms} ms "
+                    f"(current {current_text}; target {target_text}; "
+                    f"delta {delta_text}; tolerance {tolerance_text})"
+                )
+
+    def stop(self) -> None:
+        try:
+            self._send("[stop]")
+        except Exception:
+            pass
+
+    def _normalize_wait_axes(self, axes: set[str] | None) -> set[str]:
+        if axes is None:
+            return set(self._last_targets_um)
+        normalized = {axis.lower() for axis in axes}
+        unknown = normalized.difference(self._channels)
+        if unknown:
+            raise ValueError(f"Unsupported wait axes: {sorted(unknown)}")
+        return normalized.intersection(self._last_targets_um)
+
+    def _try_correct_stable_target_error(
+        self,
+        current: dict[str, float],
+        corrections: dict[str, int],
+    ) -> bool:
+        corrected = False
+        for axis, current_um in current.items():
+            target_um = self._last_targets_um[axis]
+            error_um = target_um - current_um
+            reached = abs(error_um) < self._target_tolerances_um.get(axis, 1.0)
+            close_enough_to_retry = abs(error_um) <= self._settle_correction_threshold_um
+            can_retry = corrections[axis] < self._settle_correction_attempts
+            if reached or not close_enough_to_retry or not can_retry:
+                continue
+            corrections[axis] += 1
+            self._move_axis_absolute_um(axis, target_um)
+            corrected = True
+        return corrected
+
+    def move_axis_pulses(self, axis: str, pulses: int) -> None:
+        if pulses == 0:
+            return
+        abs_pulses = abs(int(pulses))
+        if abs_pulses > 999999:
+            raise ValueError("pulse count must be <= 999999")
+        self._select_axis(axis)
+        sign = "+" if pulses > 0 else "-"
+        self._send(f"[{sign}:{abs_pulses:06d}]", wait_ms=self._move_cmd_wait_ms)
+        self._last_pulse_axes.add(axis.lower())
+
+    def move_relative_pulses(
+        self,
+        *,
+        x_pulses: int = 0,
+        y_pulses: int = 0,
+        z_pulses: int = 0,
+    ) -> None:
+        for axis, pulses in {"x": x_pulses, "y": y_pulses, "z": z_pulses}.items():
+            self.move_axis_pulses(axis, pulses)
+
+    def read_remaining_pulses(self, axis: str) -> int:
+        self._select_axis(axis)
+        response = self._send("[read:pulse?]")
+        text = response.strip().replace("[", "").replace("]", "")
+        try:
+            return int(text)
+        except ValueError as exc:
+            raise StageCommandError(
+                f"Cannot parse {axis.upper()} remaining pulse response: '{response}'"
+            ) from exc
+
+    def wait_pulses_complete(self, timeout_ms: int) -> None:
+        if not self._last_pulse_axes:
+            return
+        t_start = time.monotonic()
+        while True:
+            remaining = {
+                axis: self.read_remaining_pulses(axis)
+                for axis in sorted(self._last_pulse_axes)
+            }
+            if all(value <= 0 for value in remaining.values()):
+                return
+            elapsed_ms = (time.monotonic() - t_start) * 1000.0
+            if elapsed_ms > timeout_ms:
+                remaining_text = ", ".join(f"{axis}={value}" for axis, value in remaining.items())
+                raise StageTimeoutError(
+                    f"Stage pulses did not complete within {timeout_ms} ms "
+                    f"(remaining {remaining_text})"
+                )
+            time.sleep(0.050)
+
+    def _move_axis_absolute_um(self, axis: str, target_um: float) -> None:
+        self._select_axis(axis)
+        target_mm = target_um / 1000.0
+        self._send(f"[movetarget:{target_mm:.6f}]", wait_ms=self._move_cmd_wait_ms)
+        self._last_targets_um[axis] = target_um
+
+    def _select_axis(self, axis: str) -> None:
+        key = axis.lower()
+        if key not in self._channels:
+            raise ValueError(f"Unsupported axis: {axis}")
+        channel = self._channels[key]
+        if self._exclusive_channel:
+            for enabled in sorted(self._enabled_channels):
+                if enabled != channel:
+                    self._send(f"[ch{enabled}:0]")
+                    self._enabled_channels.discard(enabled)
+        self._send(f"[ch{channel}:1]")
+        self._enabled_channels.add(channel)
+        time.sleep(self._channel_switch_wait_ms / 1000.0)
+
+    def _send(self, cmd: str, wait_ms: float | None = None) -> str:
+        if self._ser is None:
+            raise StageConnectionError("Serial port is not connected.")
+        if wait_ms is None:
+            wait_ms = self._default_cmd_wait_ms
+        self._ser.write(cmd.encode("ascii"))
+        time.sleep(wait_ms / 1000.0)
+        return self._ser.read_all().decode("ascii", errors="replace").strip()
