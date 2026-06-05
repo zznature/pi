@@ -9,10 +9,10 @@ import {
 function createSuccessResult(): ToolResult {
 	return {
 		status: "success",
-		summary: "ExperimentSpec is valid for Phase 0 schema checks.",
-		nextActions: ["Run preflight after Phase 1 adds execution support."],
+		summary: "ExperimentSpec is valid for Phase 3 schema checks.",
+		nextActions: ["Call run_preflight with the same ExperimentSpec."],
 		artifacts: [],
-		commandId: "phase0-validate-experiment-spec",
+		commandId: "phase3-validate-experiment-spec",
 		stateBefore: null,
 		stateAfter: { valid: true },
 		stopConditionMet: false,
@@ -31,7 +31,7 @@ function createErrorResult(params: ValidateExperimentSpecParams): ToolResult {
 			"Call validate_experiment_spec again before any run.",
 		],
 		artifacts: [],
-		commandId: "phase0-validate-experiment-spec",
+		commandId: "phase3-validate-experiment-spec",
 		stateBefore: null,
 		stateAfter: { valid: false, issues },
 		errorCode: "invalid_experiment_spec",

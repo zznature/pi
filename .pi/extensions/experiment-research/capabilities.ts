@@ -22,6 +22,7 @@ const InstrumentCapabilitySchema = Type.Object(
 		softwareLimits: SoftwareLimitsSchema,
 		hazards: Type.Array(Type.String()),
 		simulationAvailable: Type.Boolean(),
+		dryRunAvailable: Type.Boolean(),
 	},
 	{ additionalProperties: false },
 );
@@ -35,7 +36,7 @@ export const CapabilitiesSchema = Type.Object(
 
 export type Capabilities = Static<typeof CapabilitiesSchema>;
 
-export const STATIC_CAPABILITIES = {
+const SIMULATION_CAPABILITIES = {
 	instruments: [
 		{
 			id: "sim-stage",
@@ -49,6 +50,7 @@ export const STATIC_CAPABILITIES = {
 			},
 			hazards: ["simulated motion only"],
 			simulationAvailable: true,
+			dryRunAvailable: false,
 		},
 		{
 			id: "sim-camera",
@@ -60,6 +62,7 @@ export const STATIC_CAPABILITIES = {
 			},
 			hazards: ["simulated camera only"],
 			simulationAvailable: true,
+			dryRunAvailable: false,
 		},
 		{
 			id: "sim-acquirer",
@@ -72,6 +75,64 @@ export const STATIC_CAPABILITIES = {
 			},
 			hazards: ["simulated acquisition only"],
 			simulationAvailable: true,
+			dryRunAvailable: false,
 		},
 	],
 } satisfies Capabilities;
+
+const DRY_RUN_CAPABILITIES = {
+	instruments: [
+		{
+			id: "lab-stage",
+			kind: "stage",
+			units: ["um"],
+			coordinateConvention: "right-handed sample coordinates, origin at calibrated hardware home",
+			softwareLimits: {
+				xUm: { minUm: 0, maxUm: 500 },
+				yUm: { minUm: 0, maxUm: 500 },
+				zUm: { minUm: -50, maxUm: 50 },
+			},
+			hazards: ["real stage adapter probed read-only"],
+			simulationAvailable: false,
+			dryRunAvailable: true,
+		},
+		{
+			id: "lab-camera",
+			kind: "camera",
+			units: ["px", "ms"],
+			coordinateConvention: "image origin at top-left",
+			softwareLimits: {
+				maxExposureMs: 500,
+			},
+			hazards: ["real camera adapter probed read-only"],
+			simulationAvailable: false,
+			dryRunAvailable: true,
+		},
+		{
+			id: "lab-acquirer",
+			kind: "acquirer",
+			units: ["mw", "ms"],
+			coordinateConvention: "no spatial coordinates",
+			softwareLimits: {
+				maxLaserPowerMw: 2,
+				maxExposureMs: 500,
+			},
+			hazards: ["real acquirer adapter probed read-only"],
+			simulationAvailable: false,
+			dryRunAvailable: true,
+		},
+	],
+} satisfies Capabilities;
+
+export type CapabilityMode = "all" | "simulation" | "dry_run";
+
+export function loadCapabilities(mode: CapabilityMode = "all"): Capabilities {
+	if (mode === "simulation") return SIMULATION_CAPABILITIES;
+	if (mode === "dry_run") return DRY_RUN_CAPABILITIES;
+
+	return {
+		instruments: [...SIMULATION_CAPABILITIES.instruments, ...DRY_RUN_CAPABILITIES.instruments],
+	};
+}
+
+export const STATIC_CAPABILITIES = loadCapabilities();

@@ -135,11 +135,45 @@ export const ValidateExperimentSpecParamsSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+export const RunPreflightParamsSchema = Type.Object(
+	{
+		spec: Type.Unknown({ description: "ExperimentSpec candidate to preflight" }),
+	},
+	{ additionalProperties: false },
+);
+
+export const RunExperimentParamsSchema = Type.Object(
+	{
+		spec: Type.Unknown({ description: "Validated ExperimentSpec to execute in simulation mode" }),
+		resumeFrom: Type.Optional(Type.String({ minLength: 1 })),
+	},
+	{ additionalProperties: false },
+);
+
+export const AnalyzeRunParamsSchema = Type.Object(
+	{
+		runId: Type.String({ minLength: 1 }),
+	},
+	{ additionalProperties: false },
+);
+
+export const PlanNextExperimentParamsSchema = Type.Object(
+	{
+		runId: Type.String({ minLength: 1 }),
+		objective: Type.String({ minLength: 1 }),
+	},
+	{ additionalProperties: false },
+);
+
 export const EmptyParamsSchema = Type.Object({}, { additionalProperties: false });
 
 export type ExperimentSpec = Static<typeof ExperimentSpecSchema>;
 export type ToolResult = Static<typeof ToolResultSchema>;
 export type ValidateExperimentSpecParams = Static<typeof ValidateExperimentSpecParamsSchema>;
+export type RunPreflightParams = Static<typeof RunPreflightParamsSchema>;
+export type RunExperimentParams = Static<typeof RunExperimentParamsSchema>;
+export type AnalyzeRunParams = Static<typeof AnalyzeRunParamsSchema>;
+export type PlanNextExperimentParams = Static<typeof PlanNextExperimentParamsSchema>;
 
 export interface ValidationIssue {
 	path: string;
