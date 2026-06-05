@@ -7,7 +7,10 @@ export const EXPERIMENT_RESEARCH_PROMPT = [
 	"Use run_preflight before run_experiment, and use run_preflight as the only dry_run action.",
 	"Use analyze_run after run_experiment returns a runId.",
 	"Use plan_next_experiment only to choose a constrained strategy: repeat_same, increase_resolution, reduce_range, or stop.",
-	"Hardware mode is not available in this Phase 3 extension.",
 	"dry_run mode checks adapter reachability, calibration, limits, output paths, and abort/intents paths without motion, acquisition, or power changes.",
+	"Hardware mode is a narrow Phase 4 pilot: stage motion only on the mc-newton-xyz-stage, at most 4 explicit points, with explicit zUm limits.",
+	"A hardware run requires that the same ExperimentSpec already passed a dry_run preflight and that an operator explicitly approved it; never start hardware motion without both.",
+	"Never edit a spec to bypass approval, widen limits, or grow point count just to make a hardware run pass.",
 	"During a run, do not change parameters in real time. Plan the next bounded run only after reading run records or summaries.",
+	"When a run errors, state clearly whether the next step is retry as-is, change strategy, or stop, and cite the run records.",
 ].join("\n");

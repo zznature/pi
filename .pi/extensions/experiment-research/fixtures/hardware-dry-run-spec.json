@@ -1,6 +1,6 @@
 {
-	"objective": "Dry-run readiness check for a small Raman mapping workflow.",
-	"sampleId": "LAB-DRY-001",
+	"objective": "Phase 4 hardware pilot: visit a few calibrated stage positions on the MC.Newton XYZ stage.",
+	"sampleId": "LAB-HW-001",
 	"mode": "dry_run",
 	"allowedInstruments": ["mc-newton-xyz-stage"],
 	"limits": {
@@ -10,18 +10,19 @@
 			"zUm": { "minUm": -10, "maxUm": 10 }
 		},
 		"powerEnergy": {
-			"maxLaserPowerMw": 1,
-			"maxExposureEnergyMj": 5
+			"maxLaserPowerMw": 1
 		},
 		"acquisition": {
 			"maxExposureMs": 100,
 			"maxPoints": 4
 		}
 	},
-	"grid": {
-		"x": { "startUm": 0, "stopUm": 10, "steps": 2 },
-		"y": { "startUm": 0, "stopUm": 10, "steps": 2 }
-	},
+	"points": [
+		{ "xUm": 0, "yUm": 0, "zUm": 0 },
+		{ "xUm": 10, "yUm": 0, "zUm": 0 },
+		{ "xUm": 10, "yUm": 10, "zUm": 0 },
+		{ "xUm": 0, "yUm": 10, "zUm": 0 }
+	],
 	"stoppingRules": {
 		"maxRuntimeMinutes": 5,
 		"maxPoints": 4,

@@ -87,6 +87,34 @@ const StoppingRulesSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+const OperatorApprovalSchema = Type.Object(
+	{
+		approvalId: Type.String({ minLength: 1 }),
+		operator: Type.String({ minLength: 1 }),
+		approved: Type.Boolean(),
+		dryRunReportId: Type.String({ minLength: 1 }),
+		operatorOnlyMonitoring: Type.Optional(Type.Boolean()),
+		notes: Type.Optional(Type.String()),
+	},
+	{ additionalProperties: false },
+);
+
+const HardwarePilotSchema = Type.Object(
+	{
+		stageAdapter: Type.Union([Type.Literal("memory"), Type.Literal("mc_newton_xyz")]),
+		stagePort: Type.Optional(Type.String({ minLength: 1 })),
+		stagePython: Type.Optional(
+			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to 'python' on PATH" }),
+		),
+		settleTimeoutMs: Type.Integer({ minimum: 1 }),
+		heartbeatTimeoutMs: Type.Integer({ minimum: 1 }),
+		maxConsecutiveErrors: Type.Integer({ minimum: 1 }),
+		intentsPath: Type.Optional(Type.String({ minLength: 1 })),
+		approval: OperatorApprovalSchema,
+	},
+	{ additionalProperties: false },
+);
+
 export const ExperimentSpecSchema = Type.Object(
 	{
 		objective: Type.String({ minLength: 1 }),
@@ -144,8 +172,9 @@ export const RunPreflightParamsSchema = Type.Object(
 
 export const RunExperimentParamsSchema = Type.Object(
 	{
-		spec: Type.Unknown({ description: "Validated ExperimentSpec to execute in simulation mode" }),
+		spec: Type.Unknown({ description: "Validated ExperimentSpec to execute in simulation or approved hardware mode" }),
 		resumeFrom: Type.Optional(Type.String({ minLength: 1 })),
+		hardwarePilot: Type.Optional(HardwarePilotSchema),
 	},
 	{ additionalProperties: false },
 );
@@ -165,6 +194,14 @@ export const PlanNextExperimentParamsSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+export const OperatorIntentParamsSchema = Type.Object(
+	{
+		runId: Type.String({ minLength: 1, description: "Hardware run id whose intents log receives the operator intent" }),
+		reason: Type.String({ minLength: 1, description: "Operator-supplied reason recorded with the intent" }),
+	},
+	{ additionalProperties: false },
+);
+
 export const EmptyParamsSchema = Type.Object({}, { additionalProperties: false });
 
 export type ExperimentSpec = Static<typeof ExperimentSpecSchema>;
@@ -172,8 +209,10 @@ export type ToolResult = Static<typeof ToolResultSchema>;
 export type ValidateExperimentSpecParams = Static<typeof ValidateExperimentSpecParamsSchema>;
 export type RunPreflightParams = Static<typeof RunPreflightParamsSchema>;
 export type RunExperimentParams = Static<typeof RunExperimentParamsSchema>;
+export type HardwarePilotParams = Static<typeof HardwarePilotSchema>;
 export type AnalyzeRunParams = Static<typeof AnalyzeRunParamsSchema>;
 export type PlanNextExperimentParams = Static<typeof PlanNextExperimentParamsSchema>;
+export type OperatorIntentParams = Static<typeof OperatorIntentParamsSchema>;
 
 export interface ValidationIssue {
 	path: string;

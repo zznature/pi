@@ -9,10 +9,10 @@ import {
 function createSuccessResult(): ToolResult {
 	return {
 		status: "success",
-		summary: "ExperimentSpec is valid for Phase 3 schema checks.",
+		summary: "ExperimentSpec is valid for schema checks.",
 		nextActions: ["Call run_preflight with the same ExperimentSpec."],
 		artifacts: [],
-		commandId: "phase3-validate-experiment-spec",
+		commandId: "validate-experiment-spec",
 		stateBefore: null,
 		stateAfter: { valid: true },
 		stopConditionMet: false,
@@ -31,7 +31,7 @@ function createErrorResult(params: ValidateExperimentSpecParams): ToolResult {
 			"Call validate_experiment_spec again before any run.",
 		],
 		artifacts: [],
-		commandId: "phase3-validate-experiment-spec",
+		commandId: "validate-experiment-spec",
 		stateBefore: null,
 		stateAfter: { valid: false, issues },
 		errorCode: "invalid_experiment_spec",
@@ -43,7 +43,7 @@ function createErrorResult(params: ValidateExperimentSpecParams): ToolResult {
 export const validateExperimentSpecTool = {
 	name: "validate_experiment_spec",
 	label: "Validate Experiment Spec",
-	description: "Validate an ExperimentSpec candidate against the Phase 0 schema.",
+	description: "Validate an ExperimentSpec candidate against the schema and semantic rules.",
 	promptSnippet: "Validate a candidate ExperimentSpec without touching hardware",
 	promptGuidelines: [
 		"Use validate_experiment_spec before proposing any experiment run.",

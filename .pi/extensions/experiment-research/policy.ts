@@ -36,6 +36,29 @@ function validateInstrumentAvailability(spec: ExperimentSpec, capabilities: Capa
 		if (spec.mode === "dry_run" && !instrument.dryRunAvailable) {
 			issues.push(issue("allowedInstruments", `Instrument is not available in dry run: ${instrumentId}`));
 		}
+		if (spec.mode === "hardware" && !instrument.hardwarePilotAvailable) {
+			issues.push(issue("allowedInstruments", `Instrument is not available in Phase 4 hardware pilot: ${instrumentId}`));
+		}
+	}
+
+	return issues;
+}
+
+function validateHardwarePilotScope(spec: ExperimentSpec): ValidationIssue[] {
+	const issues: ValidationIssue[] = [];
+
+	if (spec.mode !== "hardware") return issues;
+	if (spec.allowedInstruments.length !== 1 || spec.allowedInstruments[0] !== "mc-newton-xyz-stage") {
+		issues.push(issue("allowedInstruments", "Phase 4 hardware pilot only supports mc-newton-xyz-stage"));
+	}
+	if (!spec.points) {
+		issues.push(issue("points", "Phase 4 hardware pilot requires explicit points and does not accept grids"));
+	}
+	if (getExperimentPoints(spec).length > 4) {
+		issues.push(issue("points", "Phase 4 hardware pilot is limited to 4 points"));
+	}
+	if (!spec.limits.motion.zUm) {
+		issues.push(issue("limits.motion.zUm", "Phase 4 hardware pilot requires explicit zUm limits"));
 	}
 
 	return issues;
@@ -78,15 +101,23 @@ export function validatePolicy(
 	const issues: ValidationIssue[] = [];
 
 	if (ctx.toolName === "run_preflight") {
-		if (spec.mode !== "simulation" && spec.mode !== "dry_run") {
-			issues.push(issue("mode", "Phase 3 preflight supports simulation and dry_run modes only"));
+		if (spec.mode !== "simulation" && spec.mode !== "dry_run" && spec.mode !== "hardware") {
+			issues.push(issue("mode", "Phase 4 preflight supports simulation, dry_run, and hardware modes only"));
+		}
+	} else if (ctx.toolName === "run_experiment") {
+		if (spec.mode !== "simulation" && spec.mode !== "hardware") {
+			issues.push(issue("mode", "Phase 4 run_experiment supports simulation and approved hardware modes only"));
 		}
 	} else if (spec.mode !== "simulation") {
-		issues.push(issue("mode", `Phase 3 ${ctx.toolName} only supports simulation mode`));
+		issues.push(issue("mode", `Phase 4 ${ctx.toolName} only supports simulation mode`));
 	}
 
-	if (spec.operatorApprovalRequired) {
-		issues.push(issue("operatorApprovalRequired", "Phase 3 simulation and dry-run checks must not require approval"));
+	if (spec.mode === "hardware") {
+		if (!spec.operatorApprovalRequired) {
+			issues.push(issue("operatorApprovalRequired", "Hardware pilot requires operatorApprovalRequired to be true"));
+		}
+	} else if (spec.operatorApprovalRequired) {
+		issues.push(issue("operatorApprovalRequired", "Simulation and dry-run checks must not require approval"));
 	}
 
 	if (labState.mode !== "simulation") {
@@ -95,6 +126,7 @@ export function validatePolicy(
 
 	issues.push(...validateInstrumentAvailability(spec, labState.capabilities));
 	issues.push(...validatePointLimits(spec));
+	issues.push(...validateHardwarePilotScope(spec));
 
 	return {
 		valid: issues.length === 0,
