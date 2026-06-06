@@ -1,0 +1,32 @@
+[
+  {
+    "uri": ".pi\\experiment-runs\\runs\\hw-run-0001\\spec.json",
+    "label": "ExperimentSpec",
+    "kind": "spec"
+  },
+  {
+    "uri": ".pi\\experiment-runs\\runs\\hw-run-0001\\events.jsonl",
+    "label": "Hardware point events",
+    "kind": "events"
+  },
+  {
+    "uri": ".pi\\experiment-runs\\runs\\hw-run-0001\\intents.jsonl",
+    "label": "Operator intents",
+    "kind": "intents"
+  },
+  {
+    "uri": ".pi\\experiment-runs\\runs\\hw-run-0001\\summary.json",
+    "label": "Hardware summary",
+    "kind": "summary"
+  },
+  {
+    "uri": ".pi\\experiment-runs\\runs\\hw-run-0001\\approvals.jsonl",
+    "label": "Hardware approval",
+    "kind": "approvals"
+  },
+  {
+    "uri": ".pi\\experiment-runs\\runs\\hw-run-0001\\artifacts.json",
+    "label": "Artifact index",
+    "kind": "artifacts"
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "runId": "hw-run-0001",
+  "mode": "hardware",
+  "sampleId": "LAB-HW-SMOKE",
+  "objective": "Phase 4 hardware pilot smoke: visit 4 points near current stage position.",
+  "pointCount": 4,
+  "completedPoints": 0,
+  "status": "aborted",
+  "stopConditionMet": true,
+  "stopReason": "point error",
+  "operatorOnlyMonitoring": false
+}

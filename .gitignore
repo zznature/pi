@@ -18,7 +18,6 @@ __pycache__/
 *.pyc
 
 # Experiment research runtime records (per-run artifacts, not source)
-.pi/experiment-runs/
 
 # Editor files
 .vscode/
