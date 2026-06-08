@@ -1,0 +1,22 @@
+[
+  {
+    "uri": ".pi/experiment-runs/runs/sim-run-0001/spec.json",
+    "label": "ExperimentSpec",
+    "kind": "spec"
+  },
+  {
+    "uri": ".pi/experiment-runs/runs/sim-run-0001/events.jsonl",
+    "label": "Point events",
+    "kind": "events"
+  },
+  {
+    "uri": ".pi/experiment-runs/runs/sim-run-0001/summary.json",
+    "label": "Simulation summary",
+    "kind": "summary"
+  },
+  {
+    "uri": ".pi/experiment-runs/runs/sim-run-0001/artifacts.json",
+    "label": "Artifact index",
+    "kind": "artifacts"
+  }
+]
