@@ -86,7 +86,7 @@ export class PythonMCNewtonStageAdapter implements StageAdapter {
 			[
 				this.bridgePath,
 				"--stage-root",
-				resolve(this.cwd, "docs", "instruments"),
+				resolve(this.cwd, "docs", "Raman"),
 				"--port",
 				this.port,
 				"--action",
