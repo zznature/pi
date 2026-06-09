@@ -10,6 +10,39 @@ const ExperimentModeSchema = Type.Union([
 
 const StatusSchema = Type.Union([Type.Literal("success"), Type.Literal("warning"), Type.Literal("error")]);
 
+const ExperimentTypeSchema = Type.Union([
+	Type.Literal("spatial_mapping"),
+	Type.Literal("synthesis_screen"),
+	Type.Literal("assay"),
+	Type.Literal("generic_protocol"),
+]);
+
+const SubjectSchema = Type.Object(
+	{
+		id: Type.String({ minLength: 1 }),
+		kind: Type.String({ minLength: 1 }),
+		label: Type.Optional(Type.String({ minLength: 1 })),
+	},
+	{ additionalProperties: false },
+);
+
+const ResourceKindSchema = Type.Union([
+	Type.Literal("instrument"),
+	Type.Literal("sample_slot"),
+	Type.Literal("workspace"),
+	Type.Literal("budget"),
+	Type.Literal("operator_attention"),
+]);
+
+const ResourceRefSchema = Type.Object(
+	{
+		id: Type.String({ minLength: 1 }),
+		kind: ResourceKindSchema,
+		role: Type.Optional(Type.String({ minLength: 1 })),
+	},
+	{ additionalProperties: false },
+);
+
 const CoordinateRangeSchema = Type.Object(
 	{
 		minUm: Type.Number({ description: "Minimum allowed coordinate in micrometers" }),
@@ -38,7 +71,7 @@ const PowerEnergyLimitsSchema = Type.Object(
 const AcquisitionLimitsSchema = Type.Object(
 	{
 		maxExposureMs: Type.Number({ minimum: 1 }),
-		maxPoints: Type.Integer({ minimum: 1 }),
+		maxUnits: Type.Integer({ minimum: 1 }),
 	},
 	{ additionalProperties: false },
 );
@@ -48,6 +81,8 @@ export const LimitsSchema = Type.Object(
 		motion: MotionLimitsSchema,
 		powerEnergy: PowerEnergyLimitsSchema,
 		acquisition: AcquisitionLimitsSchema,
+		duration: Type.Optional(Type.Object({ maxRuntimeMinutes: Type.Number({ minimum: 0 }) }, { additionalProperties: false })),
+		sampleBudget: Type.Optional(Type.Object({ maxUnits: Type.Integer({ minimum: 1 }) }, { additionalProperties: false })),
 	},
 	{ additionalProperties: false },
 );
@@ -78,10 +113,45 @@ const PointSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+const GridPlanSchema = Type.Object(
+	{
+		kind: Type.Literal("grid"),
+		grid: GridSchema,
+	},
+	{ additionalProperties: false },
+);
+
+const PointsPlanSchema = Type.Object(
+	{
+		kind: Type.Literal("points"),
+		points: Type.Array(PointSchema, { minItems: 1 }),
+	},
+	{ additionalProperties: false },
+);
+
+const StepPlanSchema = Type.Object(
+	{
+		kind: Type.Literal("steps"),
+		steps: Type.Array(
+			Type.Object(
+				{
+					id: Type.String({ minLength: 1 }),
+					description: Type.String({ minLength: 1 }),
+				},
+				{ additionalProperties: false },
+			),
+			{ minItems: 1 },
+		),
+	},
+	{ additionalProperties: false },
+);
+
+const PlanSchema = Type.Union([GridPlanSchema, PointsPlanSchema, StepPlanSchema]);
+
 const StoppingRulesSchema = Type.Object(
 	{
 		maxRuntimeMinutes: Type.Number({ minimum: 0 }),
-		maxPoints: Type.Integer({ minimum: 1 }),
+		maxUnits: Type.Integer({ minimum: 1 }),
 		stopOnError: Type.Boolean(),
 	},
 	{ additionalProperties: false },
@@ -117,13 +187,16 @@ const HardwarePilotSchema = Type.Object(
 
 export const ExperimentSpecSchema = Type.Object(
 	{
+		schemaVersion: Type.String({ minLength: 1 }),
+		experimentId: Type.String({ minLength: 1 }),
+		specId: Type.String({ minLength: 1 }),
+		experimentType: ExperimentTypeSchema,
 		objective: Type.String({ minLength: 1 }),
-		sampleId: Type.String({ minLength: 1 }),
+		subject: SubjectSchema,
 		mode: ExperimentModeSchema,
-		allowedInstruments: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
+		resources: Type.Array(ResourceRefSchema, { minItems: 1 }),
 		limits: LimitsSchema,
-		grid: Type.Optional(GridSchema),
-		points: Type.Optional(Type.Array(PointSchema, { minItems: 1 })),
+		plan: PlanSchema,
 		stoppingRules: StoppingRulesSchema,
 		operatorApprovalRequired: Type.Boolean(),
 	},
@@ -132,12 +205,33 @@ export const ExperimentSpecSchema = Type.Object(
 
 const ArtifactRefSchema = Type.Object(
 	{
+		id: Type.Optional(Type.String({ minLength: 1 })),
 		uri: Type.String({ minLength: 1 }),
 		label: Type.String({ minLength: 1 }),
 		kind: Type.Optional(Type.String({ minLength: 1 })),
+		contentHash: Type.Optional(Type.String({ minLength: 1 })),
+		producerRunId: Type.Optional(Type.String({ minLength: 1 })),
 	},
 	{ additionalProperties: false },
 );
+
+export const ErrorCodeSchema = Type.Union([
+	Type.Literal("invalid_tool_params"),
+	Type.Literal("invalid_experiment_spec"),
+	Type.Literal("policy_rejected"),
+	Type.Literal("preflight_failed"),
+	Type.Literal("hardware_pilot_params_required"),
+	Type.Literal("hardware_gate_failed"),
+	Type.Literal("invalid_resume_from"),
+	Type.Literal("dry_run_execution_not_supported"),
+	Type.Literal("resume_not_supported"),
+	Type.Literal("run_not_found"),
+	Type.Literal("run_active_conflict"),
+	Type.Literal("run_not_advanceable"),
+	Type.Literal("lifecycle_mode_not_supported"),
+	Type.Literal("simulated_hardware_not_allowed"),
+	Type.Literal("tool_not_found"),
+]);
 
 export const ToolResultSchema = Type.Object(
 	{
@@ -145,11 +239,13 @@ export const ToolResultSchema = Type.Object(
 		summary: Type.String(),
 		nextActions: Type.Array(Type.String()),
 		artifacts: Type.Array(ArtifactRefSchema),
+		experimentId: Type.Optional(Type.String()),
 		runId: Type.Optional(Type.String()),
 		commandId: Type.String(),
-		stateBefore: Type.Unknown(),
+		correlationId: Type.String(),
+		stateBefore: Type.Optional(Type.Unknown()),
 		stateAfter: Type.Unknown(),
-		errorCode: Type.Optional(Type.String()),
+		errorCode: Type.Optional(ErrorCodeSchema),
 		retrySafe: Type.Optional(Type.Boolean()),
 		stopConditionMet: Type.Boolean(),
 	},
@@ -194,6 +290,30 @@ export const PlanNextExperimentParamsSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+export const StartRunParamsSchema = Type.Object(
+	{
+		spec: Type.Unknown({ description: "Validated simulation ExperimentSpec to start under the async run lifecycle" }),
+	},
+	{ additionalProperties: false },
+);
+
+export const AdvanceRunParamsSchema = Type.Object(
+	{
+		runId: Type.String({ minLength: 1, description: "Run id returned by start_run" }),
+		maxUnits: Type.Optional(
+			Type.Integer({ minimum: 1, description: "Maximum units to execute before yielding control back to the planner" }),
+		),
+	},
+	{ additionalProperties: false },
+);
+
+export const PollRunParamsSchema = Type.Object(
+	{
+		runId: Type.String({ minLength: 1, description: "Run id to read live RunState for" }),
+	},
+	{ additionalProperties: false },
+);
+
 export const OperatorIntentParamsSchema = Type.Object(
 	{
 		runId: Type.String({ minLength: 1, description: "Hardware run id whose intents log receives the operator intent" }),
@@ -204,15 +324,27 @@ export const OperatorIntentParamsSchema = Type.Object(
 
 export const EmptyParamsSchema = Type.Object({}, { additionalProperties: false });
 
+export const GetExperimentStateParamsSchema = Type.Object(
+	{
+		experimentId: Type.String({ minLength: 1 }),
+	},
+	{ additionalProperties: false },
+);
+
 export type ExperimentSpec = Static<typeof ExperimentSpecSchema>;
 export type ToolResult = Static<typeof ToolResultSchema>;
+export type ErrorCode = Static<typeof ErrorCodeSchema>;
 export type ValidateExperimentSpecParams = Static<typeof ValidateExperimentSpecParamsSchema>;
 export type RunPreflightParams = Static<typeof RunPreflightParamsSchema>;
 export type RunExperimentParams = Static<typeof RunExperimentParamsSchema>;
 export type HardwarePilotParams = Static<typeof HardwarePilotSchema>;
 export type AnalyzeRunParams = Static<typeof AnalyzeRunParamsSchema>;
 export type PlanNextExperimentParams = Static<typeof PlanNextExperimentParamsSchema>;
+export type StartRunParams = Static<typeof StartRunParamsSchema>;
+export type AdvanceRunParams = Static<typeof AdvanceRunParamsSchema>;
+export type PollRunParams = Static<typeof PollRunParamsSchema>;
 export type OperatorIntentParams = Static<typeof OperatorIntentParamsSchema>;
+export type GetExperimentStateParams = Static<typeof GetExperimentStateParamsSchema>;
 
 export interface ValidationIssue {
 	path: string;
@@ -268,11 +400,14 @@ function validateCoordinateRange(path: string, range: Static<typeof CoordinateRa
 function validateGridOrPointsPresence(value: unknown): ValidationIssue[] {
 	if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
 	const record = value as Record<string, unknown>;
-	const hasGrid = Object.hasOwn(record, "grid") && record.grid !== undefined;
-	const hasPoints = Object.hasOwn(record, "points") && record.points !== undefined;
-
-	if (hasGrid !== hasPoints) return [];
-	return [{ path: "root", message: "Exactly one of grid or points is required" }];
+	const plan = record.plan;
+	if (typeof plan !== "object" || plan === null || Array.isArray(plan)) return [];
+	const planRecord = plan as Record<string, unknown>;
+	const kind = planRecord.kind;
+	if (kind === "grid" && Object.hasOwn(planRecord, "grid")) return [];
+	if (kind === "points" && Object.hasOwn(planRecord, "points")) return [];
+	if (kind === "steps" && Object.hasOwn(planRecord, "steps")) return [];
+	return [{ path: "plan", message: "plan.kind must match its payload" }];
 }
 
 function validateExperimentSpecSemantics(spec: ExperimentSpec): ValidationIssue[] {
@@ -282,6 +417,10 @@ function validateExperimentSpecSemantics(spec: ExperimentSpec): ValidationIssue[
 	issues.push(...validateCoordinateRange("limits.motion.yUm", spec.limits.motion.yUm));
 	if (spec.limits.motion.zUm) {
 		issues.push(...validateCoordinateRange("limits.motion.zUm", spec.limits.motion.zUm));
+	}
+
+	if (spec.plan.kind === "steps") {
+		issues.push({ path: "plan.kind", message: "Current kernels require spatial grid or points plans" });
 	}
 
 	return issues;

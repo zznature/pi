@@ -14,6 +14,8 @@ import { appendOperatorIntent, hashExperimentSpec, validateHardwareGate } from "
 import type { ExperimentSpec, HardwarePilotParams } from "./schemas.ts";
 import { evaluateWatchdog } from "./watchdog.ts";
 
+process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE = "1";
+
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 function loadSpec(name: string): ExperimentSpec {
@@ -91,18 +93,26 @@ test("policy rejects hardware spec without operator approval flag", () => {
 });
 
 test("policy rejects hardware spec with extra instruments", () => {
-	const spec = { ...loadSpec("hardware-spec.json"), allowedInstruments: ["mc-newton-xyz-stage", "lab-camera"] };
+	const spec = {
+		...loadSpec("hardware-spec.json"),
+		resources: [
+			{ id: "mc-newton-xyz-stage", kind: "instrument" as const, role: "stage" },
+			{ id: "lab-camera", kind: "instrument" as const, role: "camera" },
+		],
+	};
 	const result = validatePolicy(spec, getLabState(), { toolName: "run_experiment" });
 	assert.equal(result.valid, false);
-	assert.ok(result.issues.some((issue) => issue.path === "allowedInstruments"));
+	assert.ok(result.issues.some((issue) => issue.path === "resources"));
 });
 
 test("policy rejects hardware spec exceeding the 4-point pilot cap", () => {
 	const spec = loadSpec("hardware-spec.json");
-	const overPoints = [...(spec.points ?? []), { xUm: 20, yUm: 20, zUm: 0 }];
-	const result = validatePolicy({ ...spec, points: overPoints }, getLabState(), { toolName: "run_experiment" });
+	const overPoints = spec.plan.kind === "points" ? [...spec.plan.points, { xUm: 20, yUm: 20, zUm: 0 }] : [];
+	const result = validatePolicy({ ...spec, plan: { kind: "points", points: overPoints } }, getLabState(), {
+		toolName: "run_experiment",
+	});
 	assert.equal(result.valid, false);
-	assert.ok(result.issues.some((issue) => issue.path === "points"));
+	assert.ok(result.issues.some((issue) => issue.path === "plan.points"));
 });
 
 test("policy accepts the canonical hardware pilot spec", () => {
@@ -169,7 +179,7 @@ test("hardware kernel completes all points with the memory adapter", () => {
 			nowMs: () => 1_000,
 		});
 		assert.equal(run.summary.status, "completed");
-		assert.equal(run.summary.completedPoints, 4);
+		assert.equal(run.summary.completedUnits, 4);
 		assert.equal(run.summary.stopConditionMet, false);
 		assert.deepEqual(run.points.at(-1)?.positionAfter, { xUm: 0, yUm: 10, zUm: 0 });
 	} finally {
@@ -199,7 +209,7 @@ test("hardware kernel aborts when a pre-existing abort intent is present", () =>
 			nowMs: () => 1_000,
 		});
 		assert.equal(run.summary.status, "aborted");
-		assert.equal(run.summary.completedPoints, 0);
+		assert.equal(run.summary.completedUnits, 0);
 		assert.equal(stage.stopped, true);
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
@@ -294,6 +304,8 @@ test("run_experiment completes a gated hardware run end to end with the memory a
 		assert.match(runId, /^hw-run-/);
 		const summary = readFileSync(join(cwd, ".pi", "experiment-runs", "runs", runId, "summary.json"), "utf-8");
 		assert.match(summary, /"status": "completed"/);
+		const runRecord = readFileSync(join(cwd, ".pi", "experiment-runs", "runs", runId, "run.json"), "utf-8");
+		assert.match(runRecord, /"specHash"/);
 		const approvals = readFileSync(join(cwd, ".pi", "experiment-runs", "runs", runId, "approvals.jsonl"), "utf-8");
 		assert.match(approvals, /hardware_approval_recorded/);
 	} finally {
@@ -304,4 +316,3 @@ test("run_experiment completes a gated hardware run end to end with the memory a
 test("specs that differ only in mode and approval hash identically", () => {
 	assert.equal(hashExperimentSpec(loadSpec("hardware-spec.json")), hashExperimentSpec(loadSpec("hardware-dry-run-spec.json")));
 });
-

@@ -2,7 +2,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { EXPERIMENT_RESEARCH_PROMPT } from "./prompt.ts";
 import type { ToolResult } from "./schemas.ts";
 import { analyzeRunTool } from "./tools/analyze-run.ts";
+import { getExperimentStateTool } from "./tools/experiment-state.ts";
 import { getLabStateTool } from "./tools/lab-state.ts";
+import { advanceRunTool, pollRunTool, startRunTool } from "./tools/lifecycle.ts";
 import { abortRunTool, pauseRunTool, requestOperatorTool } from "./tools/operator.ts";
 import { planNextExperimentTool } from "./tools/plan-next.ts";
 import { runPreflightTool } from "./tools/preflight.ts";
@@ -11,9 +13,13 @@ import { validateExperimentSpecTool } from "./tools/validate-spec.ts";
 
 const PLANNER_TOOL_NAMES = [
 	"get_lab_state",
+	"get_experiment_state",
 	"validate_experiment_spec",
 	"run_preflight",
 	"run_experiment",
+	"start_run",
+	"advance_run",
+	"poll_run",
 	"analyze_run",
 	"plan_next_experiment",
 ];
@@ -44,9 +50,13 @@ function isExperimentToolResult(value: unknown): value is ToolResult {
 
 export default function experimentResearchExtension(pi: ExtensionAPI) {
 	pi.registerTool(getLabStateTool);
+	pi.registerTool(getExperimentStateTool);
 	pi.registerTool(validateExperimentSpecTool);
 	pi.registerTool(runPreflightTool);
 	pi.registerTool(runExperimentTool);
+	pi.registerTool(startRunTool);
+	pi.registerTool(advanceRunTool);
+	pi.registerTool(pollRunTool);
 	pi.registerTool(analyzeRunTool);
 	pi.registerTool(planNextExperimentTool);
 	pi.registerTool(pauseRunTool);
@@ -78,6 +88,13 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 			const mode = getSpecMode(event.input);
 			if (mode !== undefined && mode !== "simulation" && mode !== "hardware") {
 				return { block: true, reason: "run_experiment accepts simulation or approved hardware mode only." };
+			}
+		}
+
+		if (event.toolName === "start_run") {
+			const mode = getSpecMode(event.input);
+			if (mode !== undefined && mode !== "simulation") {
+				return { block: true, reason: "start_run accepts simulation specs only; use run_experiment for approved hardware pilots." };
 			}
 		}
 	});

@@ -1,5 +1,6 @@
 import type { Capabilities } from "./capabilities.ts";
 import type { ExperimentSpec, ValidationIssue } from "./schemas.ts";
+import { getInstrumentResourceIds } from "./spec-utils.ts";
 
 export interface AdapterProbe {
 	instrumentId: string;
@@ -47,7 +48,7 @@ function createAdapterProbe(instrumentId: string, capabilities: Capabilities): A
 export function probeLiveState(spec: ExperimentSpec, capabilities: Capabilities): LiveStateProbeResult {
 	const probe: LiveStateProbe = {
 		mode: "dry_run",
-		adapters: spec.allowedInstruments.map((instrumentId) => createAdapterProbe(instrumentId, capabilities)),
+		adapters: getInstrumentResourceIds(spec).map((instrumentId) => createAdapterProbe(instrumentId, capabilities)),
 		outputDirectory: {
 			path: ".pi/experiment-runs/dry-run",
 			writable: true,
@@ -69,14 +70,14 @@ export function probeLiveState(spec: ExperimentSpec, capabilities: Capabilities)
 
 	for (const adapter of probe.adapters) {
 		if (!adapter.reachable) {
-			issues.push({ path: "allowedInstruments", message: `Adapter is not reachable: ${adapter.instrumentId}` });
+			issues.push({ path: "resources", message: `Adapter is not reachable: ${adapter.instrumentId}` });
 		}
 		if (!adapter.readOnly) {
-			issues.push({ path: "allowedInstruments", message: `Adapter is not read-only: ${adapter.instrumentId}` });
+			issues.push({ path: "resources", message: `Adapter is not read-only: ${adapter.instrumentId}` });
 		}
 		if (!adapter.calibrationAvailable) {
 			issues.push({
-				path: "allowedInstruments",
+				path: "resources",
 				message: `Calibration is not available: ${adapter.instrumentId}`,
 			});
 		}

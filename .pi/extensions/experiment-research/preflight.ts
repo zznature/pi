@@ -1,19 +1,21 @@
 import type { Capabilities } from "./capabilities.ts";
 import type { LabState } from "./lab-state.ts";
 import { probeLiveState, type LiveStateProbe } from "./live-state.ts";
-import { getExperimentPoints } from "./spec-utils.ts";
+import { getInstrumentResourceIds, getUnitCount } from "./spec-utils.ts";
 import type { ExperimentSpec, ValidationIssue } from "./schemas.ts";
 
 export interface PreflightResult {
 	valid: boolean;
 	issues: ValidationIssue[];
-	pointCount: number;
+	unitCount: number;
 	estimatedRuntimeMinutes: number;
 	mode: ExperimentSpec["mode"];
+	specHash?: string;
+	capabilitySnapshotId?: string;
 	liveState?: LiveStateProbe;
 	plannedRun: {
-		wouldVisitPoints: number;
-		wouldUseInstruments: string[];
+		wouldVisitUnits: number;
+		wouldUseResources: string[];
 	};
 	willNotExecute: string[];
 	approvalRecord?: {
@@ -22,14 +24,14 @@ export interface PreflightResult {
 	};
 }
 
-function estimateRuntimeMinutes(spec: ExperimentSpec, pointCount: number): number {
-	const exposureMinutes = (spec.limits.acquisition.maxExposureMs * pointCount) / 60_000;
+function estimateRuntimeMinutes(spec: ExperimentSpec, unitCount: number): number {
+	const exposureMinutes = (spec.limits.acquisition.maxExposureMs * unitCount) / 60_000;
 	return Number(exposureMinutes.toFixed(3));
 }
 
 export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labState: LabState): PreflightResult {
 	const issues: ValidationIssue[] = [];
-	const pointCount = getExperimentPoints(spec).length;
+	const unitCount = getUnitCount(spec);
 
 	if (spec.mode === "simulation" && !capabilities.instruments.some((instrument) => instrument.simulationAvailable)) {
 		issues.push({ path: "capabilities.instruments", message: "No simulation instruments are available" });
@@ -43,7 +45,7 @@ export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labS
 		issues.push({ path: "labState.activeRunId", message: "A run is already active" });
 	}
 
-	const estimatedRuntimeMinutes = estimateRuntimeMinutes(spec, pointCount);
+	const estimatedRuntimeMinutes = estimateRuntimeMinutes(spec, unitCount);
 	if (estimatedRuntimeMinutes > spec.stoppingRules.maxRuntimeMinutes) {
 		issues.push({ path: "stoppingRules.maxRuntimeMinutes", message: "Estimated runtime exceeds maxRuntimeMinutes" });
 	}
@@ -55,13 +57,13 @@ export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labS
 	return {
 		valid: issues.length === 0,
 		issues,
-		pointCount,
+		unitCount,
 		estimatedRuntimeMinutes,
 		mode: spec.mode,
 		liveState: liveState?.probe,
 		plannedRun: {
-			wouldVisitPoints: pointCount,
-			wouldUseInstruments: spec.allowedInstruments,
+			wouldVisitUnits: unitCount,
+			wouldUseResources: getInstrumentResourceIds(spec),
 		},
 		willNotExecute:
 			spec.mode === "dry_run"

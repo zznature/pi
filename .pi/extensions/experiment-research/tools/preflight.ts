@@ -9,8 +9,8 @@ export const runPreflightTool = {
 	promptSnippet: "Check whether a simulation, dry-run, or hardware ExperimentSpec is ready",
 	promptGuidelines: ["Use run_preflight after validate_experiment_spec succeeds and before run_experiment."],
 	parameters: RunPreflightParamsSchema,
-	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-		const result = dispatch("run_preflight", params, { cwd: ctx.cwd });
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		const result = dispatch("run_preflight", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return {
 			content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
 			details: result,

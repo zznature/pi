@@ -14,11 +14,17 @@ export interface HardwarePointRecord extends ExperimentPoint {
 
 export interface HardwareSummary {
 	runId: string;
+	experimentId: string;
 	mode: "hardware";
-	sampleId: string;
+	subjectId: string;
 	objective: string;
-	pointCount: number;
-	completedPoints: number;
+	unitCount: number;
+	completedUnits: number;
+	progress: {
+		completedUnits: number;
+		totalUnits: number;
+		unitKind: "point";
+	};
 	status: "completed" | "paused" | "aborted" | "error";
 	stopConditionMet: boolean;
 	stopReason?: string;
@@ -39,6 +45,7 @@ export interface HardwareKernelOptions {
 	eventsPath: string;
 	startPointIndex?: number;
 	nowMs?: () => number;
+	correlationId?: string;
 }
 
 function appendEvent(path: string, value: unknown): void {
@@ -56,11 +63,17 @@ function buildSummary(
 ): HardwareSummary {
 	return {
 		runId,
+		experimentId: spec.experimentId,
 		mode: "hardware",
-		sampleId: spec.sampleId,
+		subjectId: spec.subject.id,
 		objective: spec.objective,
-		pointCount: getExperimentPoints(spec).length,
-		completedPoints: points.filter((point) => point.status === "success").length,
+		unitCount: getExperimentPoints(spec).length,
+		completedUnits: points.filter((point) => point.status === "success").length,
+		progress: {
+			completedUnits: points.filter((point) => point.status === "success").length,
+			totalUnits: getExperimentPoints(spec).length,
+			unitKind: "point",
+		},
 		status,
 		stopConditionMet: status !== "completed",
 		stopReason,
@@ -68,22 +81,34 @@ function buildSummary(
 	};
 }
 
+function statusForWatchdogIntent(intent: "pause" | "abort" | "request_operator"): HardwareSummary["status"] {
+	return intent === "abort" ? "aborted" : "paused";
+}
+
 export function runHardwarePilotKernel(spec: ExperimentSpec, options: HardwareKernelOptions): HardwareRun {
 	const points = getExperimentPoints(spec);
 	const records: HardwarePointRecord[] = [];
 	const startPointIndex = options.startPointIndex ?? 0;
+	const correlationId = options.correlationId ?? options.runId;
+	let sequence = 2;
 	let consecutiveErrors = 0;
 	let lastHeartbeatMs = options.nowMs?.() ?? Date.now();
 	let status: HardwareSummary["status"] = "completed";
 	let stopReason: string | undefined;
 
 	appendEvent(options.eventsPath, {
-		type: "hardware_run_started",
+		schemaVersion: "1",
+		sequence,
+		type: "run_started",
+		experimentId: spec.experimentId,
 		runId: options.runId,
-		pointCount: points.length,
+		correlationId,
+		timestamp: new Date(options.nowMs?.() ?? Date.now()).toISOString(),
+		unitCount: points.length,
 		stageAdapter: options.pilot.stageAdapter,
 		operatorOnlyMonitoring: options.pilot.approval.operatorOnlyMonitoring === true,
 	});
+	sequence += 1;
 
 	for (const point of points) {
 		if (point.index < startPointIndex) {
@@ -98,17 +123,44 @@ export function runHardwarePilotKernel(spec: ExperimentSpec, options: HardwareKe
 			consecutiveErrors,
 			maxConsecutiveErrors: options.pilot.maxConsecutiveErrors,
 			intentsPath: options.pilot.intentsPath,
+			budgetGuard: {
+				completedUnits: records.filter((record) => record.status === "success").length,
+				maxUnits: spec.stoppingRules.maxUnits,
+				pauseAtRatio: 1,
+			},
 		});
-		if (beforeDecision.intent === "pause" || beforeDecision.intent === "abort") {
+		if (beforeDecision.intent !== "none") {
 			options.stage.stop();
-			status = beforeDecision.intent === "pause" ? "paused" : "aborted";
+			status = statusForWatchdogIntent(beforeDecision.intent);
 			stopReason = beforeDecision.reason;
-			appendEvent(options.eventsPath, { type: "hardware_run_stopped", runId: options.runId, status, stopReason });
+			appendEvent(options.eventsPath, {
+				schemaVersion: "1",
+				sequence,
+				type: "run_stopped",
+				experimentId: spec.experimentId,
+				runId: options.runId,
+				correlationId,
+				timestamp: new Date(options.nowMs?.() ?? Date.now()).toISOString(),
+				status,
+				stopReason,
+			});
+			sequence += 1;
 			break;
 		}
 
 		try {
-			appendEvent(options.eventsPath, { type: "point_started", runId: options.runId, point });
+			appendEvent(options.eventsPath, {
+				schemaVersion: "1",
+				sequence,
+				type: "unit_started",
+				experimentId: spec.experimentId,
+				runId: options.runId,
+				correlationId,
+				timestamp: new Date(options.nowMs?.() ?? Date.now()).toISOString(),
+				unitKind: "point",
+				unit: point,
+			});
+			sequence += 1;
 			const visit = options.stage.visitPoint(point, options.pilot.settleTimeoutMs);
 			const record: HardwarePointRecord = {
 				...point,
@@ -119,13 +171,35 @@ export function runHardwarePilotKernel(spec: ExperimentSpec, options: HardwareKe
 			records.push(record);
 			consecutiveErrors = 0;
 			lastHeartbeatMs = options.nowMs?.() ?? Date.now();
-			appendEvent(options.eventsPath, { type: "point_completed", runId: options.runId, point: record });
+			appendEvent(options.eventsPath, {
+				schemaVersion: "1",
+				sequence,
+				type: "unit_completed",
+				experimentId: spec.experimentId,
+				runId: options.runId,
+				correlationId,
+				timestamp: new Date(options.nowMs?.() ?? Date.now()).toISOString(),
+				unitKind: "point",
+				unit: record,
+			});
+			sequence += 1;
 		} catch (error) {
 			consecutiveErrors += 1;
 			const message = error instanceof Error ? error.message : String(error);
 			const record: HardwarePointRecord = { ...point, status: "error", error: message };
 			records.push(record);
-			appendEvent(options.eventsPath, { type: "point_error", runId: options.runId, point: record });
+			appendEvent(options.eventsPath, {
+				schemaVersion: "1",
+				sequence,
+				type: "unit_error",
+				experimentId: spec.experimentId,
+				runId: options.runId,
+				correlationId,
+				timestamp: new Date(options.nowMs?.() ?? Date.now()).toISOString(),
+				unitKind: "point",
+				unit: record,
+			});
+			sequence += 1;
 			const errorDecision = evaluateWatchdog({
 				nowMs: options.nowMs?.() ?? Date.now(),
 				lastHeartbeatMs,
@@ -133,12 +207,28 @@ export function runHardwarePilotKernel(spec: ExperimentSpec, options: HardwareKe
 				consecutiveErrors,
 				maxConsecutiveErrors: options.pilot.maxConsecutiveErrors,
 				intentsPath: options.pilot.intentsPath,
+				budgetGuard: {
+					completedUnits: records.filter((record) => record.status === "success").length,
+					maxUnits: spec.stoppingRules.maxUnits,
+					pauseAtRatio: 1,
+				},
 			});
 			if (errorDecision.intent !== "none" || spec.stoppingRules.stopOnError) {
 				options.stage.stop();
-				status = errorDecision.intent === "pause" ? "paused" : "aborted";
+				status = errorDecision.intent === "none" ? "aborted" : statusForWatchdogIntent(errorDecision.intent);
 				stopReason = errorDecision.reason ?? "point error";
-				appendEvent(options.eventsPath, { type: "hardware_run_stopped", runId: options.runId, status, stopReason });
+				appendEvent(options.eventsPath, {
+					schemaVersion: "1",
+					sequence,
+					type: "run_stopped",
+					experimentId: spec.experimentId,
+					runId: options.runId,
+					correlationId,
+					timestamp: new Date(options.nowMs?.() ?? Date.now()).toISOString(),
+					status,
+					stopReason,
+				});
+				sequence += 1;
 				break;
 			}
 		}
@@ -153,6 +243,15 @@ export function runHardwarePilotKernel(spec: ExperimentSpec, options: HardwareKe
 		stopReason,
 		options.pilot.approval.operatorOnlyMonitoring === true,
 	);
-	appendEvent(options.eventsPath, { type: "hardware_run_summary", runId: options.runId, summary });
+	appendEvent(options.eventsPath, {
+		schemaVersion: "1",
+		sequence,
+		type: "run_summary",
+		experimentId: spec.experimentId,
+		runId: options.runId,
+		correlationId,
+		timestamp: new Date(options.nowMs?.() ?? Date.now()).toISOString(),
+		summary,
+	});
 	return { runId: options.runId, spec, points: records, summary };
 }

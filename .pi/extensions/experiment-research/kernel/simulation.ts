@@ -9,10 +9,16 @@ export interface SimulationPointRecord extends ExperimentPoint {
 
 export interface SimulationSummary {
 	runId: string;
+	experimentId: string;
 	mode: "simulation";
-	sampleId: string;
+	subjectId: string;
 	objective: string;
-	pointCount: number;
+	unitCount: number;
+	progress: {
+		completedUnits: number;
+		totalUnits: number;
+		unitKind: "point";
+	};
 	meanSignal: number;
 	maxSignal: number;
 	minSignal: number;
@@ -26,15 +32,7 @@ export interface SimulationRun {
 	summary: SimulationSummary;
 }
 
-let nextRunNumber = 1;
-
-function nextRunId(): string {
-	const id = `sim-run-${String(nextRunNumber).padStart(4, "0")}`;
-	nextRunNumber += 1;
-	return id;
-}
-
-function simulatePoint(point: ExperimentPoint): SimulationPointRecord {
+export function simulatePoint(point: ExperimentPoint): SimulationPointRecord {
 	const signal = 100 + point.xUm * 0.1 + point.yUm * 0.2 + point.index;
 	const focusScore = 0.9 - point.index * 0.001;
 	return {
@@ -51,10 +49,16 @@ function summarizeRun(runId: string, spec: ExperimentSpec, points: SimulationPoi
 
 	return {
 		runId,
+		experimentId: spec.experimentId,
 		mode: "simulation",
-		sampleId: spec.sampleId,
+		subjectId: spec.subject.id,
 		objective: spec.objective,
-		pointCount: points.length,
+		unitCount: points.length,
+		progress: {
+			completedUnits: points.length,
+			totalUnits: points.length,
+			unitKind: "point",
+		},
 		meanSignal: Number((totalSignal / points.length).toFixed(3)),
 		maxSignal: Math.max(...signals),
 		minSignal: Math.min(...signals),
@@ -62,8 +66,7 @@ function summarizeRun(runId: string, spec: ExperimentSpec, points: SimulationPoi
 	};
 }
 
-export function runSimulation(spec: ExperimentSpec): SimulationRun {
-	const runId = nextRunId();
+export function runSimulation(runId: string, spec: ExperimentSpec): SimulationRun {
 	const points = getExperimentPoints(spec).map(simulatePoint);
 	const summary = summarizeRun(runId, spec, points);
 	return { runId, spec, points, summary };

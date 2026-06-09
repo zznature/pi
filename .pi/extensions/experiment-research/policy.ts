@@ -1,6 +1,6 @@
 import type { Capabilities } from "./capabilities.ts";
 import type { LabState } from "./lab-state.ts";
-import { getExperimentPoints } from "./spec-utils.ts";
+import { getExperimentPoints, getInstrumentResourceIds } from "./spec-utils.ts";
 import type { ExperimentSpec, ValidationIssue } from "./schemas.ts";
 
 export interface PolicyContext {
@@ -24,20 +24,20 @@ function validateInstrumentAvailability(spec: ExperimentSpec, capabilities: Capa
 	const issues: ValidationIssue[] = [];
 	const instruments = new Map(capabilities.instruments.map((instrument) => [instrument.id, instrument]));
 
-	for (const instrumentId of spec.allowedInstruments) {
+	for (const instrumentId of getInstrumentResourceIds(spec)) {
 		const instrument = instruments.get(instrumentId);
 		if (!instrument) {
-			issues.push(issue("allowedInstruments", `Unknown instrument: ${instrumentId}`));
+			issues.push(issue("resources", `Unknown instrument resource: ${instrumentId}`));
 			continue;
 		}
 		if (spec.mode === "simulation" && !instrument.simulationAvailable) {
-			issues.push(issue("allowedInstruments", `Instrument is not available in simulation: ${instrumentId}`));
+			issues.push(issue("resources", `Instrument is not available in simulation: ${instrumentId}`));
 		}
 		if (spec.mode === "dry_run" && !instrument.dryRunAvailable) {
-			issues.push(issue("allowedInstruments", `Instrument is not available in dry run: ${instrumentId}`));
+			issues.push(issue("resources", `Instrument is not available in dry run: ${instrumentId}`));
 		}
 		if (spec.mode === "hardware" && !instrument.hardwarePilotAvailable) {
-			issues.push(issue("allowedInstruments", `Instrument is not available in Phase 4 hardware pilot: ${instrumentId}`));
+			issues.push(issue("resources", `Instrument is not available in Phase 4 hardware pilot: ${instrumentId}`));
 		}
 	}
 
@@ -48,14 +48,15 @@ function validateHardwarePilotScope(spec: ExperimentSpec): ValidationIssue[] {
 	const issues: ValidationIssue[] = [];
 
 	if (spec.mode !== "hardware") return issues;
-	if (spec.allowedInstruments.length !== 1 || spec.allowedInstruments[0] !== "mc-newton-xyz-stage") {
-		issues.push(issue("allowedInstruments", "Phase 4 hardware pilot only supports mc-newton-xyz-stage"));
+	const instrumentIds = getInstrumentResourceIds(spec);
+	if (instrumentIds.length !== 1 || instrumentIds[0] !== "mc-newton-xyz-stage") {
+		issues.push(issue("resources", "Phase 4 hardware pilot only supports mc-newton-xyz-stage"));
 	}
-	if (!spec.points) {
-		issues.push(issue("points", "Phase 4 hardware pilot requires explicit points and does not accept grids"));
+	if (spec.plan.kind !== "points") {
+		issues.push(issue("plan", "Phase 4 hardware pilot requires explicit points and does not accept grids"));
 	}
 	if (getExperimentPoints(spec).length > 4) {
-		issues.push(issue("points", "Phase 4 hardware pilot is limited to 4 points"));
+		issues.push(issue("plan.points", "Phase 4 hardware pilot is limited to 4 points"));
 	}
 	if (!spec.limits.motion.zUm) {
 		issues.push(issue("limits.motion.zUm", "Phase 4 hardware pilot requires explicit zUm limits"));
@@ -68,12 +69,12 @@ function validatePointLimits(spec: ExperimentSpec): ValidationIssue[] {
 	const issues: ValidationIssue[] = [];
 	const points = getExperimentPoints(spec);
 
-	if (points.length > spec.limits.acquisition.maxPoints) {
-		issues.push(issue("limits.acquisition.maxPoints", "Experiment point count exceeds acquisition maxPoints"));
+	if (points.length > spec.limits.acquisition.maxUnits) {
+		issues.push(issue("limits.acquisition.maxUnits", "Experiment unit count exceeds acquisition maxUnits"));
 	}
 
-	if (points.length > spec.stoppingRules.maxPoints) {
-		issues.push(issue("stoppingRules.maxPoints", "Experiment point count exceeds stoppingRules maxPoints"));
+	if (points.length > spec.stoppingRules.maxUnits) {
+		issues.push(issue("stoppingRules.maxUnits", "Experiment unit count exceeds stoppingRules maxUnits"));
 	}
 
 	for (const point of points) {
@@ -120,8 +121,13 @@ export function validatePolicy(
 		issues.push(issue("operatorApprovalRequired", "Simulation and dry-run checks must not require approval"));
 	}
 
-	if (labState.mode !== "simulation") {
-		issues.push(issue("labState.mode", "Lab state must be in simulation mode"));
+	if (labState.activeRunId !== null) {
+		issues.push(
+			issue(
+				"labState.activeRunId",
+				`Another run (${labState.activeRunId}) is ${labState.mode}; abort or resume it before starting a new run.`,
+			),
+		);
 	}
 
 	issues.push(...validateInstrumentAvailability(spec, labState.capabilities));

@@ -12,7 +12,7 @@ function createLabStateResult(state: LabState): ToolResult {
 		],
 		artifacts: [],
 		commandId: "get-lab-state",
-		stateBefore: null,
+		correlationId: "get-lab-state",
 		stateAfter: state,
 		stopConditionMet: false,
 	};
@@ -27,8 +27,8 @@ export const getLabStateTool = {
 		"Use get_lab_state before planning an experiment when current lab capabilities or mode matter.",
 	],
 	parameters: EmptyParamsSchema,
-	async execute() {
-		const result = createLabStateResult(getLabState());
+	async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+		const result = createLabStateResult(getLabState(ctx.cwd));
 		return {
 			content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
 			details: result,

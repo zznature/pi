@@ -12,8 +12,8 @@ export const runExperimentTool = {
 		"For hardware specs, require a matching dry-run preflight report and explicit operator approval.",
 	],
 	parameters: RunExperimentParamsSchema,
-	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-		const result = dispatch("run_experiment", params, { cwd: ctx.cwd });
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		const result = dispatch("run_experiment", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return {
 			content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
 			details: result,
