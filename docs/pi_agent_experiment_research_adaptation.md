@@ -38,7 +38,7 @@ pi-agent 改造成实时仪器控制程序，而是把 pi-agent 作为实验研�
                                v
 +--------------------------------------------------------------+
 | experiment management extension                              |
-| prompt | schemas | thin dispatch | policy | run store | records |
+|prompt | schemas | thin dispatch | policy | run store | records|
 +------------------------------+-------------------------------+
                                |
                                v
