@@ -1,8 +1,17 @@
 {
-	"objective": "Phase 4 hardware pilot: visit a few calibrated stage positions on the MC.Newton XYZ stage.",
-	"sampleId": "LAB-HW-001",
+	"schemaVersion": "1",
+	"experimentId": "exp-hw-001",
+	"specId": "spec-hw-001",
+	"experimentType": "spatial_mapping",
+	"objective": "Gated stage hardware check: visit a few calibrated positions on the MC.Newton XYZ stage.",
+	"subject": {
+		"id": "LAB-HW-001",
+		"kind": "calibration_sample"
+	},
 	"mode": "dry_run",
-	"allowedInstruments": ["mc-newton-xyz-stage"],
+	"resources": [
+		{ "id": "mc-newton-xyz-stage", "kind": "instrument", "role": "stage" }
+	],
 	"limits": {
 		"motion": {
 			"xUm": { "minUm": 0, "maxUm": 100 },
@@ -14,18 +23,21 @@
 		},
 		"acquisition": {
 			"maxExposureMs": 100,
-			"maxPoints": 4
+			"maxUnits": 4
 		}
 	},
-	"points": [
-		{ "xUm": 0, "yUm": 0, "zUm": 0 },
-		{ "xUm": 10, "yUm": 0, "zUm": 0 },
-		{ "xUm": 10, "yUm": 10, "zUm": 0 },
-		{ "xUm": 0, "yUm": 10, "zUm": 0 }
-	],
+	"plan": {
+		"kind": "points",
+		"points": [
+			{ "xUm": 0, "yUm": 0, "zUm": 0 },
+			{ "xUm": 10, "yUm": 0, "zUm": 0 },
+			{ "xUm": 10, "yUm": 10, "zUm": 0 },
+			{ "xUm": 0, "yUm": 10, "zUm": 0 }
+		]
+	},
 	"stoppingRules": {
 		"maxRuntimeMinutes": 5,
-		"maxPoints": 4,
+		"maxUnits": 4,
 		"stopOnError": true
 	},
 	"operatorApprovalRequired": false

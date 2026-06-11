@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { dispatch } from "../../../.pi/extensions/experiment-research/dispatch.ts";
 import experimentResearchExtension from "../../../.pi/extensions/experiment-research/index.ts";
-import { validateExperimentSpec } from "../../../.pi/extensions/experiment-research/schemas.ts";
+import { hashExperimentSpec } from "../../../.pi/extensions/experiment-research/records.ts";
+import { type ExperimentSpec, validateExperimentSpec } from "../../../.pi/extensions/experiment-research/schemas.ts";
 import type {
 	CustomToolCallEvent,
 	CustomToolResultEvent,
@@ -27,11 +28,17 @@ interface CapturedExtension {
 	messages: CapturedMessage[];
 }
 
+interface CapturedMessageOptions {
+	triggerTurn?: boolean;
+	deliverAs?: "steer" | "followUp" | "nextTurn";
+}
+
 interface CapturedMessage {
 	customType: string;
 	content?: unknown;
 	display?: boolean;
 	details?: unknown;
+	options?: CapturedMessageOptions;
 }
 
 function readFixture(name: string): unknown {
@@ -58,8 +65,8 @@ function loadExperimentExtension(): CapturedExtension {
 		setActiveTools(toolNames: string[]) {
 			activeTools = toolNames;
 		},
-		sendMessage(message: CapturedMessage) {
-			messages.push(message);
+		sendMessage(message: CapturedMessage, options?: CapturedMessageOptions) {
+			messages.push({ ...message, options });
 		},
 	} as unknown as ExtensionAPI;
 
@@ -90,25 +97,32 @@ async function withTempCwd<T>(fn: (cwd: string) => Promise<T>): Promise<T> {
 }
 
 describe("experiment research extension", () => {
-	it("loads the project-local extension module and registers Phase 2 and Phase 3 tools", async () => {
+	it("loads the project-local extension module and registers experiment management tools", async () => {
 		const extension = loadExperimentExtension();
 		const [beforeAgentStart] = extension.handlers.get("before_agent_start") ?? [];
 		const [sessionStart] = extension.handlers.get("session_start") ?? [];
 
 		expect(extension.tools.has("get_lab_state")).toBe(true);
+		expect(extension.tools.has("get_experiment_state")).toBe(true);
 		expect(extension.tools.has("validate_experiment_spec")).toBe(true);
 		expect(extension.tools.has("run_preflight")).toBe(true);
 		expect(extension.tools.has("run_experiment")).toBe(true);
 		expect(extension.tools.has("analyze_run")).toBe(true);
 		expect(extension.tools.has("plan_next_experiment")).toBe(true);
 		expect(extension.handlers.get("session_start")).toHaveLength(1);
+		expect(extension.handlers.get("session_before_compact")).toHaveLength(1);
+		expect(extension.handlers.get("session_shutdown")).toHaveLength(1);
 		expect(extension.handlers.get("before_agent_start")).toHaveLength(1);
+		for (const tool of extension.tools.values()) {
+			expect(tool.executionMode).toBe("sequential");
+		}
 
 		await sessionStart?.({ type: "session_start", sessionId: "test-session" }, {} as ExtensionContext);
 		expect(extension.getActiveTools()).toEqual(
 			expect.arrayContaining([
 				"read",
 				"get_lab_state",
+				"get_experiment_state",
 				"validate_experiment_spec",
 				"run_preflight",
 				"run_experiment",
@@ -142,7 +156,7 @@ describe("experiment research extension", () => {
 		expect(invalid.valid).toBe(false);
 		if (!invalid.valid) {
 			expect(invalid.issues.map((issue) => issue.path)).toEqual(
-				expect.arrayContaining(["objective", "sampleId", "mode", "allowedInstruments", "root"]),
+				expect.arrayContaining(["experimentId", "specId", "objective", "subject.id", "mode", "plan"]),
 			);
 		}
 	});
@@ -190,7 +204,7 @@ describe("experiment research extension", () => {
 			const preflightDetails = asRecord(preflight?.details);
 			const preflightState = asRecord(preflightDetails.stateAfter);
 			expect(preflightDetails.status).toBe("success");
-			expect(preflightState.pointCount).toBe(9);
+			expect(preflightState.unitCount).toBe(9);
 
 			const run = await extension.tools
 				.get("run_experiment")
@@ -202,14 +216,19 @@ describe("experiment research extension", () => {
 			const runId = asString(runDetails.runId);
 			expect(runDetails.status).toBe("success");
 			expect(runId).toMatch(/^sim-run-/);
-			expect(runSummary.pointCount).toBe(9);
+			expect(runSummary.unitCount).toBe(9);
 			expect(runSummary.meanSignal).toBe(107);
+			expect(runDetails.experimentId).toBe("exp-sim-001");
+			expect(existsSync(asString(records.runJsonPath))).toBe(true);
 			expect(existsSync(asString(records.specPath))).toBe(true);
+			expect(existsSync(asString(records.capabilitiesSnapshotPath))).toBe(true);
 			expect(existsSync(asString(records.summaryPath))).toBe(true);
 			expect(existsSync(asString(records.artifactsPath))).toBe(true);
 			const eventsPath = asString(records.eventsPath);
 			expect(existsSync(eventsPath)).toBe(true);
-			expect(readFileSync(eventsPath, "utf-8")).toContain('"point_completed"');
+			const events = readFileSync(eventsPath, "utf-8");
+			expect(events).toContain('"run_reserved"');
+			expect(events).toContain('"unit_completed"');
 
 			const analysis = await extension.tools
 				.get("analyze_run")
@@ -217,9 +236,12 @@ describe("experiment research extension", () => {
 			const analysisDetails = asRecord(analysis?.details);
 			const analysisState = asRecord(analysisDetails.stateAfter);
 			const analysisSummary = asRecord(analysisState.summary);
+			const analysisResult = asRecord(analysisState.analysis);
+			const qualityMetrics = asRecord(analysisResult.qualityMetrics);
 			expect(analysisDetails.status).toBe("success");
 			expect(analysisSummary.runId).toBe(runId);
 			expect(analysisSummary.meanSignal).toBe(107);
+			expect(qualityMetrics.unitCount).toBe(9);
 
 			const nextPlan = await extension.tools
 				.get("plan_next_experiment")
@@ -234,7 +256,16 @@ describe("experiment research extension", () => {
 			const nextPlanState = asRecord(nextPlanDetails.stateAfter);
 			expect(nextPlanDetails.status).toBe("success");
 			expect(nextPlanState.runId).toBe(runId);
-			expect(nextPlanState.strategy).toBe("increase_resolution");
+			expect(nextPlanState.strategy).toBe("refine_region");
+			expect(existsSync(asString(nextPlanState.lineagePath))).toBe(true);
+
+			const experimentState = await extension.tools
+				.get("get_experiment_state")
+				?.execute("experiment-state", { experimentId: "exp-sim-001" }, undefined, undefined, context);
+			const experimentDetails = asRecord(experimentState?.details);
+			const experimentAfter = asRecord(experimentDetails.stateAfter);
+			expect(experimentDetails.status).toBe("success");
+			expect(experimentAfter.runs).toHaveLength(1);
 		});
 	});
 
@@ -256,8 +287,10 @@ describe("experiment research extension", () => {
 
 			expect(preflightDetails.status).toBe("success");
 			expect(preflightState.mode).toBe("dry_run");
-			expect(preflightState.pointCount).toBe(4);
-			expect(plannedRun.wouldVisitPoints).toBe(4);
+			expect(preflightState.unitCount).toBe(4);
+			expect(preflightState.specHash).toEqual(expect.any(String));
+			expect(preflightState.capabilitySnapshotId).toEqual(expect.any(String));
+			expect(plannedRun.wouldVisitUnits).toBe(4);
 			expect(liveState.mode).toBe("dry_run");
 			expect(approvalRecord.path).toBe(".pi/experiment-runs/approvals.jsonl");
 			expect(existsSync(asString(records.reportPath))).toBe(true);
@@ -309,7 +342,7 @@ describe("experiment research extension", () => {
 			),
 		);
 		expect(dryRunExecutionResult.block).toBe(true);
-		expect(dryRunExecutionResult.reason).toContain("simulation mode");
+		expect(dryRunExecutionResult.reason).toContain("approved hardware mode");
 
 		const errorDetails = {
 			status: "error",
@@ -317,7 +350,7 @@ describe("experiment research extension", () => {
 			nextActions: ["Fix the reported schema issues."],
 			artifacts: [],
 			commandId: "phase2-test-error",
-			stateBefore: {},
+			correlationId: "phase2-test-error",
 			stateAfter: {},
 			errorCode: "invalid_experiment_spec",
 			retrySafe: true,
@@ -349,7 +382,7 @@ describe("experiment research extension", () => {
 			artifacts: [],
 			runId: "sim-run-test",
 			commandId: "phase2-test-success",
-			stateBefore: {},
+			correlationId: "phase2-test-success",
 			stateAfter: { summary: { runId: "sim-run-test" } },
 			stopConditionMet: false,
 		};
@@ -369,6 +402,121 @@ describe("experiment research extension", () => {
 		expect(extension.messages).toHaveLength(1);
 		expect(extension.messages[0]?.customType).toBe("experiment-run-summary");
 		expect(extension.messages[0]?.content).toBe("Simulation run sim-run-test completed.");
+		expect(extension.messages[0]?.options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+
+		const hardwareStartDetails = {
+			...successDetails,
+			summary: "Raman hardware run hw-run-started started with 2 queued unit(s).",
+			runId: "hw-run-started",
+			stateAfter: { runState: { status: "running" } },
+		};
+		await toolResult?.(
+			{
+				type: "tool_result",
+				toolCallId: "hardware-start-call",
+				toolName: "run_experiment",
+				input: {},
+				content: [{ type: "text", text: "started" }],
+				isError: false,
+				details: hardwareStartDetails,
+			} satisfies CustomToolResultEvent,
+			context,
+		);
+		expect(extension.messages[1]?.customType).toBe("experiment-run-summary");
+		expect(extension.messages[1]?.options).toEqual({ triggerTurn: false, deliverAs: "followUp" });
+	});
+
+	it("wakes the agent when an async Raman hardware run reaches a terminal state", async () => {
+		process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE = "1";
+		await withTempCwd(async (cwd) => {
+			const extension = loadExperimentExtension();
+			const spec = readFixture("raman-hardware-spec.json");
+			const dryRun = dispatch(
+				"run_preflight",
+				{ spec: readFixture("raman-dry-run-spec.json") },
+				{ cwd, commandId: "watcher-preflight" },
+			);
+			const reportId = asString(asRecord(asRecord(dryRun.stateAfter).records).reportId);
+
+			const run = await extension.tools.get("run_experiment")?.execute(
+				"watcher-run",
+				{
+					spec,
+					hardwarePilot: {
+						stageAdapter: "memory",
+						raman: { acquisitionBackend: "fake" },
+						settleTimeoutMs: 100,
+						heartbeatTimeoutMs: 10_000,
+						maxConsecutiveErrors: 2,
+						approval: {
+							approvalId: "appr-watcher",
+							operator: "tester",
+							approved: true,
+							dryRunReportId: reportId,
+							ramanSafety: {
+								laserPowerConfirmed: true,
+								confirmedLaserPowerMw: 1,
+								labSpecWorkerReady: true,
+								windowsPowerPolicyReady: true,
+							},
+						},
+					},
+				},
+				undefined,
+				undefined,
+				{ cwd } as ExtensionContext,
+			);
+			const runId = asString(asRecord(run?.details).runId);
+			const deadline = Date.now() + 5_000;
+			while (
+				!extension.messages.some((message) => message.customType === "experiment-run-terminal") &&
+				Date.now() < deadline
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 25));
+			}
+			const terminal = extension.messages.find((message) => message.customType === "experiment-run-terminal");
+			expect(terminal).toBeDefined();
+			expect(terminal?.content).toContain(`Raman hardware run ${runId} reached completed`);
+			expect(terminal?.options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+			expect(asRecord(terminal?.details).runId).toBe(runId);
+
+			const [shutdown] = extension.handlers.get("session_shutdown") ?? [];
+			await shutdown?.({ type: "session_shutdown", reason: "quit" }, { cwd } as ExtensionContext);
+		});
+	});
+
+	it("adds experiment registry facts to custom compaction summaries", async () => {
+		await withTempCwd(async (cwd) => {
+			const extension = loadExperimentExtension();
+			const spec = readFixture("valid-spec.json");
+			const run = dispatch("run_experiment", { spec }, { cwd, commandId: "compact-run" });
+			const runId = asString(run.runId);
+			const [beforeCompact] = extension.handlers.get("session_before_compact") ?? [];
+			const result = asRecord(
+				await beforeCompact?.(
+					{
+						type: "session_before_compact",
+						preparation: {
+							firstKeptEntryId: "kept-entry",
+							tokensBefore: 123,
+							previousSummary: "previous work summary",
+						},
+						branchEntries: [],
+						signal: new AbortController().signal,
+					},
+					{ cwd } as ExtensionContext,
+				),
+			);
+			const compaction = asRecord(result.compaction);
+			expect(compaction.firstKeptEntryId).toBe("kept-entry");
+			expect(compaction.tokensBefore).toBe(123);
+			expect(compaction.summary).toContain("previous work summary");
+			expect(compaction.summary).toContain(`runId=${runId}`);
+			expect(compaction.summary).toContain(`specHash=${hashExperimentSpec(spec as ExperimentSpec)}`);
+			const details = asRecord(compaction.details);
+			expect(details.source).toBe("experiment-research");
+			expect(details.recentRunIds).toContain(runId);
+		});
 	});
 
 	it("returns normalized errors for policy rejection and invalid dispatch params", () => {

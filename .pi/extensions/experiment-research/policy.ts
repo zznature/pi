@@ -1,6 +1,6 @@
 import type { Capabilities } from "./capabilities.ts";
 import type { LabState } from "./lab-state.ts";
-import { getExperimentPoints } from "./spec-utils.ts";
+import { getExperimentPoints, getInstrumentResourceIds } from "./spec-utils.ts";
 import type { ExperimentSpec, ValidationIssue } from "./schemas.ts";
 
 export interface PolicyContext {
@@ -24,20 +24,20 @@ function validateInstrumentAvailability(spec: ExperimentSpec, capabilities: Capa
 	const issues: ValidationIssue[] = [];
 	const instruments = new Map(capabilities.instruments.map((instrument) => [instrument.id, instrument]));
 
-	for (const instrumentId of spec.allowedInstruments) {
+	for (const instrumentId of getInstrumentResourceIds(spec)) {
 		const instrument = instruments.get(instrumentId);
 		if (!instrument) {
-			issues.push(issue("allowedInstruments", `Unknown instrument: ${instrumentId}`));
+			issues.push(issue("resources", `Unknown instrument resource: ${instrumentId}`));
 			continue;
 		}
 		if (spec.mode === "simulation" && !instrument.simulationAvailable) {
-			issues.push(issue("allowedInstruments", `Instrument is not available in simulation: ${instrumentId}`));
+			issues.push(issue("resources", `Instrument is not available in simulation: ${instrumentId}`));
 		}
 		if (spec.mode === "dry_run" && !instrument.dryRunAvailable) {
-			issues.push(issue("allowedInstruments", `Instrument is not available in dry run: ${instrumentId}`));
+			issues.push(issue("resources", `Instrument is not available in dry run: ${instrumentId}`));
 		}
 		if (spec.mode === "hardware" && !instrument.hardwarePilotAvailable) {
-			issues.push(issue("allowedInstruments", `Instrument is not available in Phase 4 hardware pilot: ${instrumentId}`));
+			issues.push(issue("resources", `Instrument is not available for gated hardware execution: ${instrumentId}`));
 		}
 	}
 
@@ -48,17 +48,40 @@ function validateHardwarePilotScope(spec: ExperimentSpec): ValidationIssue[] {
 	const issues: ValidationIssue[] = [];
 
 	if (spec.mode !== "hardware") return issues;
-	if (spec.allowedInstruments.length !== 1 || spec.allowedInstruments[0] !== "mc-newton-xyz-stage") {
-		issues.push(issue("allowedInstruments", "Phase 4 hardware pilot only supports mc-newton-xyz-stage"));
+	const instrumentIds = getInstrumentResourceIds(spec);
+	const raman = spec.domain?.raman;
+	if (raman) {
+		const hasLabSpecWorkstation = spec.resources.some((resource) => resource.kind === "workspace" && resource.id === "labspec-workstation");
+		if (!instrumentIds.includes("mc-newton-xyz-stage")) {
+			issues.push(issue("resources", "Raman hardware runs require mc-newton-xyz-stage"));
+		}
+		if (!hasLabSpecWorkstation) {
+			issues.push(issue("resources", "Raman hardware runs require labspec-workstation workspace lease"));
+		}
+		if (raman.acquisition && !instrumentIds.includes("lab-acquirer")) {
+			issues.push(issue("resources", "Raman acquisition requires lab-acquirer"));
+		}
+		const requiresFrames = raman.autofocus?.enabled === true || raman.xyCorrection?.enabled === true;
+		if (requiresFrames && !instrumentIds.includes("lab-camera")) {
+			issues.push(issue("resources", "Raman autofocus or XY correction requires lab-camera"));
+		}
+		if (!spec.limits.motion.zUm) {
+			issues.push(issue("limits.motion.zUm", "Raman hardware runs require explicit zUm limits"));
+		}
+		return issues;
 	}
-	if (!spec.points) {
-		issues.push(issue("points", "Phase 4 hardware pilot requires explicit points and does not accept grids"));
+
+	if (instrumentIds.length !== 1 || instrumentIds[0] !== "mc-newton-xyz-stage") {
+		issues.push(issue("resources", "Non-Raman hardware execution only supports mc-newton-xyz-stage"));
+	}
+	if (spec.plan.kind !== "points") {
+		issues.push(issue("plan", "Non-Raman hardware execution requires explicit points and does not accept grids"));
 	}
 	if (getExperimentPoints(spec).length > 4) {
-		issues.push(issue("points", "Phase 4 hardware pilot is limited to 4 points"));
+		issues.push(issue("plan.points", "Non-Raman hardware execution is limited to 4 points"));
 	}
 	if (!spec.limits.motion.zUm) {
-		issues.push(issue("limits.motion.zUm", "Phase 4 hardware pilot requires explicit zUm limits"));
+		issues.push(issue("limits.motion.zUm", "Non-Raman hardware execution requires explicit zUm limits"));
 	}
 
 	return issues;
@@ -68,12 +91,12 @@ function validatePointLimits(spec: ExperimentSpec): ValidationIssue[] {
 	const issues: ValidationIssue[] = [];
 	const points = getExperimentPoints(spec);
 
-	if (points.length > spec.limits.acquisition.maxPoints) {
-		issues.push(issue("limits.acquisition.maxPoints", "Experiment point count exceeds acquisition maxPoints"));
+	if (points.length > spec.limits.acquisition.maxUnits) {
+		issues.push(issue("limits.acquisition.maxUnits", "Experiment unit count exceeds acquisition maxUnits"));
 	}
 
-	if (points.length > spec.stoppingRules.maxPoints) {
-		issues.push(issue("stoppingRules.maxPoints", "Experiment point count exceeds stoppingRules maxPoints"));
+	if (points.length > spec.stoppingRules.maxUnits) {
+		issues.push(issue("stoppingRules.maxUnits", "Experiment unit count exceeds stoppingRules maxUnits"));
 	}
 
 	for (const point of points) {
@@ -102,26 +125,31 @@ export function validatePolicy(
 
 	if (ctx.toolName === "run_preflight") {
 		if (spec.mode !== "simulation" && spec.mode !== "dry_run" && spec.mode !== "hardware") {
-			issues.push(issue("mode", "Phase 4 preflight supports simulation, dry_run, and hardware modes only"));
+			issues.push(issue("mode", "Preflight supports simulation, dry_run, and hardware modes only"));
 		}
 	} else if (ctx.toolName === "run_experiment") {
 		if (spec.mode !== "simulation" && spec.mode !== "hardware") {
-			issues.push(issue("mode", "Phase 4 run_experiment supports simulation and approved hardware modes only"));
+			issues.push(issue("mode", "run_experiment supports simulation and approved hardware modes only"));
 		}
 	} else if (spec.mode !== "simulation") {
-		issues.push(issue("mode", `Phase 4 ${ctx.toolName} only supports simulation mode`));
+		issues.push(issue("mode", `${ctx.toolName} only supports simulation mode`));
 	}
 
 	if (spec.mode === "hardware") {
 		if (!spec.operatorApprovalRequired) {
-			issues.push(issue("operatorApprovalRequired", "Hardware pilot requires operatorApprovalRequired to be true"));
+			issues.push(issue("operatorApprovalRequired", "Hardware execution requires operatorApprovalRequired to be true"));
 		}
 	} else if (spec.operatorApprovalRequired) {
 		issues.push(issue("operatorApprovalRequired", "Simulation and dry-run checks must not require approval"));
 	}
 
-	if (labState.mode !== "simulation") {
-		issues.push(issue("labState.mode", "Lab state must be in simulation mode"));
+	if (labState.activeRunId !== null) {
+		issues.push(
+			issue(
+				"labState.activeRunId",
+				`Another run (${labState.activeRunId}) is ${labState.mode}; abort or resume it before starting a new run.`,
+			),
+		);
 	}
 
 	issues.push(...validateInstrumentAvailability(spec, labState.capabilities));

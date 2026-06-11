@@ -13,7 +13,7 @@ function createSuccessResult(): ToolResult {
 		nextActions: ["Call run_preflight with the same ExperimentSpec."],
 		artifacts: [],
 		commandId: "validate-experiment-spec",
-		stateBefore: null,
+		correlationId: "validate-experiment-spec",
 		stateAfter: { valid: true },
 		stopConditionMet: false,
 	};
@@ -27,12 +27,12 @@ function createErrorResult(params: ValidateExperimentSpecParams): ToolResult {
 		summary: `ExperimentSpec failed validation with ${issues.length} issue(s).`,
 		nextActions: [
 			"Fix the reported schema issues.",
-			"Provide exactly one of grid or points.",
+			"Provide a valid plan payload matching plan.kind.",
 			"Call validate_experiment_spec again before any run.",
 		],
 		artifacts: [],
 		commandId: "validate-experiment-spec",
-		stateBefore: null,
+		correlationId: "validate-experiment-spec",
 		stateAfter: { valid: false, issues },
 		errorCode: "invalid_experiment_spec",
 		retrySafe: true,
@@ -50,6 +50,7 @@ export const validateExperimentSpecTool = {
 		"Do not call hardware or execution tools when validate_experiment_spec returns an error.",
 	],
 	parameters: ValidateExperimentSpecParamsSchema,
+	executionMode: "sequential",
 	async execute(_toolCallId, params) {
 		const validation = validateExperimentSpec(params.spec);
 		const result = validation.valid ? createSuccessResult() : createErrorResult(params);

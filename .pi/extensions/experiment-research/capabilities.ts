@@ -1,6 +1,7 @@
 import { Type, type Static } from "typebox";
 
 const InstrumentKindSchema = Type.Union([Type.Literal("stage"), Type.Literal("camera"), Type.Literal("acquirer")]);
+const LeasePolicySchema = Type.Union([Type.Literal("exclusive"), Type.Literal("shared-read"), Type.Literal("operator-only")]);
 
 const SoftwareLimitsSchema = Type.Object(
 	{
@@ -16,6 +17,7 @@ const SoftwareLimitsSchema = Type.Object(
 const InstrumentCapabilitySchema = Type.Object(
 	{
 		id: Type.String({ minLength: 1 }),
+		resourceKind: Type.Literal("instrument"),
 		kind: InstrumentKindSchema,
 		units: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
 		coordinateConvention: Type.String({ minLength: 1 }),
@@ -24,6 +26,7 @@ const InstrumentCapabilitySchema = Type.Object(
 		simulationAvailable: Type.Boolean(),
 		dryRunAvailable: Type.Boolean(),
 		hardwarePilotAvailable: Type.Optional(Type.Boolean()),
+		leasePolicy: LeasePolicySchema,
 	},
 	{ additionalProperties: false },
 );
@@ -41,6 +44,7 @@ const SIMULATION_CAPABILITIES = {
 	instruments: [
 		{
 			id: "sim-stage",
+			resourceKind: "instrument",
 			kind: "stage",
 			units: ["um"],
 			coordinateConvention: "right-handed sample coordinates, origin at configured simulation home",
@@ -52,9 +56,11 @@ const SIMULATION_CAPABILITIES = {
 			hazards: ["simulated motion only"],
 			simulationAvailable: true,
 			dryRunAvailable: false,
+			leasePolicy: "exclusive",
 		},
 		{
 			id: "sim-camera",
+			resourceKind: "instrument",
 			kind: "camera",
 			units: ["px", "ms"],
 			coordinateConvention: "image origin at top-left",
@@ -64,9 +70,11 @@ const SIMULATION_CAPABILITIES = {
 			hazards: ["simulated camera only"],
 			simulationAvailable: true,
 			dryRunAvailable: false,
+			leasePolicy: "exclusive",
 		},
 		{
 			id: "sim-acquirer",
+			resourceKind: "instrument",
 			kind: "acquirer",
 			units: ["mw", "ms"],
 			coordinateConvention: "no spatial coordinates",
@@ -77,6 +85,7 @@ const SIMULATION_CAPABILITIES = {
 			hazards: ["simulated acquisition only"],
 			simulationAvailable: true,
 			dryRunAvailable: false,
+			leasePolicy: "exclusive",
 		},
 	],
 } satisfies Capabilities;
@@ -85,6 +94,7 @@ const DRY_RUN_CAPABILITIES = {
 	instruments: [
 		{
 			id: "mc-newton-xyz-stage",
+			resourceKind: "instrument",
 			kind: "stage",
 			units: ["um"],
 			coordinateConvention: "right-handed sample coordinates, origin at calibrated hardware home",
@@ -97,9 +107,11 @@ const DRY_RUN_CAPABILITIES = {
 			simulationAvailable: false,
 			dryRunAvailable: true,
 			hardwarePilotAvailable: true,
+			leasePolicy: "exclusive",
 		},
 		{
 			id: "lab-camera",
+			resourceKind: "instrument",
 			kind: "camera",
 			units: ["px", "ms"],
 			coordinateConvention: "image origin at top-left",
@@ -109,10 +121,12 @@ const DRY_RUN_CAPABILITIES = {
 			hazards: ["real camera adapter probed read-only"],
 			simulationAvailable: false,
 			dryRunAvailable: true,
-			hardwarePilotAvailable: false,
+			hardwarePilotAvailable: true,
+			leasePolicy: "exclusive",
 		},
 		{
 			id: "lab-acquirer",
+			resourceKind: "instrument",
 			kind: "acquirer",
 			units: ["mw", "ms"],
 			coordinateConvention: "no spatial coordinates",
@@ -123,7 +137,8 @@ const DRY_RUN_CAPABILITIES = {
 			hazards: ["real acquirer adapter probed read-only"],
 			simulationAvailable: false,
 			dryRunAvailable: true,
-			hardwarePilotAvailable: false,
+			hardwarePilotAvailable: true,
+			leasePolicy: "exclusive",
 		},
 	],
 } satisfies Capabilities;

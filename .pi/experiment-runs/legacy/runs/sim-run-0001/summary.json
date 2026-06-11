@@ -1,0 +1,11 @@
+{
+  "runId": "sim-run-0001",
+  "mode": "simulation",
+  "sampleId": "SIM-001",
+  "objective": "Map simulated Raman signal over a calibration wafer.",
+  "pointCount": 9,
+  "meanSignal": 107,
+  "maxSignal": 114,
+  "minSignal": 100,
+  "stopConditionMet": false
+}

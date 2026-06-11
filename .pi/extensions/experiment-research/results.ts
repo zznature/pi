@@ -1,4 +1,4 @@
-import type { ToolResult, ValidationIssue } from "./schemas.ts";
+import type { ErrorCode, ToolResult, ValidationIssue } from "./schemas.ts";
 
 export function createSuccessResult(
 	commandId: string,
@@ -7,15 +7,17 @@ export function createSuccessResult(
 	nextActions: string[],
 	artifacts: ToolResult["artifacts"] = [],
 	runId?: string,
+	experimentId?: string,
 ): ToolResult {
 	return {
 		status: "success",
 		summary,
 		nextActions,
 		artifacts,
+		experimentId,
 		runId,
 		commandId,
-		stateBefore: null,
+		correlationId: commandId,
 		stateAfter,
 		stopConditionMet: false,
 	};
@@ -24,10 +26,11 @@ export function createSuccessResult(
 export function createErrorResult(
 	commandId: string,
 	summary: string,
-	errorCode: string,
+	errorCode: ErrorCode,
 	nextActions: string[],
 	stateAfter: unknown,
 	retrySafe: boolean,
+	experimentId?: string,
 ): ToolResult {
 	return {
 		status: "error",
@@ -35,7 +38,8 @@ export function createErrorResult(
 		nextActions,
 		artifacts: [],
 		commandId,
-		stateBefore: null,
+		correlationId: commandId,
+		experimentId,
 		stateAfter,
 		errorCode,
 		retrySafe,

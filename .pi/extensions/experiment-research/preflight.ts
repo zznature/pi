@@ -1,35 +1,49 @@
 import type { Capabilities } from "./capabilities.ts";
+import { resolveRamanXyCalibration } from "./kernel/raman-calibration.ts";
 import type { LabState } from "./lab-state.ts";
 import { probeLiveState, type LiveStateProbe } from "./live-state.ts";
-import { getExperimentPoints } from "./spec-utils.ts";
+import { getResourceIds, getUnitCount } from "./spec-utils.ts";
 import type { ExperimentSpec, ValidationIssue } from "./schemas.ts";
 
 export interface PreflightResult {
 	valid: boolean;
 	issues: ValidationIssue[];
-	pointCount: number;
+	unitCount: number;
 	estimatedRuntimeMinutes: number;
 	mode: ExperimentSpec["mode"];
+	specHash?: string;
+	capabilitySnapshotId?: string;
 	liveState?: LiveStateProbe;
 	plannedRun: {
-		wouldVisitPoints: number;
-		wouldUseInstruments: string[];
+		wouldVisitUnits: number;
+		wouldUseResources: string[];
 	};
 	willNotExecute: string[];
 	approvalRecord?: {
 		path: string;
 		requiredForHardware: boolean;
+		requiredSafetyConfirmations?: string[];
 	};
+	calibrationArtifacts?: {
+		id: string;
+		path: string;
+		confidence: number;
+		validUntil?: string;
+	}[];
 }
 
-function estimateRuntimeMinutes(spec: ExperimentSpec, pointCount: number): number {
-	const exposureMinutes = (spec.limits.acquisition.maxExposureMs * pointCount) / 60_000;
+function estimateRuntimeMinutes(spec: ExperimentSpec, unitCount: number): number {
+	const ramanAcquisition = spec.domain?.raman?.acquisition;
+	if (ramanAcquisition) {
+		return Number(((ramanAcquisition.integrationTimeS * ramanAcquisition.accumulations * unitCount) / 60).toFixed(3));
+	}
+	const exposureMinutes = (spec.limits.acquisition.maxExposureMs * unitCount) / 60_000;
 	return Number(exposureMinutes.toFixed(3));
 }
 
-export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labState: LabState): PreflightResult {
+export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labState: LabState, cwd: string = "."): PreflightResult {
 	const issues: ValidationIssue[] = [];
-	const pointCount = getExperimentPoints(spec).length;
+	const unitCount = getUnitCount(spec);
 
 	if (spec.mode === "simulation" && !capabilities.instruments.some((instrument) => instrument.simulationAvailable)) {
 		issues.push({ path: "capabilities.instruments", message: "No simulation instruments are available" });
@@ -43,25 +57,41 @@ export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labS
 		issues.push({ path: "labState.activeRunId", message: "A run is already active" });
 	}
 
-	const estimatedRuntimeMinutes = estimateRuntimeMinutes(spec, pointCount);
+	const estimatedRuntimeMinutes = estimateRuntimeMinutes(spec, unitCount);
 	if (estimatedRuntimeMinutes > spec.stoppingRules.maxRuntimeMinutes) {
 		issues.push({ path: "stoppingRules.maxRuntimeMinutes", message: "Estimated runtime exceeds maxRuntimeMinutes" });
 	}
-	const liveState = spec.mode === "dry_run" ? probeLiveState(spec, capabilities) : undefined;
+	const liveState = spec.mode === "dry_run" ? probeLiveState(spec, capabilities, cwd) : undefined;
 	if (liveState) {
 		issues.push(...liveState.issues);
+	}
+	const calibrationArtifacts: PreflightResult["calibrationArtifacts"] = [];
+	const xyCorrection = spec.domain?.raman?.xyCorrection;
+	if (spec.mode !== "simulation" && xyCorrection?.enabled) {
+		const resolution = resolveRamanXyCalibration(cwd, xyCorrection.transformArtifactId);
+		if (!resolution.ok) {
+			issues.push(...resolution.issues);
+		} else {
+			const artifact = resolution.artifact;
+			calibrationArtifacts.push({
+				id: artifact.calibrationId,
+				path: resolution.path,
+				confidence: artifact.confidence,
+				validUntil: artifact.validUntil,
+			});
+		}
 	}
 
 	return {
 		valid: issues.length === 0,
 		issues,
-		pointCount,
+		unitCount,
 		estimatedRuntimeMinutes,
 		mode: spec.mode,
 		liveState: liveState?.probe,
 		plannedRun: {
-			wouldVisitPoints: pointCount,
-			wouldUseInstruments: spec.allowedInstruments,
+			wouldVisitUnits: unitCount,
+			wouldUseResources: getResourceIds(spec),
 		},
 		willNotExecute:
 			spec.mode === "dry_run"
@@ -72,7 +102,11 @@ export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labS
 				? {
 						path: liveState?.probe.approvalsPath.path ?? ".pi/experiment-runs/approvals.jsonl",
 						requiredForHardware: true,
+						requiredSafetyConfirmations: spec.domain?.raman?.acquisition
+							? ["laserPowerConfirmed", "confirmedLaserPowerMw", "labSpecWorkerReady", "windowsPowerPolicyReady"]
+							: undefined,
 					}
 				: undefined,
+		calibrationArtifacts: calibrationArtifacts.length > 0 ? calibrationArtifacts : undefined,
 	};
 }

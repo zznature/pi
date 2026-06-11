@@ -1,8 +1,19 @@
 {
+	"schemaVersion": "1",
+	"experimentId": "exp-sim-001",
+	"specId": "spec-sim-001",
+	"experimentType": "spatial_mapping",
 	"objective": "Map simulated Raman signal over a calibration wafer.",
-	"sampleId": "SIM-001",
+	"subject": {
+		"id": "SIM-001",
+		"kind": "calibration_wafer"
+	},
 	"mode": "simulation",
-	"allowedInstruments": ["sim-stage", "sim-camera", "sim-acquirer"],
+	"resources": [
+		{ "id": "sim-stage", "kind": "instrument", "role": "stage" },
+		{ "id": "sim-camera", "kind": "instrument", "role": "camera" },
+		{ "id": "sim-acquirer", "kind": "instrument", "role": "acquirer" }
+	],
 	"limits": {
 		"motion": {
 			"xUm": { "minUm": 0, "maxUm": 100 },
@@ -15,16 +26,19 @@
 		},
 		"acquisition": {
 			"maxExposureMs": 100,
-			"maxPoints": 9
+			"maxUnits": 9
 		}
 	},
-	"grid": {
-		"x": { "startUm": 0, "stopUm": 20, "steps": 3 },
-		"y": { "startUm": 0, "stopUm": 20, "steps": 3 }
+	"plan": {
+		"kind": "grid",
+		"grid": {
+			"x": { "startUm": 0, "stopUm": 20, "steps": 3 },
+			"y": { "startUm": 0, "stopUm": 20, "steps": 3 }
+		}
 	},
 	"stoppingRules": {
 		"maxRuntimeMinutes": 5,
-		"maxPoints": 9,
+		"maxUnits": 9,
 		"stopOnError": true
 	},
 	"operatorApprovalRequired": false

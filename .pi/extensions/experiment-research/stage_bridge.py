@@ -1,4 +1,4 @@
-"""Bridge used by the Phase 4 hardware pilot to call the stage driver.
+"""Bridge used by gated stage hardware execution to call the stage driver.
 
 The TypeScript extension never imports Python modules directly. This script is
 only used when the operator explicitly selects the mc_newton_xyz adapter.

@@ -1,24 +1,27 @@
 import { loadCapabilities, type Capabilities } from "./capabilities.ts";
+import { findActiveRun } from "./run-store.ts";
 
 export interface LabState {
-	mode: "simulation";
+	mode: "simulation" | "active" | "paused" | "recovering";
 	capabilities: Capabilities;
-	activeRunId: null;
+	activeRunId: string | null;
 	dryRunAvailable: true;
 	hardwareAvailable: true;
 	notes: string[];
 }
 
-export function getLabState(): LabState {
+export function getLabState(cwd = "."): LabState {
+	const activeRun = findActiveRun(cwd);
+	const mode = activeRun?.status === "paused" ? "paused" : activeRun?.status === "recovering" ? "recovering" : activeRun ? "active" : "simulation";
 	return {
-		mode: "simulation",
+		mode,
 		capabilities: loadCapabilities(),
-		activeRunId: null,
+		activeRunId: activeRun?.runId ?? null,
 		dryRunAvailable: true,
 		hardwareAvailable: true,
 		notes: [
-			"Phase 4 exposes schema validation, simulation runs, dry-run preflight, and a stage-only hardware pilot.",
-			"Hardware pilot is limited to the MC.Newton XYZ stage path with no camera, Raman acquisition, laser, or LLM runtime parameter changes.",
+			"Available workflows include schema validation, simulation runs, dry-run preflight, structured run analysis, bounded replanning, and gated hardware execution.",
+			"Hardware execution supports a constrained non-Raman MC.Newton stage path plus typed Raman runs through the long-lived bridge; Raman acquisition still requires explicit operator safety approval.",
 		],
 	};
 }

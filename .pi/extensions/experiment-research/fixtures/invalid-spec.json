@@ -1,7 +1,15 @@
 {
+	"schemaVersion": "1",
+	"experimentId": "",
+	"specId": "",
+	"experimentType": "spatial_mapping",
 	"objective": "",
+	"subject": {
+		"id": "",
+		"kind": "calibration_wafer"
+	},
 	"mode": "free_text",
-	"allowedInstruments": [],
+	"resources": [],
 	"limits": {
 		"motion": {
 			"xUm": { "minUm": 100, "maxUm": 0 },
@@ -12,12 +20,15 @@
 		},
 		"acquisition": {
 			"maxExposureMs": 0,
-			"maxPoints": 0
+			"maxUnits": 0
 		}
+	},
+	"plan": {
+		"kind": "grid"
 	},
 	"stoppingRules": {
 		"maxRuntimeMinutes": 5,
-		"maxPoints": 9,
+		"maxUnits": 9,
 		"stopOnError": true
 	},
 	"operatorApprovalRequired": false
