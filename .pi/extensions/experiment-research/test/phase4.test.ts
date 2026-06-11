@@ -5,18 +5,18 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { test } from "node:test";
-import { dispatch } from "./dispatch.ts";
-import { runHardwarePilotKernel } from "./kernel/hardware-pilot.ts";
-import { MemoryStageAdapter } from "./kernel/stage-adapter.ts";
-import { getLabState } from "./lab-state.ts";
-import { validatePolicy } from "./policy.ts";
-import { appendOperatorIntent, hashExperimentSpec, validateHardwareGate } from "./records.ts";
-import type { ExperimentSpec, HardwarePilotParams } from "./schemas.ts";
-import { evaluateWatchdog } from "./watchdog.ts";
+import { dispatch } from "../dispatch.ts";
+import { runHardwarePilotKernel } from "../kernel/hardware-pilot.ts";
+import { MemoryStageAdapter } from "../kernel/stage-adapter.ts";
+import { getLabState } from "../lab-state.ts";
+import { validatePolicy } from "../policy.ts";
+import { appendOperatorIntent, hashExperimentSpec, validateHardwareGate } from "../records.ts";
+import type { ExperimentSpec, HardwarePilotParams } from "../schemas.ts";
+import { evaluateWatchdog } from "../watchdog.ts";
 
 process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE = "1";
 
-const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
 
 function loadSpec(name: string): ExperimentSpec {
 	return JSON.parse(readFileSync(join(FIXTURES, name), "utf-8")) as ExperimentSpec;

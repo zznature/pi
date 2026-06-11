@@ -4,14 +4,14 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { dispatch } from "./dispatch.ts";
-import { appendOperatorIntent } from "./records.ts";
-import type { ExperimentSpec, HardwarePilotParams } from "./schemas.ts";
-import { evaluateWatchdog } from "./watchdog.ts";
+import { dispatch } from "../dispatch.ts";
+import { appendOperatorIntent } from "../records.ts";
+import type { ExperimentSpec, HardwarePilotParams } from "../schemas.ts";
+import { evaluateWatchdog } from "../watchdog.ts";
 
 process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE = "1";
 
-const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
 
 function loadSpec(name: string): ExperimentSpec {
 	return JSON.parse(readFileSync(join(FIXTURES, name), "utf-8")) as ExperimentSpec;

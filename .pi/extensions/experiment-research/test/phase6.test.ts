@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { dispatch } from "./dispatch.ts";
-import type { ExperimentSpec, ToolResult } from "./schemas.ts";
+import { dispatch } from "../dispatch.ts";
+import type { ExperimentSpec, ToolResult } from "../schemas.ts";
 
-const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
 
 function loadSpec(name: string): ExperimentSpec {
 	return JSON.parse(readFileSync(join(FIXTURES, name), "utf-8")) as ExperimentSpec;

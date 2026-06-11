@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { dispatch } from "../../../.pi/extensions/experiment-research/dispatch.ts";
 import experimentResearchExtension from "../../../.pi/extensions/experiment-research/index.ts";
-import { validateExperimentSpec } from "../../../.pi/extensions/experiment-research/schemas.ts";
+import { hashExperimentSpec } from "../../../.pi/extensions/experiment-research/records.ts";
+import { type ExperimentSpec, validateExperimentSpec } from "../../../.pi/extensions/experiment-research/schemas.ts";
 import type {
 	CustomToolCallEvent,
 	CustomToolResultEvent,
@@ -27,11 +28,17 @@ interface CapturedExtension {
 	messages: CapturedMessage[];
 }
 
+interface CapturedMessageOptions {
+	triggerTurn?: boolean;
+	deliverAs?: "steer" | "followUp" | "nextTurn";
+}
+
 interface CapturedMessage {
 	customType: string;
 	content?: unknown;
 	display?: boolean;
 	details?: unknown;
+	options?: CapturedMessageOptions;
 }
 
 function readFixture(name: string): unknown {
@@ -58,8 +65,8 @@ function loadExperimentExtension(): CapturedExtension {
 		setActiveTools(toolNames: string[]) {
 			activeTools = toolNames;
 		},
-		sendMessage(message: CapturedMessage) {
-			messages.push(message);
+		sendMessage(message: CapturedMessage, options?: CapturedMessageOptions) {
+			messages.push({ ...message, options });
 		},
 	} as unknown as ExtensionAPI;
 
@@ -103,7 +110,12 @@ describe("experiment research extension", () => {
 		expect(extension.tools.has("analyze_run")).toBe(true);
 		expect(extension.tools.has("plan_next_experiment")).toBe(true);
 		expect(extension.handlers.get("session_start")).toHaveLength(1);
+		expect(extension.handlers.get("session_before_compact")).toHaveLength(1);
+		expect(extension.handlers.get("session_shutdown")).toHaveLength(1);
 		expect(extension.handlers.get("before_agent_start")).toHaveLength(1);
+		for (const tool of extension.tools.values()) {
+			expect(tool.executionMode).toBe("sequential");
+		}
 
 		await sessionStart?.({ type: "session_start", sessionId: "test-session" }, {} as ExtensionContext);
 		expect(extension.getActiveTools()).toEqual(
@@ -390,6 +402,121 @@ describe("experiment research extension", () => {
 		expect(extension.messages).toHaveLength(1);
 		expect(extension.messages[0]?.customType).toBe("experiment-run-summary");
 		expect(extension.messages[0]?.content).toBe("Simulation run sim-run-test completed.");
+		expect(extension.messages[0]?.options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+
+		const hardwareStartDetails = {
+			...successDetails,
+			summary: "Raman hardware run hw-run-started started with 2 queued unit(s).",
+			runId: "hw-run-started",
+			stateAfter: { runState: { status: "running" } },
+		};
+		await toolResult?.(
+			{
+				type: "tool_result",
+				toolCallId: "hardware-start-call",
+				toolName: "run_experiment",
+				input: {},
+				content: [{ type: "text", text: "started" }],
+				isError: false,
+				details: hardwareStartDetails,
+			} satisfies CustomToolResultEvent,
+			context,
+		);
+		expect(extension.messages[1]?.customType).toBe("experiment-run-summary");
+		expect(extension.messages[1]?.options).toEqual({ triggerTurn: false, deliverAs: "followUp" });
+	});
+
+	it("wakes the agent when an async Raman hardware run reaches a terminal state", async () => {
+		process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE = "1";
+		await withTempCwd(async (cwd) => {
+			const extension = loadExperimentExtension();
+			const spec = readFixture("raman-hardware-spec.json");
+			const dryRun = dispatch(
+				"run_preflight",
+				{ spec: readFixture("raman-dry-run-spec.json") },
+				{ cwd, commandId: "watcher-preflight" },
+			);
+			const reportId = asString(asRecord(asRecord(dryRun.stateAfter).records).reportId);
+
+			const run = await extension.tools.get("run_experiment")?.execute(
+				"watcher-run",
+				{
+					spec,
+					hardwarePilot: {
+						stageAdapter: "memory",
+						raman: { acquisitionBackend: "fake" },
+						settleTimeoutMs: 100,
+						heartbeatTimeoutMs: 10_000,
+						maxConsecutiveErrors: 2,
+						approval: {
+							approvalId: "appr-watcher",
+							operator: "tester",
+							approved: true,
+							dryRunReportId: reportId,
+							ramanSafety: {
+								laserPowerConfirmed: true,
+								confirmedLaserPowerMw: 1,
+								labSpecWorkerReady: true,
+								windowsPowerPolicyReady: true,
+							},
+						},
+					},
+				},
+				undefined,
+				undefined,
+				{ cwd } as ExtensionContext,
+			);
+			const runId = asString(asRecord(run?.details).runId);
+			const deadline = Date.now() + 5_000;
+			while (
+				!extension.messages.some((message) => message.customType === "experiment-run-terminal") &&
+				Date.now() < deadline
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 25));
+			}
+			const terminal = extension.messages.find((message) => message.customType === "experiment-run-terminal");
+			expect(terminal).toBeDefined();
+			expect(terminal?.content).toContain(`Raman hardware run ${runId} reached completed`);
+			expect(terminal?.options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+			expect(asRecord(terminal?.details).runId).toBe(runId);
+
+			const [shutdown] = extension.handlers.get("session_shutdown") ?? [];
+			await shutdown?.({ type: "session_shutdown", reason: "quit" }, { cwd } as ExtensionContext);
+		});
+	});
+
+	it("adds experiment registry facts to custom compaction summaries", async () => {
+		await withTempCwd(async (cwd) => {
+			const extension = loadExperimentExtension();
+			const spec = readFixture("valid-spec.json");
+			const run = dispatch("run_experiment", { spec }, { cwd, commandId: "compact-run" });
+			const runId = asString(run.runId);
+			const [beforeCompact] = extension.handlers.get("session_before_compact") ?? [];
+			const result = asRecord(
+				await beforeCompact?.(
+					{
+						type: "session_before_compact",
+						preparation: {
+							firstKeptEntryId: "kept-entry",
+							tokensBefore: 123,
+							previousSummary: "previous work summary",
+						},
+						branchEntries: [],
+						signal: new AbortController().signal,
+					},
+					{ cwd } as ExtensionContext,
+				),
+			);
+			const compaction = asRecord(result.compaction);
+			expect(compaction.firstKeptEntryId).toBe("kept-entry");
+			expect(compaction.tokensBefore).toBe(123);
+			expect(compaction.summary).toContain("previous work summary");
+			expect(compaction.summary).toContain(`runId=${runId}`);
+			expect(compaction.summary).toContain(`specHash=${hashExperimentSpec(spec as ExperimentSpec)}`);
+			const details = asRecord(compaction.details);
+			expect(details.source).toBe("experiment-research");
+			expect(details.recentRunIds).toContain(runId);
+		});
 	});
 
 	it("returns normalized errors for policy rejection and invalid dispatch params", () => {
