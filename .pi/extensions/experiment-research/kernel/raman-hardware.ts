@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
 	markRunFinished,
@@ -67,6 +67,7 @@ interface BridgeUnitRecord extends ExperimentPoint {
 	positionAfter?: unknown;
 	spectrum?: unknown;
 	spectrumMetadata?: unknown;
+	spectrumFileBridge?: unknown;
 	errorCode?: string;
 	error?: string;
 }
@@ -77,6 +78,17 @@ interface SpectrumArtifactPlan {
 	absolutePath: string;
 	relativePath: string;
 	format: string;
+}
+
+interface LabSpecBridgeArchive {
+	artifacts: ToolResult["artifacts"];
+	fileBridge?: {
+		requestId?: string;
+		requestPath?: string;
+		resultPath?: string;
+		archiveRequestPath?: string;
+		archiveResultPath?: string;
+	};
 }
 
 const activeRamanBridges = new Map<string, RamanBridgeClient>();
@@ -145,6 +157,84 @@ function buildSpectrumArtifactPlans(spec: ExperimentSpec, reserved: ReservedRun)
 			format: acquisition.saveFormat,
 		};
 	});
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(record: Record<string, unknown>, key: string): string | undefined {
+	const value = record[key];
+	return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function sanitizeArtifactSegment(value: string): string {
+	return value.replace(/[^A-Za-z0-9_.-]/g, "_");
+}
+
+function copyLabSpecBridgeFile(
+	runId: string,
+	runDir: string,
+	pointIndex: number,
+	requestId: string,
+	sourcePath: string | undefined,
+	role: "request" | "result",
+): ToolResult["artifacts"][number] | undefined {
+	if (!sourcePath || !existsSync(sourcePath)) return undefined;
+	const safeRequestId = sanitizeArtifactSegment(requestId);
+	const relativePath = `artifacts/labspec/point_${pointIndex}/${role}_${safeRequestId}.json`;
+	const absolutePath = join(runDir, relativePath);
+	mkdirSync(dirname(absolutePath), { recursive: true });
+	copyFileSync(sourcePath, absolutePath);
+	return {
+		id: `${runId}-labspec-${role}-point-${pointIndex}-${safeRequestId}`,
+		uri: relativeArtifact(runId, relativePath),
+		label: `LabSpec ${role} point ${pointIndex}`,
+		kind: `labspec-${role}`,
+		producerRunId: runId,
+	};
+}
+
+function archiveLabSpecBridgeFiles(reserved: ReservedRun, pointIndex: number, unit: BridgeUnitRecord): LabSpecBridgeArchive {
+	if (!isRecord(unit.spectrumFileBridge)) return { artifacts: [] };
+	const requestId = stringValue(unit.spectrumFileBridge, "requestId") ?? `point-${pointIndex}`;
+	const requestPath = stringValue(unit.spectrumFileBridge, "requestPath");
+	const resultPath = stringValue(unit.spectrumFileBridge, "resultPath");
+	const requestArtifact = copyLabSpecBridgeFile(
+		reserved.record.runId,
+		reserved.runDir,
+		pointIndex,
+		requestId,
+		requestPath,
+		"request",
+	);
+	const resultArtifact = copyLabSpecBridgeFile(
+		reserved.record.runId,
+		reserved.runDir,
+		pointIndex,
+		requestId,
+		resultPath,
+		"result",
+	);
+	const artifacts = [requestArtifact, resultArtifact].filter(
+		(artifact): artifact is ToolResult["artifacts"][number] => artifact !== undefined,
+	);
+	const fileBridge = {
+		requestId,
+		requestPath,
+		resultPath,
+		archiveRequestPath: requestArtifact?.uri,
+		archiveResultPath: resultArtifact?.uri,
+	};
+	return { artifacts, fileBridge };
+}
+
+function appendArtifacts(artifacts: ToolResult["artifacts"], next: ToolResult["artifacts"]): void {
+	for (const artifactRef of next) {
+		if (!artifacts.some((existing) => existing.uri === artifactRef.uri)) {
+			artifacts.push(artifactRef);
+		}
+	}
 }
 
 function baseArtifacts(runId: string, spectrumArtifacts: SpectrumArtifactPlan[]): ToolResult["artifacts"] {
@@ -351,7 +441,7 @@ function autofocusPayload(spec: ExperimentSpec, pilot: HardwarePilotParams): Rec
 	if (!autofocus?.enabled) return undefined;
 	return {
 		...autofocus,
-		backend: pilot.raman?.autofocusBackend ?? "fake",
+		backend: pilot.raman?.autofocusBackend ?? (pilot.stageAdapter === "memory" ? "fake" : "labspec_file_bridge"),
 		bridgeDir: pilot.raman?.frameBridgeDir ?? pilot.raman?.labspecBridgeDir,
 		stageTimeoutMs: pilot.settleTimeoutMs,
 	};
@@ -362,7 +452,7 @@ function xyCorrectionPayload(cwd: string, spec: ExperimentSpec, pilot: HardwareP
 	if (!xyCorrection?.enabled) return undefined;
 	const payload: Record<string, unknown> = {
 		...xyCorrection,
-		backend: pilot.raman?.xyCorrectionBackend ?? "fake",
+		backend: pilot.raman?.xyCorrectionBackend ?? (pilot.stageAdapter === "memory" ? "fake" : "phase_correlation"),
 		bridgeDir: pilot.raman?.frameBridgeDir ?? pilot.raman?.labspecBridgeDir,
 		stageTimeoutMs: pilot.settleTimeoutMs,
 	};
@@ -529,6 +619,12 @@ async function executeRamanHardwareRun(
 					...unit,
 					status: normalizeStatus(unit.status),
 				};
+				const archivedLabSpec = archiveLabSpecBridgeFiles(reserved, point.index, record);
+				if (archivedLabSpec.fileBridge) {
+					record.spectrumFileBridge = archivedLabSpec.fileBridge;
+					appendArtifacts(artifacts, archivedLabSpec.artifacts);
+					writeJson(reserved.record.recordPaths.artifacts, artifacts);
+				}
 				appendRunEvent(reserved, commandId, sequence, "unit_completed", { unitKind: "point", unit: record });
 				sequence += 1;
 				consecutiveErrors = 0;

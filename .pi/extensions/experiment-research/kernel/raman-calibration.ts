@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { createErrorResult, createSuccessResult } from "../results.ts";
+import { artifactUriPath } from "../run-store.ts";
 import type {
 	RamanAutoXyCalibrationParams,
 	RamanFitXyCalibrationParams,
@@ -52,7 +53,7 @@ function calibrationPath(cwd: string, calibrationId: string): string {
 
 function relativeToCwd(cwd: string, path: string): string {
 	const result = relative(cwd, path);
-	return result.startsWith("..") ? path : result;
+	return artifactUriPath(result.startsWith("..") ? path : result);
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -228,7 +229,7 @@ export async function fitAndRecordRamanXyCalibration(
 			true,
 		);
 	}
-	const bridge = new RamanBridgeClient({ cwd: process.cwd(), python: params.stagePython, requestTimeoutMs: 30_000 });
+	const bridge = new RamanBridgeClient({ cwd: ctx.cwd, python: params.stagePython, requestTimeoutMs: 30_000 });
 	try {
 		const fit = await bridge.request<Record<string, unknown>>("calibrate_xy", {
 			measurements: params.measurements,
@@ -329,7 +330,7 @@ export async function autoFitAndRecordRamanXyCalibration(
 	const outputDir =
 		params.outputDir ?? join(ctx.cwd, ".pi", "experiment-runs", "maintenance", "xy-calibration", params.calibrationId ?? `auto-${randomUUID().slice(0, 8)}`);
 	mkdirSync(outputDir, { recursive: true });
-	const bridge = new RamanBridgeClient({ cwd: process.cwd(), python: params.stagePython, requestTimeoutMs: 60_000 });
+	const bridge = new RamanBridgeClient({ cwd: ctx.cwd, python: params.stagePython, requestTimeoutMs: 60_000 });
 	try {
 		const fit = await bridge.request<Record<string, unknown>>("calibrate_xy_sequence", {
 			stage: stagePayload(params),

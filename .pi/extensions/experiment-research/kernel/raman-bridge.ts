@@ -68,6 +68,7 @@ export class RamanBridgeClient {
 	private readonly pending = new Map<string, PendingRequest>();
 	private readonly requestTimeoutMs: number;
 	private readonly onEvent: ((event: RamanBridgeEvent) => void) | undefined;
+	private readonly exited: Promise<void>;
 	private nextRequestNumber = 1;
 	private closed = false;
 
@@ -82,6 +83,9 @@ export class RamanBridgeClient {
 		this.child = spawn(options.python ?? "python", [bridgePath, "--stage-root", stageRoot], {
 			cwd: options.cwd,
 			stdio: ["pipe", "pipe", "pipe"],
+		});
+		this.exited = new Promise((resolveExited) => {
+			this.child.once("exit", () => resolveExited());
 		});
 		this.child.stdout.setEncoding("utf-8");
 		this.child.stderr.setEncoding("utf-8");
@@ -133,10 +137,16 @@ export class RamanBridgeClient {
 	}
 
 	async shutdown(timeoutMs: number = this.requestTimeoutMs): Promise<void> {
+		let shutdownAccepted = false;
 		try {
 			await this.request("shutdown", {}, timeoutMs);
+			shutdownAccepted = true;
+			await this.waitForExit(1_000);
 		} finally {
-			this.close();
+			if (!shutdownAccepted || !this.hasExited()) {
+				this.close();
+				await this.waitForExit(1_000);
+			}
 		}
 	}
 
@@ -148,6 +158,21 @@ export class RamanBridgeClient {
 			this.child.kill();
 		}
 		this.rejectAll(new RamanBridgeProtocolError("bridge closed"));
+	}
+
+	private hasExited(): boolean {
+		return this.child.exitCode !== null || this.child.signalCode !== null;
+	}
+
+	private waitForExit(timeoutMs: number): Promise<boolean> {
+		if (this.hasExited()) return Promise.resolve(true);
+		return new Promise((resolve) => {
+			const timer = setTimeout(() => resolve(false), timeoutMs);
+			void this.exited.then(() => {
+				clearTimeout(timer);
+				resolve(true);
+			});
+		});
 	}
 
 	private handleStdoutLine(line: string): void {

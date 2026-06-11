@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { createErrorResult, createSuccessResult } from "../results.ts";
-import { hashExperimentSpec, readRecordedEvents, readRecordedSpec, readRecordedSummary } from "../run-store.ts";
+import { artifactUriPath, hashExperimentSpec, readRecordedEvents, readRecordedSpec, readRecordedSummary } from "../run-store.ts";
 import type { RamanHardwareValidationParams, ToolResult, ValidationIssue } from "../schemas.ts";
 import { resolveRamanXyCalibration } from "./raman-calibration.ts";
 
@@ -45,7 +45,7 @@ function writeJson(path: string, value: unknown): void {
 
 function relativeToCwd(cwd: string, path: string): string {
 	const result = relative(cwd, path);
-	return result.startsWith("..") ? path : result;
+	return artifactUriPath(result.startsWith("..") ? path : result);
 }
 
 function validationPath(cwd: string, validationId: string): string {

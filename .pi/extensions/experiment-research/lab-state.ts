@@ -20,8 +20,8 @@ export function getLabState(cwd = "."): LabState {
 		dryRunAvailable: true,
 		hardwareAvailable: true,
 		notes: [
-			"Phase 5 exposes schema validation, simulation runs, dry-run preflight, structured run analysis, bounded replanning, and hardware-pilot execution.",
-			"Hardware execution supports the original stage-only pilot path plus typed Raman runs through the long-lived bridge; Raman acquisition still requires explicit operator safety approval.",
+			"Available workflows include schema validation, simulation runs, dry-run preflight, structured run analysis, bounded replanning, and gated hardware execution.",
+			"Hardware execution supports a constrained non-Raman MC.Newton stage path plus typed Raman runs through the long-lived bridge; Raman acquisition still requires explicit operator safety approval.",
 		],
 	};
 }

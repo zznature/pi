@@ -36,10 +36,10 @@ planner default active set:
 Capabilities are loaded from `capabilities.ts`.
 
 - `simulation` uses fake stage, camera, and acquisition resources.
-- `dry_run` probes the narrow hardware pilot capability without motion,
+- `dry_run` probes gated hardware readiness without motion,
   acquisition, or power writes.
-- `hardware` keeps the existing MC.Newton XYZ stage pilot path and now admits
-  typed Raman specs when `domain.raman` is present.
+- `hardware` supports a constrained non-Raman MC.Newton XYZ stage path and typed
+  Raman specs when `domain.raman` is present.
 
 Raman readiness currently includes:
 
@@ -93,7 +93,7 @@ Raman readiness currently includes:
 - bridge `autofocus` and `xy_correct` actions with fake/no-hardware backends
   plus real-capable `labspec_file_bridge` autofocus and `phase_correlation`
   XY correction backends, wired into Raman `run_unit` so focus confidence and
-  correction metadata flow into run records and analysis. Hardware-pilot
+  correction metadata flow into run records and analysis. Hardware execution
   params can provide explicit phase-correlation frame paths, while the transform
   is normally resolved from the referenced calibration artifact;
 - deterministic Raman analysis metrics for spectrum SNR, saturation, focus
@@ -101,8 +101,8 @@ Raman readiness currently includes:
 
 The `docs/Raman/mapping` LabSpec helper package is also present so the existing
 autofocus/microscope file bridge modules and `request_labspec_spectrum.py` can
-import in a no-hardware environment. The existing non-Raman hardware pilot
-remains synchronous and stage-only.
+import in a no-hardware environment. The non-Raman hardware path remains
+synchronous and limited to MC.Newton stage movement.
 
 The next hardware milestone is validating the `labspec_file_bridge`
 acquisition/autofocus path and `phase_correlation` XY correction path against
@@ -110,6 +110,10 @@ the real LabSpec worker, camera stream, stage, and operator safety workflow.
 
 Hardware execution requires a matching dry-run `specHash`, a capability
 snapshot, and explicit operator approval.
+
+New `run_experiment` hardware calls should pass `hardwareExecution` parameters.
+The legacy `hardwarePilot` parameter remains accepted during migration, but a
+single call must not provide both aliases.
 
 ## Operator Flow
 
@@ -152,7 +156,7 @@ validate_experiment_spec -> run_preflight -> run_experiment -> analyze_run -> pl
 ```
 
 Use `fixtures/hardware-dry-run-spec.json` and `fixtures/hardware-spec.json` for
-the memory-adapter hardware pilot path.
+the gated non-Raman stage hardware path.
 
 Use `fixtures/raman-dry-run-spec.json` and `fixtures/raman-hardware-spec.json`
 for the minimal Raman acquisition contract path.

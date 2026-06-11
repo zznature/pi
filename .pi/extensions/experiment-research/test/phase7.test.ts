@@ -33,6 +33,20 @@ function tempCwd(): string {
 	return mkdtempSync(join(tmpdir(), "exp-phase7-"));
 }
 
+function withSimulatedHardwareDisabled<T>(callback: () => T): T {
+	const previous = process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE;
+	delete process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE;
+	try {
+		return callback();
+	} finally {
+		if (previous === undefined) {
+			delete process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE;
+		} else {
+			process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE = previous;
+		}
+	}
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
 	assert.equal(typeof value, "object");
 	assert.notEqual(value, null);
@@ -245,12 +259,13 @@ async function waitForRunStatus(cwd: string, runId: string, status: string): Pro
 	assert.fail(`run ${runId} did not reach ${status}; last state ${JSON.stringify(lastState)}`);
 }
 
-async function fakeLabspecWorker(bridgeDir: string): Promise<void> {
+async function fakeLabspecWorker(bridgeDir: string, requestCount = 1): Promise<void> {
 	const deadline = Date.now() + 3_000;
 	const requestsDir = join(bridgeDir, "requests");
+	const handled = new Set<string>();
 	while (Date.now() < deadline) {
 		if (existsSync(requestsDir)) {
-			const [requestFile] = readdirSync(requestsDir).filter((entry) => entry.endsWith(".json"));
+			const [requestFile] = readdirSync(requestsDir).filter((entry) => entry.endsWith(".json") && !handled.has(entry));
 			if (requestFile) {
 				const request = asRecord(JSON.parse(readFileSync(join(requestsDir, requestFile), "utf-8")));
 				const outputPath = String(request.output_path);
@@ -266,12 +281,13 @@ async function fakeLabspecWorker(bridgeDir: string): Promise<void> {
 					})}\n`,
 					"utf-8",
 				);
-				return;
+				handled.add(requestFile);
+				if (handled.size >= requestCount) return;
 			}
 		}
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
-	assert.fail("fake LabSpec worker did not observe an acquisition request");
+	assert.fail(`fake LabSpec worker observed ${handled.size}/${requestCount} acquisition request(s)`);
 }
 
 function writePgm(path: string, pixels: number[][]): void {
@@ -388,6 +404,21 @@ test("Raman hardware and dry-run specs hash identically for the hardware gate", 
 	assert.equal(hashExperimentSpec(loadSpec("raman-hardware-spec.json")), hashExperimentSpec(loadSpec("raman-dry-run-spec.json")));
 });
 
+test("Raman hardware gate rejects hardware-mode preflight reports", () => {
+	const cwd = tempCwd();
+	try {
+		const hardwarePreflight = dispatch("run_preflight", { spec: loadSpec("raman-hardware-spec.json") }, { cwd, commandId: "phase7-hw-preflight" });
+		assert.equal(hardwarePreflight.status, "success");
+		const reportId = String(asRecord(asRecord(hardwarePreflight.stateAfter).records).reportId);
+		const gate = validateHardwareGate(loadSpec("raman-hardware-spec.json"), baseApproval(reportId), cwd);
+		assert.equal(gate.valid, false);
+		assert.ok(gate.issues.some((issue) => issue.includes("dry_run")));
+		assert.ok(gate.issues.some((issue) => issue.includes("read-only probe")));
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
 test("Raman hardware gate requires laser safety confirmation", () => {
 	const cwd = tempCwd();
 	try {
@@ -416,6 +447,68 @@ test("Raman hardware gate requires laser safety confirmation", () => {
 
 		const valid = validateHardwareGate(spec, baseApproval(reportId), cwd);
 		assert.equal(valid.valid, true);
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
+test("run_experiment rejects real Raman hardware fake or missing real-capable backends", () => {
+	const cwd = tempCwd();
+	try {
+		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman-dry-run-spec.json") }, { cwd, commandId: "phase7-real-backend-preflight" });
+		assert.equal(dryRun.status, "success");
+		const reportId = String(asRecord(asRecord(dryRun.stateAfter).records).reportId);
+
+		const fakeAcquisition = withSimulatedHardwareDisabled(() =>
+			dispatch(
+				"run_experiment",
+				{
+					spec: loadSpec("raman-hardware-spec.json"),
+					hardwareExecution: {
+						stageAdapter: "mc_newton_xyz",
+						stagePort: "COM_TEST",
+						raman: { acquisitionBackend: "fake" },
+						settleTimeoutMs: 100,
+						heartbeatTimeoutMs: 10_000,
+						maxConsecutiveErrors: 2,
+						approval: baseApproval(reportId),
+					},
+				},
+				{ cwd, commandId: "phase7-real-fake-acquisition" },
+			),
+		);
+		assert.equal(fakeAcquisition.status, "error");
+		assert.equal(fakeAcquisition.errorCode, "simulated_hardware_not_allowed");
+		const fakeIssues = asRecord(fakeAcquisition.stateAfter).issues as string[];
+		assert.ok(fakeIssues.some((issue) => issue.includes("labspec_file_bridge")));
+
+		recordFakeCalibration(cwd);
+		const focusDryRun = dispatch("run_preflight", { spec: focusCorrectionSpec("dry_run") }, { cwd, commandId: "phase7-real-focus-preflight" });
+		assert.equal(focusDryRun.status, "success");
+		const focusReportId = String(asRecord(asRecord(focusDryRun.stateAfter).records).reportId);
+		const missingFocusBackends = withSimulatedHardwareDisabled(() =>
+			dispatch(
+				"run_experiment",
+				{
+					spec: focusCorrectionSpec("hardware"),
+					hardwareExecution: {
+						stageAdapter: "mc_newton_xyz",
+						stagePort: "COM_TEST",
+						raman: { acquisitionBackend: "labspec_file_bridge" },
+						settleTimeoutMs: 100,
+						heartbeatTimeoutMs: 10_000,
+						maxConsecutiveErrors: 2,
+						approval: baseApproval(focusReportId),
+					},
+				},
+				{ cwd, commandId: "phase7-real-missing-focus-backends" },
+			),
+		);
+		assert.equal(missingFocusBackends.status, "error");
+		assert.equal(missingFocusBackends.errorCode, "simulated_hardware_not_allowed");
+		const missingIssues = asRecord(missingFocusBackends.stateAfter).issues as string[];
+		assert.ok(missingIssues.some((issue) => issue.includes("autofocusBackend")));
+		assert.ok(missingIssues.some((issue) => issue.includes("xyCorrectionBackend")));
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}
@@ -571,6 +664,7 @@ test("operator Raman active probe tool writes an audited maintenance record", as
 		assert.ok(result.artifacts.some((artifact) => artifact.kind === "active-probe"));
 		const stateAfter = asRecord(result.stateAfter);
 		assert.match(String(stateAfter.probeId), /^raman-active-probe-/);
+		assert.equal(String(stateAfter.recordPath).startsWith(cwd), true);
 		assert.equal(existsSync(String(stateAfter.recordPath)), true);
 		const record = asRecord(JSON.parse(readFileSync(String(stateAfter.recordPath), "utf-8")));
 		assert.equal(record.commandId, "phase7-active-probe");
@@ -1236,6 +1330,58 @@ test("run_experiment starts a Raman hardware run and poll_run observes completio
 		assert.equal(analysis.status, "success");
 		const qualityMetrics = asRecord(asRecord(asRecord(analysis.stateAfter).analysis).qualityMetrics);
 		assert.equal(qualityMetrics.meanSnrEstimate, 12);
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
+test("Raman hardware run archives LabSpec request and result files", async () => {
+	const cwd = tempCwd();
+	try {
+		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman-dry-run-spec.json") }, { cwd, commandId: "phase7-labspec-preflight" });
+		assert.equal(dryRun.status, "success");
+		const reportId = String(asRecord(asRecord(dryRun.stateAfter).records).reportId);
+		const bridgeDir = join(cwd, "external_labspec_bridge");
+		const start = dispatch(
+			"run_experiment",
+			{
+				spec: loadSpec("raman-hardware-spec.json"),
+				hardwarePilot: {
+					stageAdapter: "memory",
+					raman: {
+						acquisitionBackend: "labspec_file_bridge",
+						labspecBridgeDir: bridgeDir,
+						labspecTimeoutS: 3,
+						labspecPollIntervalS: 0.05,
+					},
+					settleTimeoutMs: 100,
+					heartbeatTimeoutMs: 10_000,
+					maxConsecutiveErrors: 2,
+					approval: baseApproval(reportId),
+				},
+			},
+			{ cwd, commandId: "phase7-labspec-run" },
+		);
+		assert.equal(start.status, "success");
+		const runId = start.runId ?? "";
+		await fakeLabspecWorker(bridgeDir, 2);
+		await waitForRunStatus(cwd, runId, "completed");
+
+		const artifacts = JSON.parse(readFileSync(join(cwd, ".pi", "experiment-runs", "runs", runId, "artifacts.json"), "utf-8")) as Record<
+			string,
+			unknown
+		>[];
+		const requestArtifact = artifacts.find((artifact) => artifact.kind === "labspec-request");
+		const resultArtifact = artifacts.find((artifact) => artifact.kind === "labspec-result");
+		assert.ok(requestArtifact);
+		assert.ok(resultArtifact);
+		assert.equal(String(requestArtifact.uri).includes("\\"), false);
+		assert.equal(String(resultArtifact.uri).includes("\\"), false);
+		assert.equal(existsSync(join(cwd, String(requestArtifact.uri))), true);
+		assert.equal(existsSync(join(cwd, String(resultArtifact.uri))), true);
+		const events = readFileSync(join(cwd, ".pi", "experiment-runs", "runs", runId, "events.jsonl"), "utf-8");
+		assert.match(events, /"archiveRequestPath"/);
+		assert.match(events, /"archiveResultPath"/);
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}

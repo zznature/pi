@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Capabilities } from "./capabilities.ts";
@@ -8,6 +9,7 @@ import type { ExperimentSpec, HardwarePilotParams, ToolResult } from "./schemas.
 import { getUnitCount } from "./spec-utils.ts";
 import {
 	hashExperimentSpec,
+	artifactUriPath,
 	markRunFinished,
 	readRecordedSummary as readStoredSummary,
 	relativeArtifact,
@@ -40,12 +42,9 @@ export interface PreflightRecordRefs {
 	artifacts: ToolResult["artifacts"];
 }
 
-let nextPreflightNumber = 1;
-
 function nextPreflightId(mode: ExperimentSpec["mode"]): string {
-	const id = `${mode}-preflight-${String(nextPreflightNumber).padStart(4, "0")}`;
-	nextPreflightNumber += 1;
-	return id;
+	const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+	return `${mode}-preflight-${timestamp}-${randomUUID().slice(0, 8)}`;
 }
 
 function writeJson(path: string, value: unknown): void {
@@ -148,14 +147,14 @@ export function appendPreflightReport(
 	const capabilitySnapshotPath = join(reportDir, "capabilities.snapshot.json");
 	const relativeReportDir = join(".pi", "experiment-runs", "preflights", reportId);
 	const artifacts: ToolResult["artifacts"] = [
-		{ id: `${reportId}-preflight`, uri: join(relativeReportDir, "preflight.json"), label: "Preflight report", kind: "preflight" },
+		{ id: `${reportId}-preflight`, uri: artifactUriPath(join(relativeReportDir, "preflight.json")), label: "Preflight report", kind: "preflight" },
 		{
 			id: `${reportId}-capabilities`,
-			uri: join(relativeReportDir, "capabilities.snapshot.json"),
+			uri: artifactUriPath(join(relativeReportDir, "capabilities.snapshot.json")),
 			label: "Capability snapshot",
 			kind: "capabilities",
 		},
-		{ id: "approvals-log", uri: join(".pi", "experiment-runs", "approvals.jsonl"), label: "Approval log", kind: "approvals" },
+		{ id: "approvals-log", uri: artifactUriPath(join(".pi", "experiment-runs", "approvals.jsonl")), label: "Approval log", kind: "approvals" },
 	];
 
 	const recordedResult = { ...result, specHash, capabilitySnapshotId };
@@ -204,6 +203,41 @@ function validateRamanSafetyConfirmation(
 	}
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireDryRunPreflight(parsed: Record<string, unknown>, result: Record<string, unknown>, issues: string[]): void {
+	const spec = isRecord(parsed.spec) ? parsed.spec : undefined;
+	if (spec?.mode !== "dry_run") {
+		issues.push("referenced preflight must be a dry_run report");
+	}
+	if (result.mode !== "dry_run") {
+		issues.push("referenced preflight result must be dry_run readiness evidence");
+	}
+}
+
+function requireRamanReadOnlyProbe(spec: ExperimentSpec, result: Record<string, unknown>, issues: string[]): void {
+	if (!spec.domain?.raman) return;
+	const liveState = isRecord(result.liveState) ? result.liveState : undefined;
+	const readOnlyProbe = liveState && isRecord(liveState.readOnlyProbe) ? liveState.readOnlyProbe : undefined;
+	if (!readOnlyProbe) {
+		issues.push("referenced Raman dry-run preflight is missing a read-only probe");
+		return;
+	}
+	if (readOnlyProbe.readOnly !== true) {
+		issues.push("referenced Raman dry-run preflight probe must be read-only");
+	}
+	const stage = isRecord(readOnlyProbe.stage) ? readOnlyProbe.stage : undefined;
+	if (stage?.reachable !== true) {
+		issues.push("referenced Raman dry-run preflight must show a reachable stage");
+	}
+	const labspecWorker = isRecord(readOnlyProbe.labspecWorker) ? readOnlyProbe.labspecWorker : undefined;
+	if (labspecWorker?.reachable !== true) {
+		issues.push("referenced Raman dry-run preflight must show a reachable LabSpec worker");
+	}
+}
+
 export function validateHardwareGate(spec: ExperimentSpec, approval: HardwarePilotParams["approval"], cwd: string): HardwareGateResult {
 	const issues: string[] = [];
 	if (!approval.approved) {
@@ -215,26 +249,33 @@ export function validateHardwareGate(spec: ExperimentSpec, approval: HardwarePil
 	const reportPath = join(cwd, ".pi", "experiment-runs", "preflights", approval.dryRunReportId, "preflight.json");
 	let capabilitySnapshotId: string | undefined;
 	try {
-		const parsed = JSON.parse(readFileSync(reportPath, "utf-8")) as {
-			specHash?: unknown;
-			capabilitySnapshotId?: unknown;
-			result?: { valid?: boolean; specHash?: unknown; capabilitySnapshotId?: unknown };
-		};
-		if (parsed.result?.valid !== true) {
+		const parsed = JSON.parse(readFileSync(reportPath, "utf-8")) as unknown;
+		if (!isRecord(parsed)) {
+			issues.push("referenced dry-run preflight report is malformed");
+			return { valid: false, issues, dryRunReportPath: reportPath, specHash };
+		}
+		const result = isRecord(parsed.result) ? parsed.result : undefined;
+		if (!result) {
+			issues.push("referenced dry-run preflight report is missing a result");
+			return { valid: false, issues, dryRunReportPath: reportPath, specHash };
+		}
+		requireDryRunPreflight(parsed, result, issues);
+		requireRamanReadOnlyProbe(spec, result, issues);
+		if (result.valid !== true) {
 			issues.push("referenced dry-run preflight did not pass");
 		}
-		const reportSpecHash = typeof parsed.specHash === "string" ? parsed.specHash : parsed.result?.specHash;
+		const reportSpecHash = typeof parsed.specHash === "string" ? parsed.specHash : result.specHash;
 		if (reportSpecHash !== specHash) {
 			issues.push("referenced dry-run preflight does not match the hardware ExperimentSpec");
 		}
-		const snapshot = typeof parsed.capabilitySnapshotId === "string" ? parsed.capabilitySnapshotId : parsed.result?.capabilitySnapshotId;
+		const snapshot = typeof parsed.capabilitySnapshotId === "string" ? parsed.capabilitySnapshotId : result.capabilitySnapshotId;
 		if (typeof snapshot !== "string" || snapshot.length === 0) {
 			issues.push("referenced dry-run preflight is missing a capability snapshot");
 		} else {
 			capabilitySnapshotId = snapshot;
 		}
 	} catch {
-		issues.push("referenced dry-run preflight report was not found");
+		issues.push("referenced dry-run preflight report was not found or was not valid JSON");
 	}
 
 	return { valid: issues.length === 0, issues, dryRunReportPath: reportPath, specHash, capabilitySnapshotId };
@@ -320,7 +361,7 @@ export function appendOperatorIntent(
 	const runDir = join(cwd, ".pi", "experiment-runs", "runs", runId);
 	mkdirSync(runDir, { recursive: true });
 	const intentsPath = join(runDir, "intents.jsonl");
-	const relativeIntentsPath = join(".pi", "experiment-runs", "runs", runId, "intents.jsonl");
+	const relativeIntentsPath = artifactUriPath(join(".pi", "experiment-runs", "runs", runId, "intents.jsonl"));
 	appendFileSync(intentsPath, `${toJsonLine({ type: intent, intent, runId, reason, timestamp: new Date().toISOString() })}\n`, "utf-8");
 	return { intentsPath, relativeIntentsPath };
 }

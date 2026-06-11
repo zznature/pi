@@ -239,8 +239,12 @@ function createRunId(mode: ExperimentSpec["mode"]): string {
 	return `${prefix}-${randomUUID().slice(0, 8)}`;
 }
 
+export function artifactUriPath(path: string): string {
+	return path.replace(/\\/g, "/");
+}
+
 function relativeRunPath(runId: string, fileName: string): string {
-	return join(".pi", "experiment-runs", "runs", runId, fileName);
+	return artifactUriPath(join(".pi", "experiment-runs", "runs", runId, fileName));
 }
 
 function absoluteRunPath(cwd: string, runId: string, fileName: string): string {

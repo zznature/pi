@@ -1086,7 +1086,15 @@ def action_acquire_labspec(
                 metadata.update(raw_metadata)
             output_value = result.get("output_path") or result.get("spectrum_path") or request.output_path
             if status == "ok":
-                return {"outputPath": str(output_value), "metadata": metadata}
+                return {
+                    "outputPath": str(output_value),
+                    "metadata": metadata,
+                    "fileBridge": {
+                        "requestId": request.request_id,
+                        "requestPath": str(request.request_path),
+                        "resultPath": str(request.result_path),
+                    },
+                }
             raise BridgeError(
                 "acquisition_failed",
                 str(result.get("message", "LabSpec worker reported an acquisition error")),
@@ -1179,6 +1187,8 @@ def action_run_unit(
             "accumulations": spectrum["metadata"]["accumulations"],
         }
         record["spectrumMetadata"] = spectrum["metadata"]
+        if isinstance(spectrum.get("fileBridge"), dict):
+            record["spectrumFileBridge"] = spectrum["fileBridge"]
     return record
 
 

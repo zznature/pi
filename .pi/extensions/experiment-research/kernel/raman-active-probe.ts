@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { createErrorResult, createSuccessResult } from "../results.ts";
+import { artifactUriPath } from "../run-store.ts";
 import type { RamanActiveProbeParams, ToolResult } from "../schemas.ts";
 import { RamanBridgeClient, RamanBridgeRequestError } from "./raman-bridge.ts";
 
@@ -20,7 +21,7 @@ function writeJson(path: string, value: unknown): void {
 
 function relativeToCwd(cwd: string, path: string): string {
 	const result = relative(cwd, path);
-	return result.startsWith("..") ? path : result;
+	return artifactUriPath(result.startsWith("..") ? path : result);
 }
 
 function activeProbeRoot(cwd: string, probeId: string): string {
@@ -69,7 +70,7 @@ export async function runRamanActiveProbe(params: RamanActiveProbeParams, ctx: R
 	const outputDir = params.outputDir ?? activeProbeRoot(ctx.cwd, probeId);
 	mkdirSync(outputDir, { recursive: true });
 	const recordPath = join(outputDir, "active-probe.json");
-	const bridge = new RamanBridgeClient({ cwd: process.cwd(), python: params.stagePython, requestTimeoutMs: 30_000 });
+	const bridge = new RamanBridgeClient({ cwd: ctx.cwd, python: params.stagePython, requestTimeoutMs: 30_000 });
 	try {
 		const result = await bridge.request<Record<string, unknown>>("active_probe", {
 			outputDir,

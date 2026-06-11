@@ -274,7 +274,7 @@ const RamanActiveProbeApprovalSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
-const HardwarePilotSchema = Type.Object(
+const HardwareExecutionSchema = Type.Object(
 	{
 		stageAdapter: Type.Union([Type.Literal("memory"), Type.Literal("mc_newton_xyz")]),
 		stagePort: Type.Optional(Type.String({ minLength: 1 })),
@@ -307,6 +307,7 @@ const HardwarePilotSchema = Type.Object(
 	},
 	{ additionalProperties: false },
 );
+const HardwarePilotSchema = HardwareExecutionSchema;
 
 export const ExperimentSpecSchema = Type.Object(
 	{
@@ -409,8 +410,9 @@ export const RunPreflightParamsSchema = Type.Object(
 
 export const RunExperimentParamsSchema = Type.Object(
 	{
-		spec: Type.Unknown({ description: "Validated ExperimentSpec to execute in simulation or approved hardware mode" }),
-		resumeFrom: Type.Optional(Type.String({ minLength: 1 })),
+		spec: Type.Unknown({ description: "Validated ExperimentSpec to execute in simulation or gated hardware mode" }),
+		resumeFrom: Type.Optional(Type.Integer({ minimum: 0 })),
+		hardwareExecution: Type.Optional(HardwareExecutionSchema),
 		hardwarePilot: Type.Optional(HardwarePilotSchema),
 	},
 	{ additionalProperties: false },
@@ -656,7 +658,8 @@ export type RamanErrorCode = Static<typeof RamanErrorCodeSchema>;
 export type ValidateExperimentSpecParams = Static<typeof ValidateExperimentSpecParamsSchema>;
 export type RunPreflightParams = Static<typeof RunPreflightParamsSchema>;
 export type RunExperimentParams = Static<typeof RunExperimentParamsSchema>;
-export type HardwarePilotParams = Static<typeof HardwarePilotSchema>;
+export type HardwareExecutionParams = Static<typeof HardwareExecutionSchema>;
+export type HardwarePilotParams = HardwareExecutionParams;
 export type AnalyzeRunParams = Static<typeof AnalyzeRunParamsSchema>;
 export type PlanNextExperimentParams = Static<typeof PlanNextExperimentParamsSchema>;
 export type StartRunParams = Static<typeof StartRunParamsSchema>;

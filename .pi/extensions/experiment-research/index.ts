@@ -182,7 +182,7 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 		if (event.toolName === "start_run") {
 			const mode = getSpecMode(event.input);
 			if (mode !== undefined && mode !== "simulation") {
-				return { block: true, reason: "start_run accepts simulation specs only; use run_experiment for approved hardware pilots." };
+				return { block: true, reason: "start_run accepts simulation specs only; use run_experiment for approved hardware execution." };
 			}
 		}
 	});

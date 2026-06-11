@@ -5,11 +5,12 @@ import { RunExperimentParamsSchema, type ToolResult } from "../schemas.ts";
 export const runExperimentTool = {
 	name: "run_experiment",
 	label: "Run Experiment",
-	description: "Execute a validated simulation ExperimentSpec or an approved Phase 4 stage-only hardware pilot.",
+	description: "Execute a validated simulation ExperimentSpec or an operator-approved hardware ExperimentSpec.",
 	promptSnippet: "Execute a simulation or approved hardware ExperimentSpec and return run records and summary",
 	promptGuidelines: [
 		"Use run_experiment for simulation specs that passed preflight.",
-		"For hardware specs, require a matching dry-run preflight report and explicit operator approval.",
+		"Use hardwareExecution for new hardware calls; legacy hardwarePilot is accepted only during migration.",
+		"For hardware specs, require a matching dry-run preflight report, explicit operator approval, and any Raman-specific safety gates.",
 	],
 	parameters: RunExperimentParamsSchema,
 	executionMode: "sequential",

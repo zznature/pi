@@ -46,6 +46,7 @@ import {
 	StartRunParamsSchema,
 	type AdvanceRunParams,
 	type ExperimentSpec,
+	type HardwareExecutionParams,
 	type OperatorIntentParams,
 	type PlanNextExperimentParams,
 	type PollRunParams,
@@ -56,6 +57,7 @@ import {
 	validateExperimentSpec,
 	validateSchema,
 } from "./schemas.ts";
+import { getUnitCount } from "./spec-utils.ts";
 
 export type DispatchToolName =
 	| "run_preflight"
@@ -147,7 +149,7 @@ function policyResult(
 		commandId,
 		`ExperimentSpec failed policy validation with ${validation.issues.length} issue(s).`,
 		"policy_rejected",
-		["Change the ExperimentSpec to a supported mode and keep it within current phase limits."],
+		["Change the ExperimentSpec to a supported mode and keep it within the active hardware gates."],
 		issuesState(validation.issues),
 		true,
 		spec.experimentId,
@@ -187,26 +189,87 @@ function runPreflight(commandId: string, params: RunPreflightParams, ctx?: Dispa
 		records ? { ...result, specHash: records.specHash, capabilitySnapshotId: records.capabilitySnapshotId, records } : result,
 		result.mode === "simulation"
 			? ["Call run_experiment with the same ExperimentSpec."]
-			: ["Review the dry-run readiness report before considering hardware pilot approval."],
+			: ["Review the dry-run readiness report before considering operator-approved hardware execution."],
 		records?.artifacts,
 		undefined,
 		specOrResult.experimentId,
 	);
 }
 
-function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: RunExperimentParams, ctx?: DispatchContext): ToolResult {
-	if (!params.hardwarePilot) {
+function resolveHardwareExecutionParams(commandId: string, params: RunExperimentParams): HardwareExecutionParams | ToolResult {
+	const hardwareExecution = params.hardwareExecution;
+	const legacyHardwarePilot = params.hardwarePilot;
+
+	if (hardwareExecution && legacyHardwarePilot) {
 		return createErrorResult(
 			commandId,
-			"hardware mode requires hardwarePilot parameters.",
-			"hardware_pilot_params_required",
-			["Provide hardwarePilot approval, watchdog, and stage adapter parameters."],
-			{ mode: spec.mode },
+			"Provide either hardwareExecution or legacy hardwarePilot parameters, not both.",
+			"invalid_tool_params",
+			["Use hardwareExecution for new calls.", "Remove hardwarePilot once the caller has migrated."],
+			{ hasHardwareExecution: true, hasHardwarePilot: true },
 			true,
 		);
 	}
 
-	if (params.hardwarePilot.stageAdapter === "memory" && process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE !== "1") {
+	if (hardwareExecution) return hardwareExecution;
+	if (legacyHardwarePilot) return legacyHardwarePilot;
+
+	return createErrorResult(
+		commandId,
+		"hardware mode requires hardwareExecution parameters.",
+		"hardware_pilot_params_required",
+		["Provide hardwareExecution approval, watchdog, and stage adapter parameters.", "Legacy hardwarePilot is still accepted during migration."],
+		{ mode: "hardware", acceptedFields: ["hardwareExecution", "hardwarePilot"] },
+		true,
+	);
+}
+
+function simulatedHardwareAllowed(): boolean {
+	return process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE === "1";
+}
+
+function invalidResumeFromResult(commandId: string, spec: ExperimentSpec, resumeFrom: number): ToolResult | undefined {
+	const unitCount = getUnitCount(spec);
+	if (resumeFrom <= unitCount) return undefined;
+	return createErrorResult(
+		commandId,
+		`resumeFrom must be between 0 and ${unitCount} for this hardware spec.`,
+		"invalid_resume_from",
+		["Use the nextUnitIndex from a paused resume.snapshot.json, or omit resumeFrom."],
+		{ resumeFrom, unitCount },
+		true,
+		spec.experimentId,
+	);
+}
+
+function realRamanBackendIssues(spec: ExperimentSpec, hardwareExecution: HardwareExecutionParams): string[] {
+	const ramanSpec = spec.domain?.raman;
+	if (!ramanSpec || hardwareExecution.stageAdapter !== "mc_newton_xyz" || simulatedHardwareAllowed()) return [];
+	const ramanExecution = hardwareExecution.raman;
+	const issues: string[] = [];
+	if (ramanSpec.acquisition && ramanExecution?.acquisitionBackend !== "labspec_file_bridge") {
+		issues.push("Real Raman acquisition requires raman.acquisitionBackend to be labspec_file_bridge.");
+	}
+	if (ramanSpec.autofocus?.enabled === true && ramanExecution?.autofocusBackend !== "labspec_file_bridge") {
+		issues.push("Real Raman autofocus requires raman.autofocusBackend to be labspec_file_bridge.");
+	}
+	if (ramanSpec.xyCorrection?.enabled === true && ramanExecution?.xyCorrectionBackend !== "phase_correlation") {
+		issues.push("Real Raman XY correction requires raman.xyCorrectionBackend to be phase_correlation.");
+	}
+	return issues;
+}
+
+function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: RunExperimentParams, ctx?: DispatchContext): ToolResult {
+	const hardwareExecutionOrResult = resolveHardwareExecutionParams(commandId, params);
+	if ("status" in hardwareExecutionOrResult) return hardwareExecutionOrResult;
+	const hardwareExecution = hardwareExecutionOrResult;
+
+	if (params.resumeFrom !== undefined) {
+		const invalidResumeFrom = invalidResumeFromResult(commandId, spec, params.resumeFrom);
+		if (invalidResumeFrom) return invalidResumeFrom;
+	}
+
+	if (hardwareExecution.stageAdapter === "memory" && !simulatedHardwareAllowed()) {
 		return createErrorResult(
 			commandId,
 			"hardware mode requires a real stage adapter; the memory adapter is a simulated stand-in.",
@@ -218,8 +281,24 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 		);
 	}
 
+	const ramanBackendIssues = realRamanBackendIssues(spec, hardwareExecution);
+	if (ramanBackendIssues.length > 0) {
+		return createErrorResult(
+			commandId,
+			"Real Raman hardware execution cannot use fake or unspecified Raman backends.",
+			"simulated_hardware_not_allowed",
+			[
+				"Use LabSpec file-bridge acquisition and autofocus backends for real Raman hardware.",
+				"Use phase_correlation for real Raman XY correction, or run with the simulated hardware guard explicitly enabled.",
+			],
+			{ valid: false, issues: ramanBackendIssues, raman: hardwareExecution.raman ?? {} },
+			true,
+			spec.experimentId,
+		);
+	}
+
 	const cwd = getCwd(ctx);
-	const gate = validateHardwareGate(spec, params.hardwarePilot.approval, cwd);
+	const gate = validateHardwareGate(spec, hardwareExecution.approval, cwd);
 	if (!gate.valid) {
 		return createErrorResult(
 			commandId,
@@ -248,8 +327,8 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 	const reserved = reserveRunGuarded(commandId, cwd, spec, capabilities);
 	if ("status" in reserved) return reserved;
 	const pilot = {
-		...params.hardwarePilot,
-		intentsPath: params.hardwarePilot.intentsPath ?? reserved.intentsPath,
+		...hardwareExecution,
+		intentsPath: hardwareExecution.intentsPath ?? reserved.intentsPath,
 	};
 	if (spec.domain?.raman) {
 		const start = startRamanHardwareRun(
@@ -258,7 +337,7 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 			pilot,
 			reserved,
 			commandId,
-			params.resumeFrom === undefined ? 0 : Number(params.resumeFrom),
+			params.resumeFrom ?? 0,
 		);
 		return createSuccessResult(
 			commandId,
@@ -278,7 +357,7 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 		stage,
 		pilot,
 		eventsPath: reserved.eventsPath,
-		startPointIndex: params.resumeFrom === undefined ? undefined : Number(params.resumeFrom),
+		startPointIndex: params.resumeFrom,
 		correlationId: commandId,
 	});
 	const records = appendHardwareRunRecords(run, pilot, reserved, cwd);
@@ -300,17 +379,6 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 }
 
 function runExperiment(commandId: string, params: RunExperimentParams, ctx?: DispatchContext): ToolResult {
-	if (params.resumeFrom !== undefined && Number.isNaN(Number(params.resumeFrom))) {
-		return createErrorResult(
-			commandId,
-			"resumeFrom must be a completed point index for hardware resume.",
-			"invalid_resume_from",
-			["Use the last completed hardware point index plus one, or omit resumeFrom."],
-			{ resumeFrom: params.resumeFrom },
-			true,
-		);
-	}
-
 	const specOrResult = validateSpecForTool(commandId, params.spec);
 	if ("status" in specOrResult) return specOrResult;
 
@@ -540,7 +608,7 @@ function startRunDispatch(commandId: string, params: StartRunParams, ctx?: Dispa
 			commandId,
 			"The async run lifecycle currently supports simulation specs only.",
 			"lifecycle_mode_not_supported",
-			["Use run_experiment for approved hardware pilots.", "Set spec.mode to simulation to use start_run/advance_run/poll_run."],
+			["Use run_experiment for approved hardware execution.", "Set spec.mode to simulation to use start_run/advance_run/poll_run."],
 			{ mode: spec.mode },
 			true,
 			spec.experimentId,

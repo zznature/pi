@@ -145,6 +145,39 @@ test("hardware gate passes after a matching dry-run preflight", () => {
 	}
 });
 
+test("hardware gate rejects hardware-mode preflight reports", () => {
+	const cwd = tempCwd();
+	try {
+		const hardwarePreflight = dispatch("run_preflight", { spec: loadSpec("hardware-spec.json") }, { cwd, commandId: "hardware-mode-preflight" });
+		assert.equal(hardwarePreflight.status, "success");
+		const reportId = (hardwarePreflight.stateAfter as { records: { reportId: string } }).records.reportId;
+		const gate = validateHardwareGate(loadSpec("hardware-spec.json"), baseApproval(reportId), cwd);
+		assert.equal(gate.valid, false);
+		assert.ok(gate.issues.some((issue) => issue.includes("dry_run")));
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
+test("dry-run preflight records use non-overwriting ids and portable artifact URIs", () => {
+	const cwd = tempCwd();
+	try {
+		const first = dispatch("run_preflight", { spec: loadSpec("hardware-dry-run-spec.json") }, { cwd, commandId: "preflight-one" });
+		const second = dispatch("run_preflight", { spec: loadSpec("hardware-dry-run-spec.json") }, { cwd, commandId: "preflight-two" });
+		assert.equal(first.status, "success");
+		assert.equal(second.status, "success");
+		const firstRecords = (first.stateAfter as { records: { reportId: string } }).records;
+		const secondRecords = (second.stateAfter as { records: { reportId: string } }).records;
+		assert.notEqual(firstRecords.reportId, secondRecords.reportId);
+		assert.match(firstRecords.reportId, /^dry_run-preflight-\d{8}T\d{9}Z-[a-f0-9]{8}$/);
+		for (const artifact of first.artifacts) {
+			assert.equal(artifact.uri.includes("\\"), false);
+		}
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
 test("hardware gate rejects an unapproved operator", () => {
 	const cwd = tempCwd();
 	try {
@@ -280,6 +313,66 @@ test("run_experiment in hardware mode requires the hardware gate", () => {
 	}
 });
 
+test("run_experiment rejects ambiguous hardware execution parameter aliases", () => {
+	const cwd = tempCwd();
+	try {
+		const approval = baseApproval("missing-report");
+		const result = dispatch(
+			"run_experiment",
+			{
+				spec: loadSpec("hardware-spec.json"),
+				hardwareExecution: {
+					stageAdapter: "memory",
+					settleTimeoutMs: 1_000,
+					heartbeatTimeoutMs: 60_000,
+					maxConsecutiveErrors: 2,
+					approval,
+				},
+				hardwarePilot: {
+					stageAdapter: "memory",
+					settleTimeoutMs: 1_000,
+					heartbeatTimeoutMs: 60_000,
+					maxConsecutiveErrors: 2,
+					approval,
+				},
+			},
+			{ cwd },
+		);
+		assert.equal(result.status, "error");
+		assert.equal(result.errorCode, "invalid_tool_params");
+		assert.match(result.summary, /hardwareExecution or legacy hardwarePilot/);
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
+test("run_experiment rejects invalid hardware resumeFrom values", () => {
+	const cwd = tempCwd();
+	try {
+		const baseParams = {
+			spec: loadSpec("hardware-spec.json"),
+			hardwareExecution: {
+				stageAdapter: "memory",
+				settleTimeoutMs: 1_000,
+				heartbeatTimeoutMs: 60_000,
+				maxConsecutiveErrors: 2,
+				approval: baseApproval("missing-report"),
+			},
+		};
+		const negative = dispatch("run_experiment", { ...baseParams, resumeFrom: -1 }, { cwd, commandId: "resume-negative" });
+		assert.equal(negative.status, "error");
+		assert.equal(negative.errorCode, "invalid_tool_params");
+		const fractional = dispatch("run_experiment", { ...baseParams, resumeFrom: 1.5 }, { cwd, commandId: "resume-fractional" });
+		assert.equal(fractional.status, "error");
+		assert.equal(fractional.errorCode, "invalid_tool_params");
+		const outOfRange = dispatch("run_experiment", { ...baseParams, resumeFrom: 5 }, { cwd, commandId: "resume-out-of-range" });
+		assert.equal(outOfRange.status, "error");
+		assert.equal(outOfRange.errorCode, "invalid_resume_from");
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
 test("run_experiment completes a gated hardware run end to end with the memory adapter", () => {
 	const cwd = tempCwd();
 	try {
@@ -289,7 +382,7 @@ test("run_experiment completes a gated hardware run end to end with the memory a
 			"run_experiment",
 			{
 				spec: loadSpec("hardware-spec.json"),
-				hardwarePilot: {
+				hardwareExecution: {
 					stageAdapter: "memory",
 					settleTimeoutMs: 1_000,
 					heartbeatTimeoutMs: 60_000,

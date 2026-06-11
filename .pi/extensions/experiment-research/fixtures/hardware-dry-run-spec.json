@@ -3,7 +3,7 @@
 	"experimentId": "exp-hw-001",
 	"specId": "spec-hw-001",
 	"experimentType": "spatial_mapping",
-	"objective": "Phase 4 hardware pilot: visit a few calibrated stage positions on the MC.Newton XYZ stage.",
+	"objective": "Gated stage hardware check: visit a few calibrated positions on the MC.Newton XYZ stage.",
 	"subject": {
 		"id": "LAB-HW-001",
 		"kind": "calibration_sample"

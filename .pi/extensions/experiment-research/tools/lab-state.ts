@@ -5,7 +5,8 @@ import { EmptyParamsSchema, type ToolResult } from "../schemas.ts";
 function createLabStateResult(state: LabState): ToolResult {
 	return {
 		status: "success",
-		summary: "Static lab state loaded. Simulation, dry-run preflight, and the stage-only hardware pilot are available.",
+		summary:
+			"Static lab state loaded. Simulation, dry-run preflight, gated stage hardware, and gated Raman hardware paths are available.",
 		nextActions: [
 			"Draft an ExperimentSpec in simulation, dry_run, or hardware mode.",
 			"Call validate_experiment_spec before any preflight or run.",
@@ -21,8 +22,8 @@ function createLabStateResult(state: LabState): ToolResult {
 export const getLabStateTool = {
 	name: "get_lab_state",
 	label: "Get Lab State",
-	description: "Return static lab state, simulation capabilities, dry-run readiness, and hardware pilot capabilities.",
-	promptSnippet: "Inspect static lab state, dry-run readiness, and hardware pilot capabilities",
+	description: "Return static lab state, simulation capabilities, dry-run readiness, and gated hardware capabilities.",
+	promptSnippet: "Inspect static lab state, dry-run readiness, and gated hardware capabilities",
 	promptGuidelines: [
 		"Use get_lab_state before planning an experiment when current lab capabilities or mode matter.",
 	],
