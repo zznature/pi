@@ -22,6 +22,38 @@ literature evidence
 
 pi 的升级目标是让上面每个箭头都有结构化记录，而不是只在对话里留下自然语言解释。
 
+## 第一版收敛范围
+
+本文其余部分描述完整目标形态（target state）。为避免一次建满，第一版范围收敛如下，
+与 MVP 目标（第一个 Raman auto-research demo）对齐：
+
+**v1 做**（最小科研推理闭环，全部先在 simulation 下验证）：
+
+- 4 个新对象 schema：`HypothesisRecord`、`AnalysisPlan`、`ScientificConclusion`、
+  `EvidenceClaim`。evidence 以人工录入/粘贴形式进入（必须带引用），不建检索栈。
+- 3 个新 planner 工具：`create_hypothesis`、`register_analysis_plan`、
+  `evaluate_hypothesis`。决策审计不新建对象：扩展 experiment-research 既有的
+  `decisions.jsonl`（phase 5 已实现）补 `hypothesisId`、`evidenceIds`、
+  `rejectedAlternatives` 字段。
+- 1 个新存储根：`.pi/research/`，复用 run store 的单写者与原子写纪律（见 Storage
+  Layout）；不新建 `.pi/literature/`、`.pi/analysis/` 根。
+- 实现位置：先在 `experiment-research` extension 内加 research 层（同一进程、同一
+  store 纪律），稳定后再拆独立 extension——沿用"先 project-local、后抽包"的策略。
+- 与 Raman 路线衔接：v1 闭环用 simulation kernel 验证；第一个真实 demo 等
+  `raman_hardware_integration` Phase 8（谱采集闭环）就绪后，以"假设驱动的 Raman
+  mapping"形式合流，不另起硬件路径。
+
+**v1 不做**（移入 Development Phases 的 Deferred）：
+
+- 文献检索/导入/抽取自动化（`search_literature`、`import_paper`、PaperQA2 类栈）
+- 正式统计检验库（effect size / CI / power）——v1 只做确定性 QC 与
+  `compare_to_prediction`（按 AnalysisPlan 预登记标准判定）
+- protocol compiler 独立工具链（v1 由 agent 直接起草 spec + validate，拒绝的备选
+  记录进 decision audit）
+- report 生成、Zotero/ELN/LIMS 集成
+- 多 extension 拆分（literature / hypothesis / protocol-compiler / data-analysis /
+  research-report 独立化）
+
 ## Current Baseline
 
 当前 pi 已经具备或已有初步设计的能力：
@@ -196,7 +228,9 @@ Recommended extensions:
 .pi/extensions/research-report/
 ```
 
-首版不需要同时实现全部 extension。优先把公共数据契约定清楚，让后续 extension 可以逐步接入。
+首版不需要同时实现全部 extension。上面的拆分是目标形态：v1 全部能力先落在
+`experiment-research` 内（见"第一版收敛范围"），公共数据契约定清楚后，后续 extension
+按需拆出，跨 extension 只交换 id 与窄记录，不互相 import 内部模块。
 
 ## Core Research Objects
 
@@ -249,6 +283,12 @@ interface HypothesisRecord {
 }
 ```
 
+**状态机归属**：`status` 的迁移只能由 `evaluate_hypothesis` 依据预登记的
+`AnalysisPlan.successCriteria/inconclusiveCriteria` 确定性判定驱动——与"stop condition
+不得由 LLM 在运行中随意决定"是同一条原则。LLM 可以起草 `ScientificConclusion` 的
+文字解释，但 `outcome` 与 `status` 迁移由判定逻辑产生并写入 decision audit；
+不暴露自由写 `status` 的工具。
+
 ### AnalysisPlan
 
 分析计划应在实验执行前生成并记录。它定义结果如何被解释，防止事后挑指标。
@@ -271,9 +311,25 @@ interface AnalysisPlan {
 }
 ```
 
+**预登记必须有运行时强制，而不只是流程约定**：
+
+- `AnalysisPlan` 以 canonical JSON 计算 `analysisPlanHash`，由 store 写入——与
+  `specHash` 同一套机制。
+- `ExperimentSpec` 经**显式 schema 扩展**增加可选 `links` 块（`hypothesisId`、
+  `analysisPlanId`、`evidenceIds`）。当前 schema 是 `additionalProperties: false`，
+  不能当"预留字段"处理，必须改 schema 并补校验测试（与 `domain.raman` 块同一教训）。
+- 准入链 `validatePolicy` 校验：plan 存在、hash 与 preflight/approval 记录一致；
+  run 结束后修改 plan 不影响已绑定 run 的解释基准。
+- `evaluate_hypothesis` 只依据 run 绑定的那份 plan 判定，运行时杜绝事后换指标。
+
 ### ExperimentDecision
 
 每次运行实验、停止实验或改变策略都应写入 decision audit。
+
+注意：experiment-research 已实现 `decisions.jsonl` 决策审计（phase 5，
+`plan_next_experiment` 写入）。v1 **不新建对象与存储**，而是给既有 decision 记录
+扩展 `hypothesisId`、`evidenceIds`、`rejectedAlternatives` 等字段；下面的接口是
+扩展后的目标形状，不是并行的第二套审计。
 
 ```ts
 interface ExperimentDecision {
@@ -521,36 +577,29 @@ Exit criteria:
 
 ## Storage Layout
 
-Recommended top-level stores:
+v1 收敛为一个新根 `.pi/research/`，复用既有 `.pi/experiment-runs/`：
 
 ```text
 .pi/research/
-  hypotheses/
-    <hypothesis-id>.json
-  decisions/
-    decisions.jsonl
-  conclusions/
-    <conclusion-id>.json
-  reports/
-    <report-id>.md
+  hypotheses/<hypothesis-id>.json
+  plans/<analysis-plan-id>.json        # 含 analysisPlanHash
+  evidence/<evidence-id>.json          # v1 人工录入，带引用
+  conclusions/<conclusion-id>.json
+  reports/                             # deferred
 
-.pi/literature/
-  papers/
-  searches/
-  reviews/
-  evidence/
-  references.bib
-
-.pi/experiment-runs/
-  experiments/
-  runs/
-
-.pi/analysis/
-  plans/
-  runs/
-  qc/
-  figures/
+.pi/experiment-runs/                   # 既有结构不变
+  experiments/<experiment-id>/         # decisions.jsonl（字段扩展）、lineage.jsonl
+  runs/<run-id>/                       # QC 报告、feature 表、figures 作为 run artifacts
 ```
+
+`.pi/literature/` 与 `.pi/analysis/` 在 v1 不建根：evidence 并入 `.pi/research/evidence/`，
+run 级分析产物留在 `runs/<runId>/` 下由 `ArtifactRef` 引用。后续文献栈接入时再立
+`.pi/literature/`。
+
+**底层纪律**：新 store 必须复用 run store 已经建立的并发与崩溃语义，而不是只定目录树。
+同一 cwd 可能有多个 pi session 并发——`.pi/research/` 同样需要单写者锁、原子写入
+（temp file + rename）、append-only jsonl 的部分写恢复、防冲突 id 派生。这些在
+run-store 中已实现，research store 直接复用同一套实现，不重写。
 
 The pi session should store summaries and human decisions. Large data, raw measurements, full text, figures, and derived tables should be stored as artifacts and referenced by stable IDs.
 
@@ -612,88 +661,82 @@ Operator or maintenance tools should not be in the default planner active set:
 
 - `pause_run`
 - `abort_run`
+- `poll_run`
 - `approve_hardware_run`
 - `register_sample`
 - `override_qc`
 - low-level hardware tools
 
+上表是完整目标形态。v1 实际新增的 planner 工具只有三个：`create_hypothesis`、
+`register_analysis_plan`、`evaluate_hypothesis`，其余沿用 experiment-research 既有集合。
+
+两条运行时纪律：
+
+- planner 同时可见的工具随研究阶段用 `setActiveTools()` 收窄（假设阶段不暴露 run
+  工具，run 进行中不暴露 report/评估工具）。十几个相近宏工具同时可见会推高 LLM
+  误选率，且每轮都付全部 schema 的 context 成本。
+- 所有新工具遵守 ToolResult 双通道：`content` 只放摘要与 id，完整记录进 `details`
+  与磁盘；evidence 原文、统计明细不内联进 context。session 恢复后先经
+  `get_experiment_state`（v1 扩展其返回值，附 hypothesis/conclusion 摘要）重建状态。
+
 ## Development Phases
 
-### Phase 0: Research Object Contracts
+阶段编号用 **R 前缀**，避免与 experiment-research extension 的 phase 4–10（hardware
+pilot、async lifecycle、Raman bridge）撞号。两条路线并行推进，在 R2 合流。
 
-Goal: define shared schemas and records.
+### Phase R0: Research Object Contracts
 
-- Add `HypothesisRecord`, `AnalysisPlan`, `ExperimentDecision`, `ScientificConclusion`.
-- Add `.pi/research/` and `.pi/analysis/` storage conventions.
-- Add schema tests and fixture examples.
+Goal: define shared schemas and enforcement.
 
-Exit criteria:
-
-- A fake workflow can link literature evidence to a hypothesis and a planned experiment without running hardware.
-
-### Phase 1: Literature and Hypothesis Loop
-
-Goal: answer “why this experiment?”
-
-- Implement minimal `literature-research` metadata search and evidence extraction.
-- Implement `create_hypothesis`.
-- Link `HypothesisRecord` to evidence and experiment objective.
-- Add `reviewId/evidenceIds/hypothesisId` to experiment planning inputs.
+- `HypothesisRecord`、`AnalysisPlan`、`ScientificConclusion`、`EvidenceClaim` schema、
+  fixtures 与 schema 测试。
+- `ExperimentSpec.links` 显式扩展（schema + validator 测试）；`analysisPlanHash`
+  进准入链 policy 校验。
+- `.pi/research/` store，复用 run store 的单写者/原子写实现。
+- 既有 `decisions.jsonl` 记录扩展 `hypothesisId`、`evidenceIds`、`rejectedAlternatives`。
 
 Exit criteria:
 
-- Every proposed experiment can cite supporting literature evidence or explicitly say evidence is missing.
+- fake 数据可以把 evidence -> hypothesis -> plan -> spec 完整链接起来，不跑任何 run；
+  缺 plan 或 hash 不一致的 spec 被 policy 拒绝。
 
-### Phase 2: Protocol Compiler
+### Phase R1: Minimal Scientific Loop (simulation)
 
-Goal: make experiment design auditable.
+Goal: 闭合本文"Recommended Next Step"的最小推理闭环，回答"为什么跑、结果是否支持假设"。
 
-- Implement `compile_experiment_spec`.
-- Record rejected protocol alternatives.
-- Generate `AnalysisPlan` before execution.
-- Require `analysisPlanId` in experiment records.
-
-Exit criteria:
-
-- Agent can explain why the selected protocol matches the hypothesis and constraints.
-
-### Phase 3: Analysis and QC Pipeline
-
-Goal: answer “does the result support the hypothesis?”
-
-- Implement deterministic artifact processing.
-- Implement domain QC rules.
-- Implement statistical analysis against `AnalysisPlan`.
-- Generate `ScientificConclusion`.
+- 人工录入 evidence -> `create_hypothesis` -> `register_analysis_plan`
+  -> 既有 validate/preflight/run（simulation）
+  -> 确定性 QC 与 `compare_to_prediction`（按预登记标准判定，TS 内聚合）
+  -> `evaluate_hypothesis` 产出 `ScientificConclusion` 并迁移 hypothesis 状态
+  -> `plan_next_experiment` 写扩展后的 decision audit。
+- 按阶段切换 `setActiveTools()`。
 
 Exit criteria:
 
-- A run result updates hypothesis status through QC and statistics, not raw summary text.
+- 验收标准 1、4–7、9、10 全部可从磁盘记录回答；2–3 以人工 evidence 满足。
 
-### Phase 4: Multi-Round Research Loop
+### Phase R2: Hypothesis-Driven Raman Demo (hardware 合流)
 
-Goal: close the adaptive research loop.
+Goal: 第一个真实 auto-research demo。
 
-- Extend `plan_next_experiment` to use evidence, hypothesis status, analysis results, and stopping criteria.
-- Record decision audit for repeat/refine/stop/change_strategy.
-- Add comparison across multiple runs.
-
-Exit criteria:
-
-- Agent can justify the next experiment or stopping decision from structured records.
-
-### Phase 5: Reporting and External Integrations
-
-Goal: produce research outputs and connect lab systems.
-
-- Implement `build_research_report`.
-- Add Zotero/BibTeX export flow.
-- Add optional ELN/LIMS connectors.
-- Add figure and methods export.
+- 依赖 `raman_hardware_integration` Phase 8（谱采集闭环）就绪。
+- 同一闭环切换 hardware 模式：假设（如"区域 X 存在特征峰 Y"）-> 真实 Raman mapping
+  -> bridge 返回的确定性谱指标 -> 结论与下一轮决策。
+- 数值计算留在 Python bridge 侧（与 Raman 接入同一边界原则），TS 只消费结果。
 
 Exit criteria:
 
-- A report can be generated from records with citations, methods, figures, results, limitations, and decision history.
+- 一次真实 Raman 实验的"为什么跑、结果是否支持假设、下一步为什么"全部可从记录重建。
+
+### Deferred（按需启动，不进入 v1）
+
+- 文献检索/导入/抽取自动化（PaperQA2 类栈、citation graph、`.pi/literature/` 根）。
+- 正式统计检验库（effect size、CI、power、replicate 设计）；启动时数值实现放
+  Python 侧，不在 TS 重写统计库。
+- protocol compiler 独立工具链与 rejected alternatives 的结构化对比。
+- `build_research_report`、方法/图表导出、Zotero/BibTeX、ELN/LIMS 连接器。
+- extension 拆分：literature-research、hypothesis-research、protocol-compiler、
+  data-analysis、research-report 独立化与跨 extension 契约。
 
 ## Acceptance Criteria
 
