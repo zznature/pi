@@ -12,6 +12,7 @@ export const getExperimentStateTool = {
 		"Keep the same experimentId when compiling a follow-up ExperimentSpec.",
 	],
 	parameters: GetExperimentStateParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const state = getExperimentState(ctx.cwd, params.experimentId);
 		const result: ToolResult = {

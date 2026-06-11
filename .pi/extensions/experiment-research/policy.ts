@@ -49,6 +49,28 @@ function validateHardwarePilotScope(spec: ExperimentSpec): ValidationIssue[] {
 
 	if (spec.mode !== "hardware") return issues;
 	const instrumentIds = getInstrumentResourceIds(spec);
+	const raman = spec.domain?.raman;
+	if (raman) {
+		const hasLabSpecWorkstation = spec.resources.some((resource) => resource.kind === "workspace" && resource.id === "labspec-workstation");
+		if (!instrumentIds.includes("mc-newton-xyz-stage")) {
+			issues.push(issue("resources", "Raman hardware runs require mc-newton-xyz-stage"));
+		}
+		if (!hasLabSpecWorkstation) {
+			issues.push(issue("resources", "Raman hardware runs require labspec-workstation workspace lease"));
+		}
+		if (raman.acquisition && !instrumentIds.includes("lab-acquirer")) {
+			issues.push(issue("resources", "Raman acquisition requires lab-acquirer"));
+		}
+		const requiresFrames = raman.autofocus?.enabled === true || raman.xyCorrection?.enabled === true;
+		if (requiresFrames && !instrumentIds.includes("lab-camera")) {
+			issues.push(issue("resources", "Raman autofocus or XY correction requires lab-camera"));
+		}
+		if (!spec.limits.motion.zUm) {
+			issues.push(issue("limits.motion.zUm", "Raman hardware runs require explicit zUm limits"));
+		}
+		return issues;
+	}
+
 	if (instrumentIds.length !== 1 || instrumentIds[0] !== "mc-newton-xyz-stage") {
 		issues.push(issue("resources", "Phase 4 hardware pilot only supports mc-newton-xyz-stage"));
 	}

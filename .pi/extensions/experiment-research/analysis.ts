@@ -18,6 +18,11 @@ export interface QualityMetrics {
 	signalRange?: number;
 	meanFocusScore?: number;
 	minFocusScore?: number;
+	meanFocusConfidence?: number;
+	meanSnrEstimate?: number;
+	minSnrEstimate?: number;
+	saturatedSpectra?: number;
+	meanXyCorrectionUm?: number;
 	artifactCount: number;
 }
 
@@ -27,7 +32,7 @@ export interface AnomalyPoint {
 	severity: AnomalySeverity;
 	metric: string;
 	observed: string | number | boolean;
-	threshold?: string | number;
+	threshold?: string | number | boolean;
 	reason: string;
 	artifactRefs: string[];
 }
@@ -63,6 +68,11 @@ interface UnitForAnalysis {
 	status?: string;
 	signal?: number;
 	focusScore?: number;
+	focusConfidence?: number;
+	snrEstimate?: number;
+	saturated?: boolean;
+	xyCorrectionUm?: number;
+	errorCode?: string;
 	error?: string;
 }
 
@@ -160,12 +170,22 @@ function readUnit(event: RecordedEvent): UnitForAnalysis | undefined {
 	const unitIndex = numberValue(unit, "index");
 	const status = stringValue(unit, "status");
 	const eventType = event.type === "unit_error" ? "error" : status;
+	const autofocus = asRecord(unit.autofocus);
+	const spectrumMetadata = asRecord(unit.spectrumMetadata);
+	const xyCorrection = asRecord(unit.xyCorrection);
+	const dxUm = xyCorrection ? numberValue(xyCorrection, "dxUm") : undefined;
+	const dyUm = xyCorrection ? numberValue(xyCorrection, "dyUm") : undefined;
 	return {
 		unitId: unitIndex === undefined ? `${event.type ?? "unit"}-${event.sequence ?? "unknown"}` : `point-${unitIndex}`,
 		unitIndex,
 		status: eventType,
 		signal: numberValue(unit, "signal"),
 		focusScore: numberValue(unit, "focusScore"),
+		focusConfidence: autofocus ? numberValue(autofocus, "confidence") : undefined,
+		snrEstimate: spectrumMetadata ? numberValue(spectrumMetadata, "snrEstimate") : undefined,
+		saturated: spectrumMetadata?.saturated === true,
+		xyCorrectionUm: dxUm === undefined || dyUm === undefined ? undefined : round(Math.hypot(dxUm, dyUm)),
+		errorCode: stringValue(unit, "errorCode"),
 		error: stringValue(unit, "error"),
 	};
 }
@@ -180,6 +200,13 @@ function readArtifactRefs(artifacts: unknown[]): ToolResult["artifacts"] {
 function computeMetrics(summary: SummaryForAnalysis, units: UnitForAnalysis[], artifactRefs: ToolResult["artifacts"]): QualityMetrics {
 	const signals = units.map((unit) => unit.signal).filter((signal): signal is number => signal !== undefined);
 	const focusScores = units.map((unit) => unit.focusScore).filter((focusScore): focusScore is number => focusScore !== undefined);
+	const focusConfidences = units
+		.map((unit) => unit.focusConfidence)
+		.filter((focusConfidence): focusConfidence is number => focusConfidence !== undefined);
+	const snrEstimates = units.map((unit) => unit.snrEstimate).filter((snrEstimate): snrEstimate is number => snrEstimate !== undefined);
+	const xyCorrections = units
+		.map((unit) => unit.xyCorrectionUm)
+		.filter((xyCorrectionUm): xyCorrectionUm is number => xyCorrectionUm !== undefined);
 	const failedUnits = units.filter((unit) => unit.status === "error").length;
 	const skippedUnits = units.filter((unit) => unit.status === "skipped").length;
 	const completedUnits = summary.completedUnits;
@@ -199,6 +226,11 @@ function computeMetrics(summary: SummaryForAnalysis, units: UnitForAnalysis[], a
 		signalRange: minSignal === undefined || maxSignal === undefined ? undefined : round(maxSignal - minSignal),
 		meanFocusScore: mean(focusScores),
 		minFocusScore: min(focusScores),
+		meanFocusConfidence: mean(focusConfidences),
+		meanSnrEstimate: mean(snrEstimates),
+		minSnrEstimate: min(snrEstimates),
+		saturatedSpectra: units.filter((unit) => unit.saturated === true).length,
+		meanXyCorrectionUm: mean(xyCorrections),
 		artifactCount: artifactRefs.length,
 	};
 }
@@ -259,7 +291,7 @@ function buildAnomalies(summary: SummaryForAnalysis, metrics: QualityMetrics, un
 				metric: "unitStatus",
 				observed: "error",
 				threshold: "success",
-				reason: unit.error ?? "Unit error event was recorded.",
+				reason: unit.errorCode ?? unit.error ?? "Unit error event was recorded.",
 				artifactRefs: [],
 			});
 		}
@@ -284,6 +316,18 @@ function buildAnomalies(summary: SummaryForAnalysis, metrics: QualityMetrics, un
 				observed: unit.focusScore,
 				threshold: MIN_FOCUS_SCORE,
 				reason: "Focus score is below the deterministic quality threshold.",
+				artifactRefs: [],
+			});
+		}
+		if (unit.saturated === true) {
+			anomalies.push({
+				unitId: unit.unitId,
+				unitIndex: unit.unitIndex,
+				severity: "warning",
+				metric: "saturated",
+				observed: true,
+				threshold: false,
+				reason: "Spectrum metadata reports saturation.",
 				artifactRefs: [],
 			});
 		}

@@ -50,6 +50,7 @@ export const validateExperimentSpecTool = {
 		"Do not call hardware or execution tools when validate_experiment_spec returns an error.",
 	],
 	parameters: ValidateExperimentSpecParamsSchema,
+	executionMode: "sequential",
 	async execute(_toolCallId, params) {
 		const validation = validateExperimentSpec(params.spec);
 		const result = validation.valid ? createSuccessResult() : createErrorResult(params);

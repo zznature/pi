@@ -1,14 +1,38 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import type { ExperimentSpec, HardwarePilotParams } from "../schemas.ts";
+import type { ExperimentSpec, HardwarePilotParams, RamanErrorCode } from "../schemas.ts";
 import { getExperimentPoints, type ExperimentPoint } from "../spec-utils.ts";
 import { evaluateWatchdog } from "../watchdog.ts";
 import type { StageAdapter, StagePosition } from "./stage-adapter.ts";
+
+export interface HardwareAutofocusRecord {
+	zBestUm: number;
+	finalScore: number;
+	confidence: number;
+	curveArtifactId?: string;
+}
+
+export interface HardwareXyCorrectionRecord {
+	dxUm: number;
+	dyUm: number;
+	confidence: number;
+	applied: boolean;
+}
+
+export interface HardwareSpectrumRecord {
+	artifactId: string;
+	integrationTimeS: number;
+	accumulations: number;
+}
 
 export interface HardwarePointRecord extends ExperimentPoint {
 	status: "success" | "error" | "skipped";
 	positionBefore?: StagePosition;
 	positionAfter?: StagePosition;
+	autofocus?: HardwareAutofocusRecord;
+	xyCorrection?: HardwareXyCorrectionRecord;
+	spectrum?: HardwareSpectrumRecord;
+	errorCode?: RamanErrorCode;
 	error?: string;
 }
 

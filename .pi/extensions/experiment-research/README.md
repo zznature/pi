@@ -13,6 +13,8 @@ planner macro tools only:
 - `validate_experiment_spec`
 - `run_preflight`
 - `run_experiment`
+- `start_run`
+- `advance_run`
 - `analyze_run`
 - `plan_next_experiment`
 
@@ -21,7 +23,13 @@ planner default active set:
 
 - `pause_run`
 - `abort_run`
+- `poll_run`
 - `request_operator`
+- `raman_active_probe`
+- `raman_record_xy_calibration`
+- `raman_fit_xy_calibration`
+- `raman_auto_xy_calibration`
+- `raman_record_hardware_validation`
 
 ## Capabilities
 
@@ -30,7 +38,75 @@ Capabilities are loaded from `capabilities.ts`.
 - `simulation` uses fake stage, camera, and acquisition resources.
 - `dry_run` probes the narrow hardware pilot capability without motion,
   acquisition, or power writes.
-- `hardware` is limited to the MC.Newton XYZ stage pilot path.
+- `hardware` keeps the existing MC.Newton XYZ stage pilot path and now admits
+  typed Raman specs when `domain.raman` is present.
+
+Raman readiness currently includes:
+
+- typed `domain.raman` schema and semantic validation for acquisition,
+  autofocus windows, and XY correction margins;
+- `raman_bridge.py`, a JSON-lines Python bridge with read-only probe,
+  memory-stage `visit_point`, fake `run_unit` acquisition, and stderr-only
+  diagnostics;
+- `RamanBridgeClient` for long-lived stdio protocol tests;
+- dry-run `readOnlyProbe` reports written through the Python bridge for Raman
+  specs;
+- `active_probe` smoke checks for operator-approved frame capture and short
+  spectrum artifacts through the operator-only `raman_active_probe` tool, kept
+  separate from read-only dry runs;
+- operator-approved Raman XY calibration records through
+  `raman_record_xy_calibration`, persisted under
+  `.pi/experiment-runs/lab/calibrations` and referenced by
+  `domain.raman.xyCorrection.transformArtifactId`;
+- operator-approved Raman XY calibration fitting through
+  `raman_fit_xy_calibration`, which estimates `pixelPerUm` from non-collinear
+  stage shifts and reference/current frame pairs before writing the same
+  calibration artifact format;
+- operator-approved automatic Raman XY calibration sequencing through
+  `raman_auto_xy_calibration`, which can move a stage, capture frames, fit
+  `pixelPerUm`, and write the calibration artifact. The no-hardware path uses a
+  memory stage with synthetic frames; the real path uses MC.Newton plus the
+  LabSpec frame bridge and still requires supervised hardware validation;
+- operator-reviewed Raman hardware validation records through
+  `raman_record_hardware_validation`, collecting read-only preflight, active
+  smoke, minimum Raman run, optional calibration, safety checklist evidence,
+  explicit hardware observation metadata, and instrument IDs into
+  `.pi/experiment-runs/lab/validations`. Records only become
+  `productionReady` when the evidence is marked `hardware`, the operator
+  attests real hardware observation, and the referenced active probe/run records
+  do not use fake or memory backends. The minimum Raman run must also include a
+  completed unit with `labspec_file_bridge` spectrum metadata, while the active
+  probe must include both LabSpec frame capture and spectrum smoke artifacts.
+  The referenced read-only preflight and minimum Raman run must share the same
+  canonical `specHash`; the validation record stores an `evidenceDigest` with
+  SHA-256 hashes for the referenced preflight, active probe, run records, and
+  optional calibration artifact, plus the active probe frame/spectrum artifacts
+  and minimum-run spectrum artifacts;
+- Raman hardware gates require a `labspec-workstation` workspace lease and
+  explicit `ramanSafety` laser-power confirmation in the operator approval;
+- bridge-backed Raman `run_experiment` execution for the minimal
+  `visit_point + acquire` path, returning immediately with a `runId` and
+  updating `poll_run` state through `resume.snapshot.json`;
+- selectable Raman acquisition backends: `fake` for no-hardware regression
+  tests and `labspec_file_bridge` for the LabSpec worker request/result
+  directory protocol;
+- bridge `autofocus` and `xy_correct` actions with fake/no-hardware backends
+  plus real-capable `labspec_file_bridge` autofocus and `phase_correlation`
+  XY correction backends, wired into Raman `run_unit` so focus confidence and
+  correction metadata flow into run records and analysis. Hardware-pilot
+  params can provide explicit phase-correlation frame paths, while the transform
+  is normally resolved from the referenced calibration artifact;
+- deterministic Raman analysis metrics for spectrum SNR, saturation, focus
+  confidence, and XY correction metadata.
+
+The `docs/Raman/mapping` LabSpec helper package is also present so the existing
+autofocus/microscope file bridge modules and `request_labspec_spectrum.py` can
+import in a no-hardware environment. The existing non-Raman hardware pilot
+remains synchronous and stage-only.
+
+The next hardware milestone is validating the `labspec_file_bridge`
+acquisition/autofocus path and `phase_correlation` XY correction path against
+the real LabSpec worker, camera stream, stage, and operator safety workflow.
 
 Hardware execution requires a matching dry-run `specHash`, a capability
 snapshot, and explicit operator approval.
@@ -78,13 +154,21 @@ validate_experiment_spec -> run_preflight -> run_experiment -> analyze_run -> pl
 Use `fixtures/hardware-dry-run-spec.json` and `fixtures/hardware-spec.json` for
 the memory-adapter hardware pilot path.
 
+Use `fixtures/raman-dry-run-spec.json` and `fixtures/raman-hardware-spec.json`
+for the minimal Raman acquisition contract path.
+
 ## CI Checks
 
 Run focused tests after changing this extension:
 
 ```text
-node --test .pi\extensions\experiment-research\phase4.test.ts
-node --test .pi\extensions\experiment-research\phase5.test.ts
+npm --prefix .pi/extensions/experiment-research test
+```
+
+Run an individual phase test when iterating on a narrow change:
+
+```text
+npm --prefix .pi/extensions/experiment-research run test:phase7
 ```
 
 After code changes, run the repository check:

@@ -185,11 +185,31 @@ export interface HardwareGateResult {
 	capabilitySnapshotId?: string;
 }
 
+function validateRamanSafetyConfirmation(
+	spec: ExperimentSpec,
+	approval: HardwarePilotParams["approval"],
+	issues: string[],
+): void {
+	if (!spec.domain?.raman?.acquisition) return;
+	const safety = approval.ramanSafety;
+	if (!safety) {
+		issues.push("Raman acquisition requires operator ramanSafety confirmation");
+		return;
+	}
+	if (safety.laserPowerConfirmed !== true) {
+		issues.push("Raman acquisition requires laser power confirmation");
+	}
+	if (safety.confirmedLaserPowerMw > spec.limits.powerEnergy.maxLaserPowerMw) {
+		issues.push("confirmed Raman laser power exceeds spec limits.powerEnergy.maxLaserPowerMw");
+	}
+}
+
 export function validateHardwareGate(spec: ExperimentSpec, approval: HardwarePilotParams["approval"], cwd: string): HardwareGateResult {
 	const issues: string[] = [];
 	if (!approval.approved) {
 		issues.push("operator approval is not approved");
 	}
+	validateRamanSafetyConfirmation(spec, approval, issues);
 
 	const specHash = hashExperimentSpec(spec);
 	const reportPath = join(cwd, ".pi", "experiment-runs", "preflights", approval.dryRunReportId, "preflight.json");

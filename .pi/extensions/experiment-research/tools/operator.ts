@@ -9,6 +9,7 @@ export const pauseRunTool = {
 	promptSnippet: "Record an operator pause intent for a hardware run",
 	promptGuidelines: ["Use pause_run only to request a safe pause of an active hardware run."],
 	parameters: OperatorIntentParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("pause_run", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
@@ -22,6 +23,7 @@ export const abortRunTool = {
 	promptSnippet: "Record an operator abort intent for a hardware run",
 	promptGuidelines: ["Use abort_run only to request a safe abort of an active hardware run."],
 	parameters: OperatorIntentParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("abort_run", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
@@ -35,6 +37,7 @@ export const requestOperatorTool = {
 	promptSnippet: "Record a request for operator attention on a hardware run",
 	promptGuidelines: ["Use request_operator to flag that a human operator should review the run."],
 	parameters: OperatorIntentParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("request_operator", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };

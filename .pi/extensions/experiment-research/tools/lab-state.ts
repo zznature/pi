@@ -27,6 +27,7 @@ export const getLabStateTool = {
 		"Use get_lab_state before planning an experiment when current lab capabilities or mode matter.",
 	],
 	parameters: EmptyParamsSchema,
+	executionMode: "sequential",
 	async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
 		const result = createLabStateResult(getLabState(ctx.cwd));
 		return {

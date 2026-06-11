@@ -12,6 +12,7 @@ export const planNextExperimentTool = {
 		"Do not treat plan_next_experiment output as a full ExperimentSpec; compile the strategy into a bounded spec first.",
 	],
 	parameters: PlanNextExperimentParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("plan_next_experiment", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return {

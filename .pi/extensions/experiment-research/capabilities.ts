@@ -121,8 +121,8 @@ const DRY_RUN_CAPABILITIES = {
 			hazards: ["real camera adapter probed read-only"],
 			simulationAvailable: false,
 			dryRunAvailable: true,
-			hardwarePilotAvailable: false,
-			leasePolicy: "shared-read",
+			hardwarePilotAvailable: true,
+			leasePolicy: "exclusive",
 		},
 		{
 			id: "lab-acquirer",
@@ -137,8 +137,8 @@ const DRY_RUN_CAPABILITIES = {
 			hazards: ["real acquirer adapter probed read-only"],
 			simulationAvailable: false,
 			dryRunAvailable: true,
-			hardwarePilotAvailable: false,
-			leasePolicy: "shared-read",
+			hardwarePilotAvailable: true,
+			leasePolicy: "exclusive",
 		},
 	],
 } satisfies Capabilities;

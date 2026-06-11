@@ -4,6 +4,7 @@ import { getLabState } from "./lab-state.ts";
 import { runHardwarePilotKernel } from "./kernel/hardware-pilot.ts";
 import { advanceRun, pollRun, startRun, type RunState } from "./kernel/kernel.ts";
 import { runLabAgentKernel } from "./kernel/lab-agent-kernel.ts";
+import { requestRamanHardwareStop, startRamanHardwareRun } from "./kernel/raman-hardware.ts";
 import { createStageAdapter } from "./kernel/stage-adapter.ts";
 import { planNextExperiment } from "./planning.ts";
 import { validatePolicy } from "./policy.ts";
@@ -162,7 +163,7 @@ function runPreflight(commandId: string, params: RunPreflightParams, ctx?: Dispa
 
 	const capabilityMode = specOrResult.mode === "simulation" ? "simulation" : "dry_run";
 	const capabilities = loadCapabilities(capabilityMode);
-	const result = preflight(specOrResult, capabilities, getLabState(getCwd(ctx)));
+	const result = preflight(specOrResult, capabilities, getLabState(getCwd(ctx)), getCwd(ctx));
 	if (!result.valid) {
 		return createErrorResult(
 			commandId,
@@ -231,7 +232,7 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 	}
 
 	const capabilities = loadCapabilities("hardware");
-	const preflightResult = preflight(spec, capabilities, getLabState(cwd));
+	const preflightResult = preflight(spec, capabilities, getLabState(cwd), cwd);
 	if (!preflightResult.valid) {
 		return createErrorResult(
 			commandId,
@@ -246,11 +247,31 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 
 	const reserved = reserveRunGuarded(commandId, cwd, spec, capabilities);
 	if ("status" in reserved) return reserved;
-	markRunRunning(cwd, reserved.record.runId);
 	const pilot = {
 		...params.hardwarePilot,
 		intentsPath: params.hardwarePilot.intentsPath ?? reserved.intentsPath,
 	};
+	if (spec.domain?.raman) {
+		const start = startRamanHardwareRun(
+			cwd,
+			spec,
+			pilot,
+			reserved,
+			commandId,
+			params.resumeFrom === undefined ? 0 : Number(params.resumeFrom),
+		);
+		return createSuccessResult(
+			commandId,
+			`Raman hardware run ${reserved.record.runId} started with ${start.runState.progress.totalUnits} queued unit(s).`,
+			{ runState: start.runState, records: { runDir: reserved.runDir, eventsPath: reserved.eventsPath, intentsPath: reserved.intentsPath } },
+			["Call poll_run with the returned runId to observe progress.", "Use pause_run or abort_run to intervene during the hardware run."],
+			start.artifacts,
+			reserved.record.runId,
+			spec.experimentId,
+		);
+	}
+
+	markRunRunning(cwd, reserved.record.runId);
 	const stage = createStageAdapter(pilot, cwd);
 	const run = runHardwarePilotKernel(spec, {
 		runId: reserved.record.runId,
@@ -323,7 +344,7 @@ function runExperiment(commandId: string, params: RunExperimentParams, ctx?: Dis
 	}
 
 	const capabilities = loadCapabilities("simulation");
-	const preflightResult = preflight(specOrResult, capabilities, getLabState(getCwd(ctx)));
+	const preflightResult = preflight(specOrResult, capabilities, getLabState(getCwd(ctx)), getCwd(ctx));
 	if (!preflightResult.valid) {
 		return createErrorResult(
 			commandId,
@@ -531,7 +552,7 @@ function startRunDispatch(commandId: string, params: StartRunParams, ctx?: Dispa
 
 	const cwd = getCwd(ctx);
 	const capabilities = loadCapabilities("simulation");
-	const preflightResult = preflight(spec, capabilities, getLabState(cwd));
+	const preflightResult = preflight(spec, capabilities, getLabState(cwd), cwd);
 	if (!preflightResult.valid) {
 		return createErrorResult(
 			commandId,
@@ -626,6 +647,7 @@ function operatorIntent(
 	const cwd = getCwd(ctx);
 	const ref = appendOperatorIntent(params.runId, intent, params.reason, cwd);
 	if (intent === "abort") {
+		requestRamanHardwareStop(params.runId);
 		try {
 			const record = readRunRecord(cwd, params.runId);
 			if (record.status === "running" || record.status === "paused" || record.status === "recovering") {

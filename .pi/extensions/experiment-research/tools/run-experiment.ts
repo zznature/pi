@@ -12,6 +12,7 @@ export const runExperimentTool = {
 		"For hardware specs, require a matching dry-run preflight report and explicit operator approval.",
 	],
 	parameters: RunExperimentParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("run_experiment", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return {

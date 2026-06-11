@@ -12,6 +12,7 @@ export const startRunTool = {
 		"start_run only reserves and starts the run; call advance_run to execute units.",
 	],
 	parameters: StartRunParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("start_run", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
@@ -28,6 +29,7 @@ export const advanceRunTool = {
 		"Set maxUnits to keep control returning to the planner; omit it to run to completion.",
 	],
 	parameters: AdvanceRunParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("advance_run", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
@@ -41,6 +43,7 @@ export const pollRunTool = {
 	promptSnippet: "Read the live RunState and progress for a run",
 	promptGuidelines: ["Use poll_run to observe progress between advance_run calls."],
 	parameters: PollRunParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("poll_run", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };

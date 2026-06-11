@@ -39,6 +39,10 @@ export function getInstrumentResourceIds(spec: ExperimentSpec): string[] {
 	return spec.resources.filter((resource) => resource.kind === "instrument").map((resource) => resource.id);
 }
 
+export function getResourceIds(spec: ExperimentSpec): string[] {
+	return spec.resources.map((resource) => resource.id);
+}
+
 export function getUnitCount(spec: ExperimentSpec): number {
 	if (spec.plan.kind === "steps") return spec.plan.steps.length;
 	return getExperimentPoints(spec).length;

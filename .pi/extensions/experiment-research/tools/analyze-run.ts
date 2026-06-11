@@ -9,6 +9,7 @@ export const analyzeRunTool = {
 	promptSnippet: "Analyze a completed experiment run by runId",
 	promptGuidelines: ["Use analyze_run after run_experiment returns a runId."],
 	parameters: AnalyzeRunParamsSchema,
+	executionMode: "sequential",
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const result = dispatch("analyze_run", params, { cwd: ctx.cwd, commandId: toolCallId });
 		return {

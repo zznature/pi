@@ -115,6 +115,21 @@ export interface RecordedEvent {
 	stopReason?: string;
 }
 
+export interface RecordedApproval {
+	type?: string;
+	runId?: string;
+	approval?: {
+		approvalId?: string;
+		operator?: string;
+		approved?: boolean;
+		dryRunReportId?: string;
+		operatorOnlyMonitoring?: boolean;
+	};
+	operatorOnlyMonitoring?: boolean;
+	specHash?: string;
+	raman?: boolean;
+}
+
 export interface ResumeSnapshot {
 	schemaVersion: "1";
 	runId: string;
@@ -438,6 +453,12 @@ export function readRecordedEvents(cwd: string, runId: string): RecordedEvent[] 
 	return readJsonl(eventsPath).filter((event): event is RecordedEvent => typeof event === "object" && event !== null && !Array.isArray(event));
 }
 
+export function readRecordedApprovals(cwd: string, runId: string): RecordedApproval[] {
+	const approvalsPath = absoluteRunPath(cwd, runId, "approvals.jsonl");
+	if (!existsSync(approvalsPath)) return [];
+	return readJsonl(approvalsPath).filter(isRecordedApproval);
+}
+
 export function writeRecordedAnalysis(cwd: string, runId: string, analysis: unknown): ToolResult["artifacts"][number] {
 	const analysisPath = absoluteRunPath(cwd, runId, "analysis.json");
 	writeJson(analysisPath, analysis);
@@ -516,6 +537,21 @@ export function getExperimentState(
 		})
 		.filter((record): record is RunRecord => record !== undefined && record.experimentId === experimentId);
 	return { experiment, runs, lineage, decisions };
+}
+
+export function listRunRecords(cwd: string): RunRecord[] {
+	const runsDir = runsRoot(cwd);
+	if (!existsSync(runsDir)) return [];
+	return readDirNames(runsDir)
+		.map((runId) => {
+			try {
+				return readRunRecord(cwd, runId);
+			} catch {
+				return undefined;
+			}
+		})
+		.filter((record): record is RunRecord => record !== undefined)
+		.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 export function findActiveRun(cwd: string): RunRecord | undefined {
@@ -605,5 +641,26 @@ function isDecisionAuditEntry(value: unknown): value is DecisionAuditEntry {
 		Array.isArray(record.inputArtifacts) &&
 		typeof record.stopConditionMet === "boolean" &&
 		typeof record.createdAt === "string"
+	);
+}
+
+function isRecordedApproval(value: unknown): value is RecordedApproval {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+	const record = value as Record<string, unknown>;
+	if (record.approval !== undefined) {
+		if (typeof record.approval !== "object" || record.approval === null || Array.isArray(record.approval)) return false;
+		const approval = record.approval as Record<string, unknown>;
+		if (approval.approvalId !== undefined && typeof approval.approvalId !== "string") return false;
+		if (approval.operator !== undefined && typeof approval.operator !== "string") return false;
+		if (approval.approved !== undefined && typeof approval.approved !== "boolean") return false;
+		if (approval.dryRunReportId !== undefined && typeof approval.dryRunReportId !== "string") return false;
+		if (approval.operatorOnlyMonitoring !== undefined && typeof approval.operatorOnlyMonitoring !== "boolean") return false;
+	}
+	return (
+		(record.type === undefined || typeof record.type === "string") &&
+		(record.runId === undefined || typeof record.runId === "string") &&
+		(record.operatorOnlyMonitoring === undefined || typeof record.operatorOnlyMonitoring === "boolean") &&
+		(record.specHash === undefined || typeof record.specHash === "string") &&
+		(record.raman === undefined || typeof record.raman === "boolean")
 	);
 }
