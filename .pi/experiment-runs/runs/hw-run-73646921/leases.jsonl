@@ -1,0 +1,2 @@
+{"leaseId":"lease-3899da1e","resourceIds":["mc-newton-xyz-stage"],"mode":"hardware","runId":"hw-run-73646921","commandId":"call_00_5TnhLk2DVFVS3Wrg1PmY5458","fencingToken":"e1733895-a369-47c0-9a03-ef21174c7442","status":"active","createdAt":"2026-06-12T02:33:11.030Z"}
+{"leaseId":"lease-3899da1e","resourceIds":["mc-newton-xyz-stage"],"mode":"hardware","runId":"hw-run-73646921","commandId":"call_00_5TnhLk2DVFVS3Wrg1PmY5458","fencingToken":"e1733895-a369-47c0-9a03-ef21174c7442","status":"released","createdAt":"2026-06-12T02:33:11.030Z","releasedAt":"2026-06-12T02:34:47.170Z"}

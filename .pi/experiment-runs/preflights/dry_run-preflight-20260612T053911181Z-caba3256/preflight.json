@@ -1,0 +1,154 @@
+{
+  "reportId": "dry_run-preflight-20260612T053911181Z-caba3256",
+  "spec": {
+    "schemaVersion": "1",
+    "experimentId": "exp-single-spectrum-001",
+    "specId": "spec-single-003",
+    "experimentType": "spatial_mapping",
+    "objective": "在用户已聚焦的当前位置直接采集单条拉曼光谱，不移动平台",
+    "subject": {
+      "id": "sample-focused",
+      "kind": "user_sample",
+      "label": "用户已聚焦样品"
+    },
+    "mode": "dry_run",
+    "resources": [
+      {
+        "id": "lab-acquirer",
+        "kind": "instrument",
+        "role": "acquirer"
+      },
+      {
+        "id": "labspec-workstation",
+        "kind": "workspace",
+        "role": "exclusive_lab_station"
+      }
+    ],
+    "limits": {
+      "motion": {
+        "xUm": {
+          "minUm": 0,
+          "maxUm": 0
+        },
+        "yUm": {
+          "minUm": 0,
+          "maxUm": 0
+        }
+      },
+      "powerEnergy": {
+        "maxLaserPowerMw": 2
+      },
+      "acquisition": {
+        "maxExposureMs": 10000,
+        "maxUnits": 1
+      }
+    },
+    "plan": {
+      "kind": "points",
+      "points": [
+        {
+          "xUm": 0,
+          "yUm": 0
+        }
+      ]
+    },
+    "domain": {
+      "raman": {
+        "acquisition": {
+          "integrationTimeS": 1,
+          "accumulations": 1,
+          "fromNm": 100,
+          "toNm": 3500,
+          "saveFormat": "txt"
+        }
+      }
+    },
+    "stoppingRules": {
+      "maxRuntimeMinutes": 5,
+      "maxUnits": 1,
+      "stopOnError": true
+    },
+    "operatorApprovalRequired": false
+  },
+  "result": {
+    "valid": true,
+    "issues": [],
+    "unitCount": 1,
+    "estimatedRuntimeMinutes": 0.017,
+    "mode": "dry_run",
+    "liveState": {
+      "mode": "dry_run",
+      "adapters": [
+        {
+          "instrumentId": "lab-acquirer",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        }
+      ],
+      "outputDirectory": {
+        "path": ".pi/experiment-runs/dry-run",
+        "writable": true
+      },
+      "abortPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "available": true
+      },
+      "intentsPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "writable": true
+      },
+      "approvalsPath": {
+        "path": ".pi/experiment-runs/approvals.jsonl",
+        "writable": true
+      },
+      "readOnlyProbe": {
+        "stage": {
+          "reachable": true,
+          "idn": "memory-stage",
+          "adapter": "memory"
+        },
+        "labspecWorker": {
+          "reachable": true,
+          "latencyMs": 0
+        },
+        "outputDirWritable": true,
+        "dependencies": {
+          "python": "3.13.13",
+          "pyserial": "3.5",
+          "numpy": "2.4.6",
+          "PIL": "12.2.0"
+        },
+        "readOnly": true
+      }
+    },
+    "plannedRun": {
+      "wouldVisitUnits": 1,
+      "wouldUseResources": [
+        "lab-acquirer",
+        "labspec-workstation"
+      ]
+    },
+    "willNotExecute": [
+      "stage motion",
+      "camera exposure",
+      "Raman acquisition",
+      "laser power change",
+      "instrument writes"
+    ],
+    "approvalRecord": {
+      "path": ".pi/experiment-runs/approvals.jsonl",
+      "requiredForHardware": true,
+      "requiredSafetyConfirmations": [
+        "laserPowerConfirmed",
+        "confirmedLaserPowerMw",
+        "labSpecWorkerReady",
+        "windowsPowerPolicyReady"
+      ]
+    },
+    "specHash": "1fe3749ed5c9926ee94b538d30027540ec9861332f4fca6c3d011e9f871de036",
+    "capabilitySnapshotId": "dry_run-preflight-20260612T053911181Z-caba3256-capabilities"
+  },
+  "specHash": "1fe3749ed5c9926ee94b538d30027540ec9861332f4fca6c3d011e9f871de036",
+  "capabilitySnapshotId": "dry_run-preflight-20260612T053911181Z-caba3256-capabilities"
+}

@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-5406d1ef",
+  "experimentId": "exp-z-axis-full-wait-diagnostic",
+  "mode": "hardware",
+  "subjectId": "LAB-Z-FULL-WAIT-DIAGNOSTIC",
+  "objective": "Validate Z-axis movement after preserving enabled channels during full XYZ wait polling.",
+  "unitCount": 4,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 4,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "stopReason": "maximum consecutive errors reached",
+  "operatorOnlyMonitoring": false
+}

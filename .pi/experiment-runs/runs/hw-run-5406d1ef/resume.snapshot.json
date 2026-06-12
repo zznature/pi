@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-5406d1ef",
+  "experimentId": "exp-z-axis-full-wait-diagnostic",
+  "mode": "hardware",
+  "status": "aborted",
+  "completedUnits": 0,
+  "totalUnits": 4,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-12T02:54:01.304Z",
+  "resumeFrom": "0",
+  "reason": "maximum consecutive errors reached"
+}

@@ -1,0 +1,17 @@
+{
+  "runId": "hw-run-e56231ce",
+  "experimentId": "exp-z-axis-final-verify",
+  "mode": "hardware",
+  "subjectId": "LAB-Z-FINAL-VERIFY",
+  "objective": "Final verification for full XYZ wait polling after preserving enabled channels only during wait.",
+  "unitCount": 2,
+  "completedUnits": 2,
+  "progress": {
+    "completedUnits": 2,
+    "totalUnits": 2,
+    "unitKind": "point"
+  },
+  "status": "completed",
+  "stopConditionMet": false,
+  "operatorOnlyMonitoring": false
+}

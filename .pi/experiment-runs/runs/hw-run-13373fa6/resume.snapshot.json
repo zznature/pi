@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-13373fa6",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "status": "aborted",
+  "completedUnits": 0,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-12T07:36:17.202Z",
+  "resumeFrom": "0",
+  "reason": "No LabSpec worker result for request acq_6831333483956500 within 60.0s"
+}

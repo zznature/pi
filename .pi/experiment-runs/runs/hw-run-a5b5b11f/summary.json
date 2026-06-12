@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-a5b5b11f",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "subjectId": "sample-focused",
+  "objective": "在用户已聚焦的当前位置采集单条拉曼光谱",
+  "unitCount": 1,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "operatorOnlyMonitoring": false,
+  "stopReason": "Stage did not settle within 5000 ms (current x=876.521, y=1528.483; target x=0.000, y=0.000; delta x=876.521, y=1528.483; tolerance x=1.000, y=1.000)"
+}

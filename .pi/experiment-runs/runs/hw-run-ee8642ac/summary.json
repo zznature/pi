@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-ee8642ac",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "subjectId": "sample-focused",
+  "objective": "在用户已聚焦的当前位置采集单条拉曼光谱",
+  "unitCount": 1,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "operatorOnlyMonitoring": false,
+  "stopReason": "Stage did not settle within 15000 ms (current z=2505.231, y=1529.030, x=898.272; target x=877.500, y=1529.000, z=2517.100; delta x=20.772, y=0.030, z=-11.869; tolerance x=1.000, y=1.000, z=1.000)"
+}

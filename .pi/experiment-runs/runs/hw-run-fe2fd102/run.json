@@ -1,0 +1,28 @@
+{
+  "runId": "hw-run-fe2fd102",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "specId": "spec-single-004",
+  "specHash": "d3ebf26464037500ef0d106a76037566a229e64263e93801e73c2bc5e36c11d5",
+  "status": "aborted",
+  "resourceLeaseId": "lease-bab5fc63",
+  "recordPaths": {
+    "runDir": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102",
+    "runJson": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\run.json",
+    "spec": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\spec.json",
+    "preflight": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\preflight.json",
+    "capabilitiesSnapshot": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\capabilities.snapshot.json",
+    "events": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\events.jsonl",
+    "intents": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\intents.jsonl",
+    "summary": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\summary.json",
+    "analysis": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\analysis.json",
+    "resumeSnapshot": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\resume.snapshot.json",
+    "artifacts": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\artifacts.json",
+    "approvals": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\approvals.jsonl",
+    "leases": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-fe2fd102\\leases.jsonl"
+  },
+  "createdAt": "2026-06-12T05:57:21.212Z",
+  "updatedAt": "2026-06-12T05:57:21.930Z",
+  "startedAt": "2026-06-12T05:57:21.214Z",
+  "finishedAt": "2026-06-12T05:57:21.930Z"
+}

@@ -1,0 +1,131 @@
+{
+  "reportId": "dry_run-preflight-20260612T023302974Z-2cfc6360",
+  "spec": {
+    "schemaVersion": "1",
+    "experimentId": "exp-z-speed-test",
+    "specId": "spec-z-speed-001",
+    "experimentType": "spatial_mapping",
+    "objective": "Test Z-axis movement speed and model: move Z up +50µm, down -100µm, back +50µm to characterize velocity and settling.",
+    "subject": {
+      "id": "LAB-Z-SPEED-TEST",
+      "kind": "test_sample"
+    },
+    "mode": "dry_run",
+    "resources": [
+      {
+        "id": "mc-newton-xyz-stage",
+        "kind": "instrument",
+        "role": "stage"
+      }
+    ],
+    "limits": {
+      "motion": {
+        "xUm": {
+          "minUm": 600,
+          "maxUm": 700
+        },
+        "yUm": {
+          "minUm": 1500,
+          "maxUm": 1600
+        },
+        "zUm": {
+          "minUm": 2450,
+          "maxUm": 2600
+        }
+      },
+      "powerEnergy": {
+        "maxLaserPowerMw": 1
+      },
+      "acquisition": {
+        "maxExposureMs": 100,
+        "maxUnits": 4
+      }
+    },
+    "plan": {
+      "kind": "points",
+      "points": [
+        {
+          "xUm": 630,
+          "yUm": 1525,
+          "zUm": 2516
+        },
+        {
+          "xUm": 630,
+          "yUm": 1525,
+          "zUm": 2566
+        },
+        {
+          "xUm": 630,
+          "yUm": 1525,
+          "zUm": 2466
+        },
+        {
+          "xUm": 630,
+          "yUm": 1525,
+          "zUm": 2516
+        }
+      ]
+    },
+    "stoppingRules": {
+      "maxRuntimeMinutes": 5,
+      "maxUnits": 4,
+      "stopOnError": true
+    },
+    "operatorApprovalRequired": false
+  },
+  "result": {
+    "valid": true,
+    "issues": [],
+    "unitCount": 4,
+    "estimatedRuntimeMinutes": 0.007,
+    "mode": "dry_run",
+    "liveState": {
+      "mode": "dry_run",
+      "adapters": [
+        {
+          "instrumentId": "mc-newton-xyz-stage",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        }
+      ],
+      "outputDirectory": {
+        "path": ".pi/experiment-runs/dry-run",
+        "writable": true
+      },
+      "abortPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "available": true
+      },
+      "intentsPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "writable": true
+      },
+      "approvalsPath": {
+        "path": ".pi/experiment-runs/approvals.jsonl",
+        "writable": true
+      }
+    },
+    "plannedRun": {
+      "wouldVisitUnits": 4,
+      "wouldUseResources": [
+        "mc-newton-xyz-stage"
+      ]
+    },
+    "willNotExecute": [
+      "stage motion",
+      "camera exposure",
+      "Raman acquisition",
+      "laser power change",
+      "instrument writes"
+    ],
+    "approvalRecord": {
+      "path": ".pi/experiment-runs/approvals.jsonl",
+      "requiredForHardware": true
+    },
+    "specHash": "7f010fe244243aeeb1609e9337cd6470e5cb4788f8b32c3776a15b0cddf9fc44",
+    "capabilitySnapshotId": "dry_run-preflight-20260612T023302974Z-2cfc6360-capabilities"
+  },
+  "specHash": "7f010fe244243aeeb1609e9337cd6470e5cb4788f8b32c3776a15b0cddf9fc44",
+  "capabilitySnapshotId": "dry_run-preflight-20260612T023302974Z-2cfc6360-capabilities"
+}

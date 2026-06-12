@@ -1,0 +1,17 @@
+{
+  "experimentId": "exp-hw-z-test",
+  "experimentType": "spatial_mapping",
+  "objective": "Test Z-axis movement: move stage Z by +10μm on MC.Newton XYZ stage.",
+  "subject": {
+    "id": "LAB-Z-TEST",
+    "kind": "test_sample"
+  },
+  "status": "active",
+  "rootRunIds": [
+    "hw-run-9c25ce9f",
+    "hw-run-1d7854bf",
+    "hw-run-b55c7e64"
+  ],
+  "createdAt": "2026-06-12T01:45:01.378Z",
+  "updatedAt": "2026-06-12T01:48:33.833Z"
+}

@@ -1,0 +1,17 @@
+{
+  "runId": "hw-run-eefc553a",
+  "experimentId": "exp-z-axis-minimal-diagnostic",
+  "mode": "hardware",
+  "subjectId": "LAB-Z-DIAGNOSTIC",
+  "objective": "Minimal Z-axis diagnostic after restricting stage wait polling to the Z axis.",
+  "unitCount": 4,
+  "completedUnits": 4,
+  "progress": {
+    "completedUnits": 4,
+    "totalUnits": 4,
+    "unitKind": "point"
+  },
+  "status": "completed",
+  "stopConditionMet": false,
+  "operatorOnlyMonitoring": false
+}

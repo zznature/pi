@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-1d7854bf",
+  "experimentId": "exp-hw-z-test",
+  "mode": "hardware",
+  "subjectId": "LAB-Z-TEST",
+  "objective": "Test Z-axis movement: move stage Z by +10μm on MC.Newton XYZ stage.",
+  "unitCount": 2,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 2,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "stopReason": "point error",
+  "operatorOnlyMonitoring": false
+}

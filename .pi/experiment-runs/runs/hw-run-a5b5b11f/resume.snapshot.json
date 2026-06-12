@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-a5b5b11f",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "status": "aborted",
+  "completedUnits": 0,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-12T05:58:52.641Z",
+  "resumeFrom": "0",
+  "reason": "Stage did not settle within 5000 ms (current x=876.521, y=1528.483; target x=0.000, y=0.000; delta x=876.521, y=1528.483; tolerance x=1.000, y=1.000)"
+}

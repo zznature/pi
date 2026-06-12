@@ -1,0 +1,20 @@
+{
+  "experimentId": "exp-z-speed-test",
+  "experimentType": "spatial_mapping",
+  "objective": "Test Z-axis movement speed and model: move Z up +50µm, down -100µm, back +50µm to characterize velocity and settling.",
+  "subject": {
+    "id": "LAB-Z-SPEED-TEST",
+    "kind": "test_sample"
+  },
+  "status": "active",
+  "rootRunIds": [
+    "hw-run-73646921",
+    "hw-run-e607a3db",
+    "hw-run-8810b02f",
+    "hw-run-9a93f2b2",
+    "hw-run-09a5d6fc",
+    "hw-run-6f16c5f4"
+  ],
+  "createdAt": "2026-06-12T02:33:11.030Z",
+  "updatedAt": "2026-06-12T03:45:03.537Z"
+}

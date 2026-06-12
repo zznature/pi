@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-22b3f776",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "status": "failed",
+  "completedUnits": 0,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-12T05:35:27.472Z",
+  "resumeFrom": "0",
+  "reason": "stage.port is required for mc_newton_xyz"
+}

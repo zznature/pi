@@ -1,0 +1,17 @@
+{
+  "runId": "sim-run-9dc0e9f4",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "simulation",
+  "subjectId": "sample-focused",
+  "objective": "在用户已聚焦的当前位置采集单条拉曼光谱",
+  "unitCount": 1,
+  "progress": {
+    "completedUnits": 1,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "meanSignal": 100,
+  "maxSignal": 100,
+  "minSignal": 100,
+  "stopConditionMet": false
+}

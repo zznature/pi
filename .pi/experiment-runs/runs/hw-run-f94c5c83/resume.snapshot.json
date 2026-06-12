@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-f94c5c83",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "status": "aborted",
+  "completedUnits": 0,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-12T05:36:15.531Z",
+  "resumeFrom": "0",
+  "reason": "Cannot parse X position response: ''"
+}

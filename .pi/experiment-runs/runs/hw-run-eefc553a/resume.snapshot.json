@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-eefc553a",
+  "experimentId": "exp-z-axis-minimal-diagnostic",
+  "mode": "hardware",
+  "status": "completed",
+  "completedUnits": 4,
+  "totalUnits": 4,
+  "unitKind": "point",
+  "nextUnitIndex": 4,
+  "safeToResume": false,
+  "requiresOperatorApproval": false,
+  "createdAt": "2026-06-12T02:50:08.787Z"
+}

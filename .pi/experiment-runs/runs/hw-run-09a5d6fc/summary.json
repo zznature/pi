@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-09a5d6fc",
+  "experimentId": "exp-z-speed-test",
+  "mode": "hardware",
+  "subjectId": "LAB-Z-SPEED-TEST",
+  "objective": "XYZ 3-axis simultaneous relative +5µm movement test.",
+  "unitCount": 2,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 2,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "stopReason": "heartbeat timeout",
+  "operatorOnlyMonitoring": false
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-6bc0fdf2",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "status": "failed",
+  "completedUnits": 0,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-12T05:39:38.347Z",
+  "resumeFrom": "0",
+  "reason": "could not open port 'COM6': PermissionError(13, '拒绝访问。', None, 5)"
+}

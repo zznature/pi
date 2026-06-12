@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-e607a3db",
+  "experimentId": "exp-z-speed-test",
+  "mode": "hardware",
+  "subjectId": "LAB-Z-SPEED-TEST",
+  "objective": "Test Z-axis movement speed and model: move Z up +50µm, down -100µm, back +50µm to characterize velocity and settling.",
+  "unitCount": 4,
+  "completedUnits": 1,
+  "progress": {
+    "completedUnits": 1,
+    "totalUnits": 4,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "stopReason": "heartbeat timeout",
+  "operatorOnlyMonitoring": false
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "sim-run-9dc0e9f4-run",
+    "uri": ".pi/experiment-runs/runs/sim-run-9dc0e9f4/run.json",
+    "label": "Run record",
+    "kind": "run",
+    "producerRunId": "sim-run-9dc0e9f4"
+  },
+  {
+    "id": "sim-run-9dc0e9f4-spec",
+    "uri": ".pi/experiment-runs/runs/sim-run-9dc0e9f4/spec.json",
+    "label": "ExperimentSpec",
+    "kind": "spec",
+    "producerRunId": "sim-run-9dc0e9f4"
+  },
+  {
+    "id": "sim-run-9dc0e9f4-events",
+    "uri": ".pi/experiment-runs/runs/sim-run-9dc0e9f4/events.jsonl",
+    "label": "Unit events",
+    "kind": "events",
+    "producerRunId": "sim-run-9dc0e9f4"
+  },
+  {
+    "id": "sim-run-9dc0e9f4-summary",
+    "uri": ".pi/experiment-runs/runs/sim-run-9dc0e9f4/summary.json",
+    "label": "Simulation summary",
+    "kind": "summary",
+    "producerRunId": "sim-run-9dc0e9f4"
+  },
+  {
+    "id": "sim-run-9dc0e9f4-resume-snapshot",
+    "uri": ".pi/experiment-runs/runs/sim-run-9dc0e9f4/resume.snapshot.json",
+    "label": "Resume snapshot",
+    "kind": "resume-snapshot",
+    "producerRunId": "sim-run-9dc0e9f4"
+  },
+  {
+    "id": "sim-run-9dc0e9f4-artifacts",
+    "uri": ".pi/experiment-runs/runs/sim-run-9dc0e9f4/artifacts.json",
+    "label": "Artifact index",
+    "kind": "artifacts",
+    "producerRunId": "sim-run-9dc0e9f4"
+  }
+]

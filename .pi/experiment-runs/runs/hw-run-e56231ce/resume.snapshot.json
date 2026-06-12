@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-e56231ce",
+  "experimentId": "exp-z-axis-final-verify",
+  "mode": "hardware",
+  "status": "completed",
+  "completedUnits": 2,
+  "totalUnits": 2,
+  "unitKind": "point",
+  "nextUnitIndex": 2,
+  "safeToResume": false,
+  "requiresOperatorApproval": false,
+  "createdAt": "2026-06-12T02:55:48.956Z"
+}

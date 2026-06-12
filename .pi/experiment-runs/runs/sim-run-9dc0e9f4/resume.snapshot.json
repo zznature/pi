@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "runId": "sim-run-9dc0e9f4",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "simulation",
+  "status": "completed",
+  "completedUnits": 1,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 1,
+  "safeToResume": false,
+  "requiresOperatorApproval": false,
+  "createdAt": "2026-06-12T05:28:42.895Z"
+}

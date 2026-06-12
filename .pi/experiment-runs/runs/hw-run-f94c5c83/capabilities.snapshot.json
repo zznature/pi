@@ -1,0 +1,75 @@
+{
+  "instruments": [
+    {
+      "id": "mc-newton-xyz-stage",
+      "resourceKind": "instrument",
+      "kind": "stage",
+      "units": [
+        "um"
+      ],
+      "coordinateConvention": "right-handed sample coordinates, origin at calibrated hardware home",
+      "softwareLimits": {
+        "xUm": {
+          "minUm": 0,
+          "maxUm": 50000
+        },
+        "yUm": {
+          "minUm": 0,
+          "maxUm": 50000
+        },
+        "zUm": {
+          "minUm": 0,
+          "maxUm": 5000
+        }
+      },
+      "hazards": [
+        "real stage adapter probed read-only"
+      ],
+      "simulationAvailable": false,
+      "dryRunAvailable": true,
+      "hardwarePilotAvailable": true,
+      "leasePolicy": "exclusive"
+    },
+    {
+      "id": "lab-camera",
+      "resourceKind": "instrument",
+      "kind": "camera",
+      "units": [
+        "px",
+        "ms"
+      ],
+      "coordinateConvention": "image origin at top-left",
+      "softwareLimits": {
+        "maxExposureMs": 500
+      },
+      "hazards": [
+        "real camera adapter probed read-only"
+      ],
+      "simulationAvailable": false,
+      "dryRunAvailable": true,
+      "hardwarePilotAvailable": true,
+      "leasePolicy": "exclusive"
+    },
+    {
+      "id": "lab-acquirer",
+      "resourceKind": "instrument",
+      "kind": "acquirer",
+      "units": [
+        "mw",
+        "ms"
+      ],
+      "coordinateConvention": "no spatial coordinates",
+      "softwareLimits": {
+        "maxLaserPowerMw": 2,
+        "maxExposureMs": 500
+      },
+      "hazards": [
+        "real acquirer adapter probed read-only"
+      ],
+      "simulationAvailable": false,
+      "dryRunAvailable": true,
+      "hardwarePilotAvailable": true,
+      "leasePolicy": "exclusive"
+    }
+  ]
+}

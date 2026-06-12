@@ -1,0 +1,15 @@
+{
+  "experimentId": "exp-z-axis-full-wait-diagnostic",
+  "experimentType": "spatial_mapping",
+  "objective": "Validate Z-axis movement after preserving enabled channels during full XYZ wait polling.",
+  "subject": {
+    "id": "LAB-Z-FULL-WAIT-DIAGNOSTIC",
+    "kind": "test_sample"
+  },
+  "status": "active",
+  "rootRunIds": [
+    "hw-run-5406d1ef"
+  ],
+  "createdAt": "2026-06-12T02:53:47.514Z",
+  "updatedAt": "2026-06-12T02:53:47.517Z"
+}

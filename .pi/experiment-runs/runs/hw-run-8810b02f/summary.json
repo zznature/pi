@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-8810b02f",
+  "experimentId": "exp-z-speed-test",
+  "mode": "hardware",
+  "subjectId": "LAB-Z-SPEED-TEST",
+  "objective": "Z-axis 4-point (3-step) continuous movement test: Z +30, +20, -50µm to characterize velocity model.",
+  "unitCount": 4,
+  "completedUnits": 1,
+  "progress": {
+    "completedUnits": 1,
+    "totalUnits": 4,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "stopReason": "heartbeat timeout",
+  "operatorOnlyMonitoring": false
+}

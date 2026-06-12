@@ -1,0 +1,121 @@
+{
+  "reportId": "dry_run-preflight-20260612T014305358Z-b97c57c2",
+  "spec": {
+    "schemaVersion": "1",
+    "experimentId": "exp-hw-z-test",
+    "specId": "spec-hw-z-test-001",
+    "experimentType": "spatial_mapping",
+    "objective": "Test Z-axis movement: move stage Z by +10μm on MC.Newton XYZ stage.",
+    "subject": {
+      "id": "LAB-Z-TEST",
+      "kind": "test_sample"
+    },
+    "mode": "dry_run",
+    "resources": [
+      {
+        "id": "mc-newton-xyz-stage",
+        "kind": "instrument",
+        "role": "stage"
+      }
+    ],
+    "limits": {
+      "motion": {
+        "xUm": {
+          "minUm": 0,
+          "maxUm": 100
+        },
+        "yUm": {
+          "minUm": 0,
+          "maxUm": 100
+        },
+        "zUm": {
+          "minUm": -50,
+          "maxUm": 50
+        }
+      },
+      "powerEnergy": {
+        "maxLaserPowerMw": 1
+      },
+      "acquisition": {
+        "maxExposureMs": 100,
+        "maxUnits": 2
+      }
+    },
+    "plan": {
+      "kind": "points",
+      "points": [
+        {
+          "xUm": 0,
+          "yUm": 0,
+          "zUm": 0
+        },
+        {
+          "xUm": 0,
+          "yUm": 0,
+          "zUm": 10
+        }
+      ]
+    },
+    "stoppingRules": {
+      "maxRuntimeMinutes": 5,
+      "maxUnits": 2,
+      "stopOnError": true
+    },
+    "operatorApprovalRequired": false
+  },
+  "result": {
+    "valid": true,
+    "issues": [],
+    "unitCount": 2,
+    "estimatedRuntimeMinutes": 0.003,
+    "mode": "dry_run",
+    "liveState": {
+      "mode": "dry_run",
+      "adapters": [
+        {
+          "instrumentId": "mc-newton-xyz-stage",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        }
+      ],
+      "outputDirectory": {
+        "path": ".pi/experiment-runs/dry-run",
+        "writable": true
+      },
+      "abortPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "available": true
+      },
+      "intentsPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "writable": true
+      },
+      "approvalsPath": {
+        "path": ".pi/experiment-runs/approvals.jsonl",
+        "writable": true
+      }
+    },
+    "plannedRun": {
+      "wouldVisitUnits": 2,
+      "wouldUseResources": [
+        "mc-newton-xyz-stage"
+      ]
+    },
+    "willNotExecute": [
+      "stage motion",
+      "camera exposure",
+      "Raman acquisition",
+      "laser power change",
+      "instrument writes"
+    ],
+    "approvalRecord": {
+      "path": ".pi/experiment-runs/approvals.jsonl",
+      "requiredForHardware": true
+    },
+    "specHash": "c52f637bddeda51a091727adafc50da10774b8ab72279c984fbb2243a9aa64ce",
+    "capabilitySnapshotId": "dry_run-preflight-20260612T014305358Z-b97c57c2-capabilities"
+  },
+  "specHash": "c52f637bddeda51a091727adafc50da10774b8ab72279c984fbb2243a9aa64ce",
+  "capabilitySnapshotId": "dry_run-preflight-20260612T014305358Z-b97c57c2-capabilities"
+}

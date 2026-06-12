@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-cbe7278d",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "status": "aborted",
+  "completedUnits": 0,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-12T07:27:36.869Z",
+  "resumeFrom": "0",
+  "reason": "Stage did not settle within 15000 ms (current y=1528.401, z=2504.836, x=877.658; target x=898.000, y=1529.000, z=2505.000; delta x=-20.342, y=-0.599, z=-0.164; tolerance x=1.000, y=1.000, z=1.000)"
+}

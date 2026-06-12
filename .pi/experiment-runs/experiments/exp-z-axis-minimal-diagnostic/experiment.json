@@ -1,0 +1,15 @@
+{
+  "experimentId": "exp-z-axis-minimal-diagnostic",
+  "experimentType": "spatial_mapping",
+  "objective": "Minimal Z-axis diagnostic after restricting stage wait polling to the Z axis.",
+  "subject": {
+    "id": "LAB-Z-DIAGNOSTIC",
+    "kind": "test_sample"
+  },
+  "status": "active",
+  "rootRunIds": [
+    "hw-run-eefc553a"
+  ],
+  "createdAt": "2026-06-12T02:49:46.447Z",
+  "updatedAt": "2026-06-12T02:49:46.450Z"
+}

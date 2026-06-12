@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-09a5d6fc",
+  "experimentId": "exp-z-speed-test",
+  "mode": "hardware",
+  "status": "aborted",
+  "completedUnits": 0,
+  "totalUnits": 2,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-12T03:37:24.169Z",
+  "resumeFrom": "0",
+  "reason": "heartbeat timeout"
+}
