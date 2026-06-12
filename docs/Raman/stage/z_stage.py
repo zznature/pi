@@ -3,9 +3,10 @@ ZStageController: serial driver for the MC.NewtonLT-06 piezo stage.
 """
 
 import time
+import re
 import serial
 
-from stage.exceptions import StageConnectionError, StageCommandError, StageTimeoutError
+from stage.exceptions import StageCommandError, StageConnectionError, StageTimeoutError
 
 
 class ZStageController:
@@ -22,6 +23,9 @@ class ZStageController:
         idn_retries: int = 3,
         move_cmd_wait_ms: float = 30.0,
         channel_switch_wait_ms: float = 100.0,
+        position_retries: int = 3,
+        position_retry_wait_ms: float = 50.0,
+        response_collect_ms: float = 50.0,
     ):
         """Store connection parameters; does not open the serial port."""
         self._port = port
@@ -33,6 +37,9 @@ class ZStageController:
         self._idn_retries = idn_retries
         self._move_cmd_wait_ms = move_cmd_wait_ms
         self._channel_switch_wait_ms = channel_switch_wait_ms
+        self._position_retries = position_retries
+        self._position_retry_wait_ms = position_retry_wait_ms
+        self._response_collect_ms = response_collect_ms
         self._ser = None
         self._connected = False
         self._last_target_um = None
@@ -86,14 +93,16 @@ class ZStageController:
 
     def get_position_um(self):
         """Query current absolute position and return it in micrometres."""
-        response = self._send("[check:pos?]")
-        try:
-            pos_str = response.replace("[pos:", "").replace("]", "")
-            return float(pos_str) * 1000.0
-        except (ValueError, AttributeError):
-            raise StageCommandError(
-                f"Cannot parse position response: '{response}'"
-            )
+        last_response = ""
+        for attempt in range(max(1, self._position_retries)):
+            response = self._send("[check:pos?]")
+            last_response = response
+            try:
+                return self._parse_position_um(response)
+            except (ValueError, AttributeError):
+                if attempt < self._position_retries - 1:
+                    time.sleep(self._position_retry_wait_ms / 1000.0)
+        raise StageCommandError(f"Cannot parse position response: '{last_response}'")
 
     def move_absolute_um(self, z_um):
         """Command an absolute move to z_um (non-blocking)."""
@@ -151,7 +160,31 @@ class ZStageController:
         """Write cmd to serial, wait, read and return the stripped response."""
         if wait_ms is None:
             wait_ms = self._default_cmd_wait_ms
+        try:
+            self._ser.reset_input_buffer()
+        except Exception:
+            pass
         self._ser.write(cmd.encode("ascii"))
         time.sleep(wait_ms / 1000.0)
-        response = self._ser.read_all().decode("ascii", errors="replace").strip()
+        chunks = []
+        deadline = time.monotonic() + self._response_collect_ms / 1000.0
+        while True:
+            chunk = self._ser.read_all()
+            if chunk:
+                chunks.append(chunk)
+                if b"]" in b"".join(chunks):
+                    break
+            elif not chunks:
+                break
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.005)
+        response = b"".join(chunks).decode("ascii", errors="replace").strip()
         return response
+
+    @staticmethod
+    def _parse_position_um(response):
+        matches = re.findall(r"\[pos:([+-]?\d+(?:\.\d+)?)\]", response or "")
+        if not matches:
+            raise ValueError(response)
+        return float(matches[-1]) * 1000.0

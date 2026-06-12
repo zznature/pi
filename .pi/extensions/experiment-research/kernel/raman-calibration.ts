@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../labspec-bridge.ts";
 import { createErrorResult, createSuccessResult } from "../results.ts";
 import { artifactUriPath } from "../run-store.ts";
 import type {
@@ -317,16 +318,7 @@ export async function autoFitAndRecordRamanXyCalibration(
 			true,
 		);
 	}
-	if ((params.frameBackend ?? "fake") === "labspec_file_bridge" && !params.frameBridgeDir) {
-		return createErrorResult(
-			ctx.commandId,
-			"LabSpec automatic XY calibration requires frameBridgeDir.",
-			"invalid_tool_params",
-			["Provide frameBridgeDir for the LabSpec frame provider."],
-			{ frameBackend: params.frameBackend },
-			true,
-		);
-	}
+	const frameBridgeDir = params.frameBridgeDir ?? DEFAULT_LABSPEC_BRIDGE_DIR;
 	const outputDir =
 		params.outputDir ?? join(ctx.cwd, ".pi", "experiment-runs", "maintenance", "xy-calibration", params.calibrationId ?? `auto-${randomUUID().slice(0, 8)}`);
 	mkdirSync(outputDir, { recursive: true });
@@ -335,7 +327,7 @@ export async function autoFitAndRecordRamanXyCalibration(
 		const fit = await bridge.request<Record<string, unknown>>("calibrate_xy_sequence", {
 			stage: stagePayload(params),
 			frameBackend: params.frameBackend ?? "fake",
-			bridgeDir: params.frameBridgeDir,
+			bridgeDir: frameBridgeDir,
 			outputDir,
 			stepUm: params.stepUm,
 			shifts: params.shifts,

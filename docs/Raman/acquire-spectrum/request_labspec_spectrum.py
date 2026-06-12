@@ -57,7 +57,7 @@ LabSpecFileBridgeRamanAcquirer = labspec_module.LabSpecFileBridgeRamanAcquirer
 LabSpecWorkerAcquisitionConfig = labspec_module.LabSpecWorkerAcquisitionConfig
 
 
-DEFAULT_BRIDGE_DIR = Path(__file__).resolve().parents[1] / "runtime" / "labspec_bridge"
+DEFAULT_BRIDGE_DIR = Path(r"D:\RamanLab\SpecBridge")
 
 
 def main() -> int:

@@ -99,9 +99,9 @@ const DRY_RUN_CAPABILITIES = {
 			units: ["um"],
 			coordinateConvention: "right-handed sample coordinates, origin at calibrated hardware home",
 			softwareLimits: {
-				xUm: { minUm: 0, maxUm: 500 },
-				yUm: { minUm: 0, maxUm: 500 },
-				zUm: { minUm: -50, maxUm: 50 },
+				xUm: { minUm: 0, maxUm: 50000 },
+				yUm: { minUm: 0, maxUm: 50000 },
+				zUm: { minUm: 0, maxUm: 5000 },
 			},
 			hazards: ["real stage adapter probed read-only"],
 			simulationAvailable: false,

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../labspec-bridge.ts";
 import { createErrorResult, createSuccessResult } from "../results.ts";
 import { artifactUriPath } from "../run-store.ts";
 import type { RamanActiveProbeParams, ToolResult } from "../schemas.ts";
@@ -68,6 +69,8 @@ export async function runRamanActiveProbe(params: RamanActiveProbeParams, ctx: R
 
 	const probeId = `raman-active-probe-${randomUUID().slice(0, 8)}`;
 	const outputDir = params.outputDir ?? activeProbeRoot(ctx.cwd, probeId);
+	const labspecBridgeDir = params.labspecBridgeDir ?? DEFAULT_LABSPEC_BRIDGE_DIR;
+	const frameBridgeDir = params.frameBridgeDir ?? labspecBridgeDir;
 	mkdirSync(outputDir, { recursive: true });
 	const recordPath = join(outputDir, "active-probe.json");
 	const bridge = new RamanBridgeClient({ cwd: ctx.cwd, python: params.stagePython, requestTimeoutMs: 30_000 });
@@ -77,15 +80,15 @@ export async function runRamanActiveProbe(params: RamanActiveProbeParams, ctx: R
 			captureFrame: params.captureFrame === true,
 			acquireSpectrumSmoke: params.acquireSpectrumSmoke === true,
 			frameBackend: params.frameBackend ?? "fake",
-			bridgeDir: params.frameBridgeDir ?? params.labspecBridgeDir,
+			bridgeDir: frameBridgeDir,
 			frame: {
 				backend: params.frameBackend ?? "fake",
-				bridgeDir: params.frameBridgeDir ?? params.labspecBridgeDir,
+				bridgeDir: frameBridgeDir,
 				timeoutMs: params.timeoutS === undefined ? undefined : Math.round(params.timeoutS * 1000),
 			},
 			acquisition: {
 				backend: params.acquisitionBackend ?? "fake",
-				bridgeDir: params.labspecBridgeDir,
+				bridgeDir: labspecBridgeDir,
 				timeoutS: params.timeoutS,
 				pollIntervalS: params.pollIntervalS,
 				saveFormat: "txt",

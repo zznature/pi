@@ -46,8 +46,8 @@ Use this structure with `run_experiment` for hardware tasks. Replace IDs and pat
     "acquisitionBackend": "labspec_file_bridge",
     "autofocusBackend": "labspec_file_bridge",
     "xyCorrectionBackend": "phase_correlation",
-    "labspecBridgeDir": "D:\\LabBridge\\raman\\spectrum-bridge",
-    "frameBridgeDir": "D:\\LabBridge\\raman\\frame-bridge",
+    "labspecBridgeDir": "D:\\RamanLab\\SpecBridge",
+    "frameBridgeDir": "D:\\RamanLab\\SpecBridge",
     "labspecTimeoutS": 15,
     "labspecPollIntervalS": 0.2
   },
@@ -81,4 +81,3 @@ Use this structure with `run_experiment` for hardware tasks. Replace IDs and pat
 - The full planned XY area stays inside the operator-approved region.
 - Z limits cannot crash the objective into the sample.
 - Emergency stop and shutter behavior are verified before hardware run.
-

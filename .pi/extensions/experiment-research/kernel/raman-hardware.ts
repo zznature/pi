@@ -10,6 +10,7 @@ import {
 	type ResumeSnapshot,
 	type RunStatus,
 } from "../run-store.ts";
+import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../labspec-bridge.ts";
 import type { ExperimentSpec, HardwarePilotParams, RamanErrorCode, ToolResult } from "../schemas.ts";
 import { getExperimentPoints, getUnitCount, type ExperimentPoint } from "../spec-utils.ts";
 import { evaluateWatchdog } from "../watchdog.ts";
@@ -182,7 +183,8 @@ function copyLabSpecBridgeFile(
 ): ToolResult["artifacts"][number] | undefined {
 	if (!sourcePath || !existsSync(sourcePath)) return undefined;
 	const safeRequestId = sanitizeArtifactSegment(requestId);
-	const relativePath = `artifacts/labspec/point_${pointIndex}/${role}_${safeRequestId}.json`;
+	const extension = sourcePath.toLowerCase().endsWith(".ini") ? "ini" : "txt";
+	const relativePath = `artifacts/labspec/point_${pointIndex}/${role}_${safeRequestId}.${extension}`;
 	const absolutePath = join(runDir, relativePath);
 	mkdirSync(dirname(absolutePath), { recursive: true });
 	copyFileSync(sourcePath, absolutePath);
@@ -428,7 +430,7 @@ function acquisitionPayload(
 	return {
 		...acquisition,
 		backend,
-		bridgeDir: pilot.raman?.labspecBridgeDir ?? join(reserved.runDir, "labspec_bridge"),
+		bridgeDir: pilot.raman?.labspecBridgeDir ?? DEFAULT_LABSPEC_BRIDGE_DIR,
 		timeoutS: pilot.raman?.labspecTimeoutS,
 		pollIntervalS: pilot.raman?.labspecPollIntervalS,
 		savePath: spectrum.absolutePath,
@@ -442,7 +444,7 @@ function autofocusPayload(spec: ExperimentSpec, pilot: HardwarePilotParams): Rec
 	return {
 		...autofocus,
 		backend: pilot.raman?.autofocusBackend ?? (pilot.stageAdapter === "memory" ? "fake" : "labspec_file_bridge"),
-		bridgeDir: pilot.raman?.frameBridgeDir ?? pilot.raman?.labspecBridgeDir,
+		bridgeDir: pilot.raman?.frameBridgeDir ?? pilot.raman?.labspecBridgeDir ?? DEFAULT_LABSPEC_BRIDGE_DIR,
 		stageTimeoutMs: pilot.settleTimeoutMs,
 	};
 }
@@ -453,7 +455,7 @@ function xyCorrectionPayload(cwd: string, spec: ExperimentSpec, pilot: HardwareP
 	const payload: Record<string, unknown> = {
 		...xyCorrection,
 		backend: pilot.raman?.xyCorrectionBackend ?? (pilot.stageAdapter === "memory" ? "fake" : "phase_correlation"),
-		bridgeDir: pilot.raman?.frameBridgeDir ?? pilot.raman?.labspecBridgeDir,
+		bridgeDir: pilot.raman?.frameBridgeDir ?? pilot.raman?.labspecBridgeDir ?? DEFAULT_LABSPEC_BRIDGE_DIR,
 		stageTimeoutMs: pilot.settleTimeoutMs,
 	};
 	if (pilot.raman?.xyReferenceFramePath) {

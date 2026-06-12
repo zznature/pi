@@ -13,6 +13,7 @@ import queue
 import sys
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -274,6 +275,9 @@ def load_real_stage(stage_root: Path, payload: dict[str, Any]) -> Any:
         x_channel=int(channels.get("x", 1)),
         y_channel=int(channels.get("y", 2)),
         z_channel=int(channels.get("z", 3)),
+        default_cmd_wait_ms=100.0,
+        stability_tolerance_um=0.5,
+        settle_correction_attempts=3,
     )
     stage.connect()
     return stage
@@ -493,13 +497,25 @@ def action_visit_point(
     if abort_event.is_set():
         raise BridgeError("aborted", "visit_point aborted before motion")
     before = stage.get_position_um()
-    write_protocol({"event": "progress", "action": "visit_point", "phase": "move"}, output_lock)
-    stage.move_absolute_um(
-        x_um=point.get("xUm"),
-        y_um=point.get("yUm"),
-        z_um=point.get("zUm"),
+    target = StagePosition(
+        float(point.get("xUm", getattr(before, "x_um", 0.0))),
+        float(point.get("yUm", getattr(before, "y_um", 0.0))),
+        float(point.get("zUm", getattr(before, "z_um", 0.0))),
     )
-    stage.wait_settled(settle_timeout_ms)
+    dx = abs(target.x_um - getattr(before, "x_um", 0.0))
+    dy = abs(target.y_um - getattr(before, "y_um", 0.0))
+    dz = abs(target.z_um - getattr(before, "z_um", 0.0))
+    skip_move = max(dx, dy, dz) < 2.0
+    if skip_move:
+        debug(f"visit_point skip move: already within 2um (dx={dx:.3f} dy={dy:.3f} dz={dz:.3f})")
+    else:
+        write_protocol({"event": "progress", "action": "visit_point", "phase": "move"}, output_lock)
+        stage.move_absolute_um(
+            x_um=point.get("xUm"),
+            y_um=point.get("yUm"),
+            z_um=point.get("zUm"),
+        )
+        stage.wait_settled(settle_timeout_ms)
     if abort_event.is_set():
         state.stop()
         raise BridgeError("aborted", "visit_point aborted after motion")
@@ -1007,6 +1023,24 @@ def base_acquisition_metadata(acquisition: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def update_metadata_from_labspec_result(metadata: dict[str, Any], result: dict[str, str]) -> None:
+    numeric_keys = {
+        "snr_estimate": "snrEstimate",
+        "total_intensity": "totalIntensity",
+    }
+    for source_key, target_key in numeric_keys.items():
+        value = result.get(source_key)
+        if value is None:
+            continue
+        try:
+            metadata[target_key] = float(value)
+        except ValueError:
+            metadata[target_key] = value
+    saturated = result.get("saturated")
+    if saturated is not None:
+        metadata["saturated"] = saturated.strip().lower() in {"1", "true", "yes", "y"}
+
+
 def action_acquire_fake(acquisition: dict[str, Any]) -> dict[str, Any]:
     save_format = str(acquisition.get("saveFormat", "txt"))
     save_path_value = acquisition.get("savePath")
@@ -1028,13 +1062,10 @@ def action_acquire_labspec(
     abort_event: threading.Event,
     output_lock: threading.Lock,
 ) -> dict[str, Any]:
-    if str(state.stage_root) not in sys.path:
-        sys.path.insert(0, str(state.stage_root))
-    from mapping import create_labspec_acquisition_request, read_labspec_result
-
     bridge_dir_value = acquisition.get("bridgeDir")
     if not isinstance(bridge_dir_value, str) or not bridge_dir_value:
         raise BridgeError("acquisition_failed", "labspec_file_bridge acquisition requires bridgeDir")
+    bridge_dir = Path(bridge_dir_value)
 
     request_id = f"acq_{time.monotonic_ns()}"
     timeout_s = float(acquisition.get("timeoutS", 30.0))
@@ -1042,18 +1073,37 @@ def action_acquire_labspec(
     save_format = str(acquisition.get("saveFormat", "txt"))
     save_path_value = acquisition.get("savePath")
     save_path = Path(str(save_path_value)) if save_path_value else None
-    request = create_labspec_acquisition_request(
-        bridge_dir=Path(bridge_dir_value),
-        request_id=request_id,
-        integration_time_s=float(acquisition.get("integrationTimeS", 1.0)),
-        accumulations=int(acquisition.get("accumulations", 1)),
-        acq_from_nm=float(acquisition.get("fromNm", 0.0)),
-        acq_to_nm=float(acquisition.get("toNm", 0.0)),
-        auto_show=bool(acquisition.get("autoShow", True)),
-        save_path=save_path,
-        save_format=save_format,
-        plot_spectrum=bool(acquisition.get("plotSpectrum", False)),
-    )
+
+    request_path = bridge_dir / "requests" / f"{request_id}.ini"
+    result_path = bridge_dir / "results" / f"{request_id}.ini"
+
+    request_path.parent.mkdir(parents=True, exist_ok=True)
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    if request_path.exists():
+        request_path.unlink()
+    if result_path.exists():
+        result_path.unlink()
+
+    request_lines = [
+        ("request_id", request_id),
+        ("action", "spectrum"),
+        ("integration_time_s", str(float(acquisition.get("integrationTimeS", 1.0)))),
+        ("accumulations", str(int(acquisition.get("accumulations", 1)))),
+        ("acq_from_nm", str(float(acquisition.get("fromNm", 0.0)))),
+        ("acq_to_nm", str(float(acquisition.get("toNm", 0.0)))),
+        ("auto_show", "1" if bool(acquisition.get("autoShow", True)) else "0"),
+        ("save_format", save_format),
+    ]
+    if save_path is not None:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        request_lines.append(("output_path", str(save_path.resolve())))
+        request_lines.append(("save_path", str(save_path.resolve())))
+
+    body = "".join(f"{key}={value}\n" for key, value in request_lines)
+    temp_path = request_path.with_name(f"{request_id}.ini.{uuid.uuid4().hex}.tmp")
+    temp_path.write_text(body, encoding="utf-8")
+    temp_path.replace(request_path)
+
     deadline = time.monotonic() + timeout_s
     last_event = 0.0
     while time.monotonic() <= deadline:
@@ -1073,38 +1123,41 @@ def action_acquire_labspec(
                 output_lock,
             )
             last_event = now
-        if is_stable_file(request.result_path):
-            result = read_labspec_result(request.result_path)
-            if result.get("request_id") != request.request_id:
+        if is_stable_file(result_path):
+            result = {}
+            for line in result_path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#") and "=" in stripped:
+                    key, value = stripped.split("=", 1)
+                    result[key.strip()] = value.strip()
+            if result.get("request_id") != request_id:
                 time.sleep(poll_interval_s)
                 continue
             status = str(result.get("status", "error")).strip().lower()
-            raw_metadata = result.get("metadata")
             metadata = base_acquisition_metadata(acquisition)
             metadata["backend"] = "labspec_file_bridge"
-            if isinstance(raw_metadata, dict):
-                metadata.update(raw_metadata)
-            output_value = result.get("output_path") or result.get("spectrum_path") or request.output_path
+            update_metadata_from_labspec_result(metadata, result)
+            output_value = result.get("save_path") or str(save_path) if save_path else None
             if status == "ok":
                 return {
-                    "outputPath": str(output_value),
+                    "outputPath": str(output_value) if output_value else "",
                     "metadata": metadata,
                     "fileBridge": {
-                        "requestId": request.request_id,
-                        "requestPath": str(request.request_path),
-                        "resultPath": str(request.result_path),
+                        "requestId": request_id,
+                        "requestPath": str(request_path),
+                        "resultPath": str(result_path),
                     },
                 }
             raise BridgeError(
                 "acquisition_failed",
                 str(result.get("message", "LabSpec worker reported an acquisition error")),
-                {"requestId": request.request_id, "resultPath": str(request.result_path)},
+                {"requestId": request_id, "resultPath": str(result_path)},
             )
         time.sleep(poll_interval_s)
     raise BridgeError(
         "acquisition_failed",
-        f"No LabSpec worker result for request {request.request_id} within {timeout_s:.1f}s",
-        {"requestId": request.request_id, "resultPath": str(request.result_path)},
+        f"No LabSpec worker result for request {request_id} within {timeout_s:.1f}s",
+        {"requestId": request_id, "resultPath": str(result_path)},
     )
 
 

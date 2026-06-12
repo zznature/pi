@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 
 import serial
@@ -35,6 +36,7 @@ class MCNewtonXYZStageController:
         stability_tolerance_um: float = 0.2,
         settle_correction_attempts: int = 20,
         settle_correction_threshold_um: float = 100.0,
+        response_collect_ms: float = 50.0,
     ) -> None:
         self._port = port
         self._baudrate = baudrate
@@ -59,6 +61,7 @@ class MCNewtonXYZStageController:
         self._stability_tolerance_um = float(stability_tolerance_um)
         self._settle_correction_attempts = int(settle_correction_attempts)
         self._settle_correction_threshold_um = float(settle_correction_threshold_um)
+        self._response_collect_ms = float(response_collect_ms)
         self._ser = None
         self._connected = False
         self._enabled_channels: set[int] = set()
@@ -113,12 +116,12 @@ class MCNewtonXYZStageController:
             z_um=self.get_axis_position_um("z"),
         )
 
-    def get_axis_position_um(self, axis: str) -> float:
-        self._select_axis(axis)
+    def get_axis_position_um(self, axis: str, *, preserve_enabled_channels: bool = False) -> float:
+        disable_others = False if preserve_enabled_channels else None
+        self._select_axis(axis, disable_others=disable_others)
         response = self._send("[check:pos?]")
         try:
-            pos_str = response.replace("[pos:", "").replace("]", "")
-            return float(pos_str) * 1000.0
+            return self._parse_position_um(response)
         except (ValueError, AttributeError) as exc:
             raise StageCommandError(f"Cannot parse {axis.upper()} position response: '{response}'") from exc
 
@@ -135,6 +138,21 @@ class MCNewtonXYZStageController:
             if target_um is None:
                 continue
             self._move_axis_absolute_um(axis, float(target_um))
+
+    def move_to_position_um(
+        self,
+        target: StagePosition,
+        *,
+        timeout_ms: int,
+    ) -> StagePosition:
+        """Move all axes to target, wait until settled, and return final position."""
+        self.move_absolute_um(
+            x_um=target.x_um,
+            y_um=target.y_um,
+            z_um=target.z_um,
+        )
+        self.wait_settled(timeout_ms)
+        return self.get_position_um()
 
     def move_relative_um(
         self,
@@ -158,10 +176,10 @@ class MCNewtonXYZStageController:
         target_axes = self._normalize_wait_axes(axes)
         t_start = time.monotonic()
         corrections = {axis: 0 for axis in target_axes}
-        previous = {axis: self.get_axis_position_um(axis) for axis in target_axes}
+        previous = {axis: self.get_axis_position_um(axis, preserve_enabled_channels=True) for axis in target_axes}
         while True:
             time.sleep(0.050)
-            current = {axis: self.get_axis_position_um(axis) for axis in target_axes}
+            current = {axis: self.get_axis_position_um(axis, preserve_enabled_channels=True) for axis in target_axes}
 
             all_stable = all(
                 abs(current[axis] - previous[axis]) < self._stability_tolerance_um
@@ -177,7 +195,10 @@ class MCNewtonXYZStageController:
             if all_stable and not all_reached:
                 corrected = self._try_correct_stable_target_error(current, corrections)
                 if corrected:
-                    previous = {axis: self.get_axis_position_um(axis) for axis in target_axes}
+                    previous = {
+                        axis: self.get_axis_position_um(axis, preserve_enabled_channels=True)
+                        for axis in target_axes
+                    }
                     continue
 
             previous = current
@@ -291,12 +312,14 @@ class MCNewtonXYZStageController:
         self._send(f"[movetarget:{target_mm:.6f}]", wait_ms=self._move_cmd_wait_ms)
         self._last_targets_um[axis] = target_um
 
-    def _select_axis(self, axis: str) -> None:
+    def _select_axis(self, axis: str, *, disable_others: bool | None = None) -> None:
         key = axis.lower()
         if key not in self._channels:
             raise ValueError(f"Unsupported axis: {axis}")
         channel = self._channels[key]
-        if self._exclusive_channel:
+        if disable_others is None:
+            disable_others = self._exclusive_channel
+        if disable_others:
             for enabled in sorted(self._enabled_channels):
                 if enabled != channel:
                     self._send(f"[ch{enabled}:0]")
@@ -310,6 +333,30 @@ class MCNewtonXYZStageController:
             raise StageConnectionError("Serial port is not connected.")
         if wait_ms is None:
             wait_ms = self._default_cmd_wait_ms
+        try:
+            self._ser.reset_input_buffer()
+        except Exception:
+            pass
         self._ser.write(cmd.encode("ascii"))
         time.sleep(wait_ms / 1000.0)
-        return self._ser.read_all().decode("ascii", errors="replace").strip()
+        chunks = []
+        deadline = time.monotonic() + self._response_collect_ms / 1000.0
+        while True:
+            chunk = self._ser.read_all()
+            if chunk:
+                chunks.append(chunk)
+                if b"]" in b"".join(chunks):
+                    break
+            elif not chunks:
+                break
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.005)
+        return b"".join(chunks).decode("ascii", errors="replace").strip()
+
+    @staticmethod
+    def _parse_position_um(response: str) -> float:
+        matches = re.findall(r"\[pos:([+-]?\d+(?:\.\d+)?)\]", response or "")
+        if not matches:
+            raise ValueError(response)
+        return float(matches[-1]) * 1000.0

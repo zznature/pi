@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Capabilities } from "./capabilities.ts";
+import { DEFAULT_LABSPEC_BRIDGE_DIR } from "./labspec-bridge.ts";
 import type { ExperimentSpec, ValidationIssue } from "./schemas.ts";
 import { getInstrumentResourceIds } from "./spec-utils.ts";
 
@@ -69,8 +70,8 @@ function readRamanBridgeProbe(cwd: string): { probe?: RamanReadOnlyProbe; issue?
 	const extensionDir = dirname(fileURLToPath(import.meta.url));
 	const bridgePath = join(extensionDir, "raman_bridge.py");
 	const dryRunDir = join(cwd, ".pi", "experiment-runs", "dry-run");
-	const bridgeDir = join(dryRunDir, "labspec_bridge");
-	mkdirSync(bridgeDir, { recursive: true });
+	const bridgeDir = DEFAULT_LABSPEC_BRIDGE_DIR;
+	mkdirSync(dryRunDir, { recursive: true });
 	const request = {
 		id: "probe-0001",
 		action: "probe",

@@ -22,7 +22,7 @@ This task is not a mapping task. It is a single- or two-point hardware pilot.
 | --- | --- |
 | `dryRunReportId` | `dry_run-preflight-0001` |
 | `stage_port` | `COM3` |
-| `labspec_bridge_dir` | `D:\LabBridge\raman\spectrum-bridge` |
+| `labspec_bridge_dir` | `D:\RamanLab\SpecBridge` |
 | `confirmed_laser_power_mw` | `0.2` |
 | `operator` | Lab operator name |
 
@@ -118,4 +118,3 @@ The operator should inspect the saved spectrum for:
 - Approximate Si peak near 520.7 cm-1 if substrate signal is expected.
 - Film-specific Raman features if the material has known bands.
 - Any sign that the film may be heating or degrading.
-

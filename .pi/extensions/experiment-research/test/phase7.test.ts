@@ -265,20 +265,23 @@ async function fakeLabspecWorker(bridgeDir: string, requestCount = 1): Promise<v
 	const handled = new Set<string>();
 	while (Date.now() < deadline) {
 		if (existsSync(requestsDir)) {
-			const [requestFile] = readdirSync(requestsDir).filter((entry) => entry.endsWith(".json") && !handled.has(entry));
+			const [requestFile] = readdirSync(requestsDir).filter((entry) => entry.endsWith(".ini") && !handled.has(entry));
 			if (requestFile) {
-				const request = asRecord(JSON.parse(readFileSync(join(requestsDir, requestFile), "utf-8")));
+				const request = readIniRecord(join(requestsDir, requestFile));
 				const outputPath = String(request.output_path);
 				mkdirSync(dirname(outputPath), { recursive: true });
 				writeFileSync(outputPath, "raman_shift_nm,intensity\n100,10\n200,20\n", "utf-8");
 				writeFileSync(
-					String(request.result_path),
-					`${JSON.stringify({
-						request_id: request.request_id,
-						status: "ok",
-						output_path: outputPath,
-						metadata: { snrEstimate: 21, totalIntensity: 30, saturated: false },
-					})}\n`,
+					join(bridgeDir, "results", requestFile),
+					[
+						`request_id=${String(request.request_id)}`,
+						"status=ok",
+						`output_path=${outputPath}`,
+						"snr_estimate=21",
+						"total_intensity=30",
+						"saturated=false",
+						"",
+					].join("\n"),
 					"utf-8",
 				);
 				handled.add(requestFile);
@@ -288,6 +291,17 @@ async function fakeLabspecWorker(bridgeDir: string, requestCount = 1): Promise<v
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 	assert.fail(`fake LabSpec worker observed ${handled.size}/${requestCount} acquisition request(s)`);
+}
+
+function readIniRecord(path: string): Record<string, string> {
+	const record: Record<string, string> = {};
+	for (const line of readFileSync(path, "utf-8").split(/\r?\n/)) {
+		const trimmed = line.trim();
+		const separator = trimmed.indexOf("=");
+		if (!trimmed || trimmed.startsWith("#") || separator < 0) continue;
+		record[trimmed.slice(0, separator).trim()] = trimmed.slice(separator + 1).trim();
+	}
+	return record;
 }
 
 function writePgm(path: string, pixels: number[][]): void {
