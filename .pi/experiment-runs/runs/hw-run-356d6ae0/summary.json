@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-356d6ae0",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "subjectId": "sample-focused",
+  "objective": "在用户已聚焦的当前位置采集单条拉曼光谱",
+  "unitCount": 1,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "operatorOnlyMonitoring": false,
+  "stopReason": "No LabSpec worker result for request acq_6833612576935400 within 30.0s"
+}

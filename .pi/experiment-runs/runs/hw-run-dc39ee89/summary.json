@@ -1,0 +1,17 @@
+{
+  "runId": "hw-run-dc39ee89",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "subjectId": "sample-focused",
+  "objective": "在用户已聚焦的当前位置采集单条180秒积分时间拉曼光谱；parentRunId=hw-run-49449af7",
+  "unitCount": 1,
+  "completedUnits": 1,
+  "progress": {
+    "completedUnits": 1,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "completed",
+  "stopConditionMet": false,
+  "operatorOnlyMonitoring": false
+}

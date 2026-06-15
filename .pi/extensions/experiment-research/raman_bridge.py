@@ -253,6 +253,18 @@ def parse_payload(value: Any) -> dict[str, Any]:
     return {}
 
 
+def wait_stage_settled(stage: Any, timeout_ms: int, axes: set[str] | None = None) -> None:
+    if axes is None:
+        stage.wait_settled(timeout_ms)
+        return
+    try:
+        stage.wait_settled(timeout_ms, axes=axes)
+    except TypeError as exc:
+        if "axes" not in str(exc):
+            raise
+        stage.wait_settled(timeout_ms)
+
+
 def position_to_wire(position: Any) -> dict[str, float]:
     return {
         "xUm": float(getattr(position, "x_um", 0.0)),
@@ -276,10 +288,12 @@ def load_real_stage(stage_root: Path, payload: dict[str, Any]) -> Any:
         y_channel=int(channels.get("y", 2)),
         z_channel=int(channels.get("z", 3)),
         default_cmd_wait_ms=100.0,
+        exclusive_channel=False,
         stability_tolerance_um=0.5,
         settle_correction_attempts=3,
     )
     stage.connect()
+    stage.apply_fast_move_profile()
     return stage
 
 
@@ -509,13 +523,29 @@ def action_visit_point(
     if skip_move:
         debug(f"visit_point skip move: already within 2um (dx={dx:.3f} dy={dy:.3f} dz={dz:.3f})")
     else:
-        write_protocol({"event": "progress", "action": "visit_point", "phase": "move"}, output_lock)
-        stage.move_absolute_um(
-            x_um=point.get("xUm"),
-            y_um=point.get("yUm"),
-            z_um=point.get("zUm"),
-        )
-        stage.wait_settled(settle_timeout_ms)
+        axis_targets = [
+            ("x", "x_um", "xUm", target.x_um, dx),
+            ("y", "y_um", "yUm", target.y_um, dy),
+            ("z", "z_um", "zUm", target.z_um, dz),
+        ]
+        for axis, move_key, wire_key, target_um, delta_um in axis_targets:
+            if wire_key not in point or delta_um < 2.0:
+                continue
+            if abort_event.is_set():
+                state.stop()
+                raise BridgeError("aborted", f"visit_point aborted before {axis.upper()} motion")
+            write_protocol(
+                {
+                    "event": "progress",
+                    "action": "visit_point",
+                    "phase": "move_axis",
+                    "axis": axis,
+                    "targetUm": target_um,
+                },
+                output_lock,
+            )
+            stage.move_absolute_um(**{move_key: target_um})
+            wait_stage_settled(stage, settle_timeout_ms, {axis})
     if abort_event.is_set():
         state.stop()
         raise BridgeError("aborted", "visit_point aborted after motion")
@@ -1062,10 +1092,12 @@ def action_acquire_labspec(
     abort_event: threading.Event,
     output_lock: threading.Lock,
 ) -> dict[str, Any]:
+    if str(state.stage_root) not in sys.path:
+        sys.path.insert(0, str(state.stage_root))
+    from mapping import DEFAULT_LABSPEC_BRIDGE_DIR
+
     bridge_dir_value = acquisition.get("bridgeDir")
-    if not isinstance(bridge_dir_value, str) or not bridge_dir_value:
-        raise BridgeError("acquisition_failed", "labspec_file_bridge acquisition requires bridgeDir")
-    bridge_dir = Path(bridge_dir_value)
+    bridge_dir = Path(bridge_dir_value) if isinstance(bridge_dir_value, str) and bridge_dir_value.strip() else DEFAULT_LABSPEC_BRIDGE_DIR
 
     request_id = f"acq_{time.monotonic_ns()}"
     timeout_s = float(acquisition.get("timeoutS", 30.0))

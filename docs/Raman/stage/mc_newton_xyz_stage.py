@@ -34,9 +34,11 @@ class MCNewtonXYZStageController:
         y_target_tolerance_um: float = 1.0,
         z_target_tolerance_um: float = 1.0,
         stability_tolerance_um: float = 0.2,
-        settle_correction_attempts: int = 20,
+        settle_correction_attempts: int = 10,
         settle_correction_threshold_um: float = 100.0,
         response_collect_ms: float = 50.0,
+        segmented_move_threshold_um: float = 10.0,
+        segmented_move_step_um: float = 5.0,
     ) -> None:
         self._port = port
         self._baudrate = baudrate
@@ -62,6 +64,8 @@ class MCNewtonXYZStageController:
         self._settle_correction_attempts = int(settle_correction_attempts)
         self._settle_correction_threshold_um = float(settle_correction_threshold_um)
         self._response_collect_ms = float(response_collect_ms)
+        self._segmented_move_threshold_um = float(segmented_move_threshold_um)
+        self._segmented_move_step_um = float(segmented_move_step_um)
         self._ser = None
         self._connected = False
         self._enabled_channels: set[int] = set()
@@ -95,6 +99,69 @@ class MCNewtonXYZStageController:
             raise StageConnectionError(f"IDN check failed: unexpected response '{idn}'")
 
         self._connected = True
+
+    def configure_motion(
+        self,
+        *,
+        voltage_v: int | None = None,
+        frequency_hz: int | None = None,
+        mode: str | None = None,
+        units: str | None = None,
+    ) -> None:
+        """Configure controller motion parameters from the MC.Newton command set."""
+
+        if units is not None:
+            normalized_units = units.strip().lower()
+            if normalized_units not in {"mm", "angle"}:
+                raise ValueError("units must be 'mm' or 'angle'.")
+            self._send(f"[changeunits:{normalized_units}]")
+
+        if mode is not None:
+            normalized_mode = mode.strip().lower()
+            if normalized_mode == "slide":
+                self._send("[-slid-]")
+            elif normalized_mode == "step":
+                self._send("[-step-]")
+            else:
+                raise ValueError("mode must be 'slide' or 'step'.")
+
+        if voltage_v is not None:
+            voltage = int(voltage_v)
+            if voltage < 0 or voltage > 999:
+                raise ValueError("voltage_v must be between 0 and 999.")
+            self._send(f"[volt:+{voltage:03d}V]")
+
+        if frequency_hz is not None:
+            frequency = int(frequency_hz)
+            if frequency <= 0 or frequency > 99999:
+                raise ValueError("frequency_hz must be between 1 and 99999.")
+            self._send(f"[freq:{frequency:05d}Hz]")
+
+    def apply_fast_move_profile(
+        self,
+        *,
+        voltage_v: int = 30,
+        frequency_hz: int = 2000,
+        mode: str = "slide",
+        units: str = "mm",
+    ) -> None:
+        """Apply a fast movement profile.
+
+        The programming guide example uses 500 Hz; this profile uses 2000 Hz,
+        while keeping voltage capped at 30 V for conservative hardware use.
+        """
+
+        if voltage_v > 30:
+            raise ValueError("fast move profile voltage_v must not exceed 30 V.")
+        if frequency_hz > 2000:
+            raise ValueError("fast move profile frequency_hz must not exceed 2000 Hz.")
+
+        self.configure_motion(
+            units=units,
+            mode=mode,
+            voltage_v=voltage_v,
+            frequency_hz=frequency_hz,
+        )
 
     def disconnect(self) -> None:
         if not self._connected:
@@ -307,11 +374,27 @@ class MCNewtonXYZStageController:
             time.sleep(0.050)
 
     def _move_axis_absolute_um(self, axis: str, target_um: float) -> None:
+        current_um = self.get_axis_position_um(axis, preserve_enabled_channels=True)
+        distance_um = target_um - current_um
+        step_um = self._segmented_move_step_um
+        if (
+            self._segmented_move_threshold_um > 0
+            and step_um > 0
+            and abs(distance_um) > self._segmented_move_threshold_um
+        ):
+            direction = 1.0 if distance_um > 0 else -1.0
+            next_target_um = current_um
+            while abs(target_um - next_target_um) > step_um:
+                next_target_um += direction * step_um
+                self._send_axis_movetarget(axis, next_target_um)
+                time.sleep(0.050)
+        self._send_axis_movetarget(axis, target_um)
+        self._last_targets_um[axis] = target_um
+
+    def _send_axis_movetarget(self, axis: str, target_um: float) -> None:
         self._select_axis(axis)
         target_mm = target_um / 1000.0
         self._send(f"[movetarget:{target_mm:.6f}]", wait_ms=self._move_cmd_wait_ms)
-        self._last_targets_um[axis] = target_um
-
     def _select_axis(self, axis: str, *, disable_others: bool | None = None) -> None:
         key = axis.lower()
         if key not in self._channels:

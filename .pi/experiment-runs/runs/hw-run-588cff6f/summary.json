@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-588cff6f",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "subjectId": "sample-focused",
+  "objective": "在用户已聚焦的当前位置再进行一次单点180秒积分时间拉曼硬件采集；parentRunId=hw-run-dc39ee89；输入产物包括 .pi/experiment-runs/runs/hw-run-dc39ee89/summary.json, .pi/experiment-runs/runs/hw-run-dc39ee89/analysis.json, .pi/experiment-runs/runs/hw-run-dc39ee89/artifacts/spectra/point_0.txt",
+  "unitCount": 1,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "operatorOnlyMonitoring": true,
+  "stopReason": "Stage did not settle within 30000 ms (current z=2504.877, x=875.849, y=1528.218; target x=877.700, y=1528.400, z=2504.800; delta x=-1.851, y=-0.182, z=0.077; tolerance x=1.000, y=1.000, z=1.000)"
+}

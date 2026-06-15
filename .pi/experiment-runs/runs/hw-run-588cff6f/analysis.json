@@ -1,0 +1,149 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-588cff6f",
+  "experimentId": "exp-single-spectrum-001",
+  "status": "aborted",
+  "qualityMetrics": {
+    "unitCount": 1,
+    "completedUnits": 0,
+    "failedUnits": 1,
+    "skippedUnits": 0,
+    "completionRate": 0,
+    "errorRate": 1,
+    "saturatedSpectra": 0,
+    "artifactCount": 9
+  },
+  "anomalies": [
+    {
+      "unitId": "run",
+      "severity": "critical",
+      "metric": "status",
+      "observed": "aborted",
+      "threshold": "completed",
+      "reason": "Run did not complete normally.",
+      "artifactRefs": []
+    },
+    {
+      "unitId": "run",
+      "severity": "warning",
+      "metric": "completionRate",
+      "observed": 0,
+      "threshold": 1,
+      "reason": "Not all planned units completed.",
+      "artifactRefs": []
+    },
+    {
+      "unitId": "point-0",
+      "unitIndex": 0,
+      "severity": "critical",
+      "metric": "unitStatus",
+      "observed": "error",
+      "threshold": "success",
+      "reason": "stage_timeout",
+      "artifactRefs": []
+    }
+  ],
+  "artifactRefs": [
+    {
+      "id": "hw-run-588cff6f-run",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/run.json",
+      "label": "Run record",
+      "kind": "run",
+      "producerRunId": "hw-run-588cff6f"
+    },
+    {
+      "id": "hw-run-588cff6f-spec",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/spec.json",
+      "label": "ExperimentSpec",
+      "kind": "spec",
+      "producerRunId": "hw-run-588cff6f"
+    },
+    {
+      "id": "hw-run-588cff6f-events",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/events.jsonl",
+      "label": "Hardware unit events",
+      "kind": "events",
+      "producerRunId": "hw-run-588cff6f"
+    },
+    {
+      "id": "hw-run-588cff6f-intents",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/intents.jsonl",
+      "label": "Operator intents",
+      "kind": "intents",
+      "producerRunId": "hw-run-588cff6f"
+    },
+    {
+      "id": "hw-run-588cff6f-summary",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/summary.json",
+      "label": "Hardware summary",
+      "kind": "summary",
+      "producerRunId": "hw-run-588cff6f"
+    },
+    {
+      "id": "hw-run-588cff6f-resume-snapshot",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/resume.snapshot.json",
+      "label": "Resume snapshot",
+      "kind": "resume-snapshot",
+      "producerRunId": "hw-run-588cff6f"
+    },
+    {
+      "id": "hw-run-588cff6f-approvals",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/approvals.jsonl",
+      "label": "Hardware approval",
+      "kind": "approvals",
+      "producerRunId": "hw-run-588cff6f"
+    },
+    {
+      "id": "hw-run-588cff6f-artifacts",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/artifacts.json",
+      "label": "Artifact index",
+      "kind": "artifacts",
+      "producerRunId": "hw-run-588cff6f"
+    },
+    {
+      "id": "hw-run-588cff6f-spectrum-point-0",
+      "uri": ".pi/experiment-runs/runs/hw-run-588cff6f/artifacts/spectra/point_0.txt",
+      "label": "Raman spectrum point 0",
+      "kind": "spectrum",
+      "producerRunId": "hw-run-588cff6f"
+    }
+  ],
+  "stoppingRules": [
+    {
+      "rule": "maxUnits",
+      "status": "passed",
+      "triggered": false,
+      "observed": 1,
+      "limit": 1,
+      "reason": "Run stayed within the bounded unit limit."
+    },
+    {
+      "rule": "maxRuntimeMinutes",
+      "status": "not_evaluable",
+      "triggered": false,
+      "limit": 8,
+      "reason": "Run summary does not include runtimeMinutes."
+    },
+    {
+      "rule": "stopOnError",
+      "status": "triggered",
+      "triggered": true,
+      "observed": 1,
+      "limit": true,
+      "reason": "Run recorded unit errors while stopOnError is enabled."
+    },
+    {
+      "rule": "summaryStopCondition",
+      "status": "triggered",
+      "triggered": true,
+      "observed": true,
+      "limit": false,
+      "reason": "Kernel summary reports that a stop condition was met."
+    }
+  ],
+  "stopConditionMet": true,
+  "recommendationBasis": {
+    "usableForReplan": false,
+    "reason": "A stopping rule was triggered; operator or researcher review is required."
+  }
+}

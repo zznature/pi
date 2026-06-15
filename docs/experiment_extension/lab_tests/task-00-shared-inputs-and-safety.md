@@ -22,7 +22,7 @@ Collect the minimum information required before pi-agent is allowed to compile o
 | `safe_z_range_um` | Allowed local Z window |
 | `labspec_bridge_dir` | LabSpec spectrum request/result bridge directory |
 | `frame_bridge_dir` | LabSpec frame bridge directory if autofocus or XY correction is enabled |
-| `stage_port` | MC.Newton controller port, for example `COM3` |
+| `stage_port` | MC.Newton controller port, for example `COM17` |
 
 ## Safety Rules
 
@@ -40,7 +40,7 @@ Use this structure with `run_experiment` for hardware tasks. Replace IDs and pat
 ```json
 {
   "stageAdapter": "mc_newton_xyz",
-  "stagePort": "COM3",
+  "stagePort": "COM17",
   "stagePython": "python",
   "raman": {
     "acquisitionBackend": "labspec_file_bridge",

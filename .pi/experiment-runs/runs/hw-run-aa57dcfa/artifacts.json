@@ -1,0 +1,65 @@
+[
+  {
+    "id": "hw-run-aa57dcfa-run",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/run.json",
+    "label": "Run record",
+    "kind": "run",
+    "producerRunId": "hw-run-aa57dcfa"
+  },
+  {
+    "id": "hw-run-aa57dcfa-spec",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/spec.json",
+    "label": "ExperimentSpec",
+    "kind": "spec",
+    "producerRunId": "hw-run-aa57dcfa"
+  },
+  {
+    "id": "hw-run-aa57dcfa-events",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/events.jsonl",
+    "label": "Hardware unit events",
+    "kind": "events",
+    "producerRunId": "hw-run-aa57dcfa"
+  },
+  {
+    "id": "hw-run-aa57dcfa-intents",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/intents.jsonl",
+    "label": "Operator intents",
+    "kind": "intents",
+    "producerRunId": "hw-run-aa57dcfa"
+  },
+  {
+    "id": "hw-run-aa57dcfa-summary",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/summary.json",
+    "label": "Hardware summary",
+    "kind": "summary",
+    "producerRunId": "hw-run-aa57dcfa"
+  },
+  {
+    "id": "hw-run-aa57dcfa-resume-snapshot",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/resume.snapshot.json",
+    "label": "Resume snapshot",
+    "kind": "resume-snapshot",
+    "producerRunId": "hw-run-aa57dcfa"
+  },
+  {
+    "id": "hw-run-aa57dcfa-approvals",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/approvals.jsonl",
+    "label": "Hardware approval",
+    "kind": "approvals",
+    "producerRunId": "hw-run-aa57dcfa"
+  },
+  {
+    "id": "hw-run-aa57dcfa-artifacts",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/artifacts.json",
+    "label": "Artifact index",
+    "kind": "artifacts",
+    "producerRunId": "hw-run-aa57dcfa"
+  },
+  {
+    "id": "hw-run-aa57dcfa-spectrum-point-0",
+    "uri": ".pi/experiment-runs/runs/hw-run-aa57dcfa/artifacts/spectra/point_0.txt",
+    "label": "Raman spectrum point 0",
+    "kind": "spectrum",
+    "producerRunId": "hw-run-aa57dcfa"
+  }
+]

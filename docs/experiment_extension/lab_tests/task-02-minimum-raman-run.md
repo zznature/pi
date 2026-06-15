@@ -21,7 +21,7 @@ This task is not a mapping task. It is a single- or two-point hardware pilot.
 | Parameter | Example |
 | --- | --- |
 | `dryRunReportId` | `dry_run-preflight-0001` |
-| `stage_port` | `COM3` |
+| `stage_port` | `COM17` |
 | `labspec_bridge_dir` | `D:\RamanLab\SpecBridge` |
 | `confirmed_laser_power_mw` | `0.2` |
 | `operator` | Lab operator name |

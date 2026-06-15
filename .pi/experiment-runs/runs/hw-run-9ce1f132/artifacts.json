@@ -1,0 +1,72 @@
+[
+  {
+    "id": "hw-run-9ce1f132-run",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/run.json",
+    "label": "Run record",
+    "kind": "run",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-spec",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/spec.json",
+    "label": "ExperimentSpec",
+    "kind": "spec",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-events",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/events.jsonl",
+    "label": "Hardware unit events",
+    "kind": "events",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-intents",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/intents.jsonl",
+    "label": "Operator intents",
+    "kind": "intents",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-summary",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/summary.json",
+    "label": "Hardware summary",
+    "kind": "summary",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-resume-snapshot",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/resume.snapshot.json",
+    "label": "Resume snapshot",
+    "kind": "resume-snapshot",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-approvals",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/approvals.jsonl",
+    "label": "Hardware approval",
+    "kind": "approvals",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-artifacts",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/artifacts.json",
+    "label": "Artifact index",
+    "kind": "artifacts",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-spectrum-point-0",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/artifacts/spectra/point_0.txt",
+    "label": "Raman spectrum point 0",
+    "kind": "spectrum",
+    "producerRunId": "hw-run-9ce1f132"
+  },
+  {
+    "id": "hw-run-9ce1f132-analysis",
+    "uri": ".pi/experiment-runs/runs/hw-run-9ce1f132/analysis.json",
+    "label": "Run analysis",
+    "kind": "analysis",
+    "producerRunId": "hw-run-9ce1f132"
+  }
+]

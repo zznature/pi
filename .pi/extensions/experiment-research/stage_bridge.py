@@ -45,7 +45,8 @@ def main() -> int:
     # [check:pos?] returns a value (the Z axis returns nothing at 5 ms). Use a
     # 100 ms command wait so every position query gets one clean response and no
     # reply carries over into the next read.
-    with MCNewtonXYZStageController(args.port, default_cmd_wait_ms=100.0) as stage:
+    with MCNewtonXYZStageController(args.port, default_cmd_wait_ms=100.0, exclusive_channel=False) as stage:
+        stage.apply_fast_move_profile()
         if args.action == "position":
             print(json.dumps(_position_dict(stage.get_position_um())))
             return 0

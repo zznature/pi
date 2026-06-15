@@ -1,0 +1,79 @@
+[
+  {
+    "id": "hw-run-49449af7-run",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/run.json",
+    "label": "Run record",
+    "kind": "run",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-spec",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/spec.json",
+    "label": "ExperimentSpec",
+    "kind": "spec",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-events",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/events.jsonl",
+    "label": "Hardware unit events",
+    "kind": "events",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-intents",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/intents.jsonl",
+    "label": "Operator intents",
+    "kind": "intents",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-summary",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/summary.json",
+    "label": "Hardware summary",
+    "kind": "summary",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-resume-snapshot",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/resume.snapshot.json",
+    "label": "Resume snapshot",
+    "kind": "resume-snapshot",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-approvals",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/approvals.jsonl",
+    "label": "Hardware approval",
+    "kind": "approvals",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-artifacts",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/artifacts.json",
+    "label": "Artifact index",
+    "kind": "artifacts",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-spectrum-point-0",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/artifacts/spectra/point_0.txt",
+    "label": "Raman spectrum point 0",
+    "kind": "spectrum",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-labspec-result-point-0-acq_6836097403639200",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/artifacts/labspec/point_0/result_acq_6836097403639200.ini",
+    "label": "LabSpec result point 0",
+    "kind": "labspec-result",
+    "producerRunId": "hw-run-49449af7"
+  },
+  {
+    "id": "hw-run-49449af7-analysis",
+    "uri": ".pi/experiment-runs/runs/hw-run-49449af7/analysis.json",
+    "label": "Run analysis",
+    "kind": "analysis",
+    "producerRunId": "hw-run-49449af7"
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-dc39ee89",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "status": "completed",
+  "completedUnits": 1,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 1,
+  "safeToResume": false,
+  "requiresOperatorApproval": false,
+  "createdAt": "2026-06-12T09:30:14.808Z"
+}
