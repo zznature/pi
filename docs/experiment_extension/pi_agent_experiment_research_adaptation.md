@@ -1,8 +1,8 @@
 # pi-agent 实验研究适配方案
 
 本文给出将 pi-agent 适配为科学实验研究 agent 的工程方案与当前状态。参考设计见
-`docs/instrument_agent_design.md`；Raman 领域接入见
-`docs/experiment/raman_hardware_integration.md`。
+`docs/experiment_extension/instrument_agent_design.md`；Raman 领域接入见
+`docs/experiment_extension/raman_hardware_integration.md`。
 
 ## 核心思想
 

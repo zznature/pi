@@ -14,19 +14,19 @@
 
 ## 推荐阅读顺序
 
-1. [experiment/pi_agent_experiment_research_adaptation.md](experiment/pi_agent_experiment_research_adaptation.md)：pi-agent 项目内 experiment-research extension 的具体落地方案，包括数据契约、工具、run store、审计记录、阶段计划和风险控制。
-2. [experiment/instrument_agent_design.md](experiment/instrument_agent_design.md)：更通用的 instrument-orchestration agent 架构，说明 gateway、middleware、watchdog、safety model、execution modes 和 roadmap。
+1. [experiment_extension/pi_agent_experiment_research_adaptation.md](experiment_extension/pi_agent_experiment_research_adaptation.md)：pi-agent 项目内 experiment-research extension 的具体落地方案，包括数据契约、工具、run store、审计记录、阶段计划和风险控制。
+2. [experiment_extension/instrument_agent_design.md](experiment_extension/instrument_agent_design.md)：更通用的 instrument-orchestration agent 架构，说明 gateway、middleware、watchdog、safety model、execution modes 和 roadmap。
 3. [Raman/README.md](Raman/README.md)：Raman measurement automation 总览，覆盖硬件、环境、目录、运行命令、autofocus、XY calibration 和 LabSpec acquisition。
-4. [literature/README.md](literature/README.md)：literature-research extension 方案，覆盖文献检索、论文导入、证据抽取和实验规划联动。
+4. [literature_extension/README.md](literature_extension/README.md)：literature-research extension 方案，覆盖文献检索、论文导入、证据抽取和实验规划联动。
 5. [scientific_research_automation_development.md](scientific_research_automation_development.md)：科研流程自动化总体路线图，覆盖文献证据、假设、协议、数据分析、决策审计和报告生成。
 
 ## 目录说明
 
 | 路径 | 内容 |
 | --- | --- |
-| `experiment/instrument_agent_design.md` | 实验仪器 agent 的通用架构设计：Protocol -> Tool、bounded run、deterministic kernel、watchdog、safety policy。 |
-| `experiment/pi_agent_experiment_research_adaptation.md` | 将 pi-agent 作为实验研究外层 agent 的实施方案，推荐从 `.pi/extensions/experiment-research` 的 Contract Spike 和 Simulation Closed Loop 开始。 |
-| `literature/` | literature-research extension 方案，包括 metadata search、paper import、evidence extraction 和 experiment planning link。 |
+| `experiment_extension/instrument_agent_design.md` | 实验仪器 agent 的通用架构设计：Protocol -> Tool、bounded run、deterministic kernel、watchdog、safety policy。 |
+| `experiment_extension/pi_agent_experiment_research_adaptation.md` | 将 pi-agent 作为实验研究外层 agent 的实施方案，推荐从 `.pi/extensions/experiment-research` 的 Contract Spike 和 Simulation Closed Loop 开始。 |
+| `literature_extension/` | literature-research extension 方案，包括 metadata search、paper import、evidence extraction 和 experiment planning link。 |
 | `scientific_research_automation_development.md` | pi 科研流程自动化总体路线图：literature、hypothesis、protocol、experiment、analysis、decision audit、report。 |
 | `Raman/` | Raman 自动化相关说明和原型代码，包括 stage、autofocus、calibration 和 LabSpec spectrum acquisition。 |
 | `Raman/stage/` | stage 抽象、内存 stage、MC.Newton XYZ/Z stage 控制相关原型。 |
