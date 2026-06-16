@@ -11,7 +11,7 @@
     "completionRate": 1,
     "errorRate": 0,
     "saturatedSpectra": 0,
-    "artifactCount": 10
+    "artifactCount": 11
   },
   "anomalies": [],
   "artifactRefs": [
@@ -83,6 +83,13 @@
       "uri": ".pi/experiment-runs/runs/hw-run-9fb9bdb2/artifacts/labspec/point_0/result_acq_6839696910289900.ini",
       "label": "LabSpec result point 0",
       "kind": "labspec-result",
+      "producerRunId": "hw-run-9fb9bdb2"
+    },
+    {
+      "id": "hw-run-9fb9bdb2-analysis",
+      "uri": ".pi/experiment-runs/runs/hw-run-9fb9bdb2/analysis.json",
+      "label": "Run analysis",
+      "kind": "analysis",
       "producerRunId": "hw-run-9fb9bdb2"
     }
   ],

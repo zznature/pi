@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-6fec4528",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "status": "aborted",
+  "completedUnits": 0,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-15T08:31:13.547Z",
+  "resumeFrom": "0",
+  "reason": "Coarse scan: Stage did not settle within 60000 ms (current z=2411.679; target z=2403.000; delta z=8.679; tolerance z=1.000)"
+}

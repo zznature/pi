@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-6fec4528",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "subjectId": "sample-focused",
+  "objective": "operator review完成后，基于当前位置x=884,y=1526,z=2453执行一次Z-only autofocus；parentRunId=hw-run-12cea468；不回旧目标点、不做XY correction、不做确认采谱",
+  "unitCount": 1,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "operatorOnlyMonitoring": true,
+  "stopReason": "Coarse scan: Stage did not settle within 60000 ms (current z=2411.679; target z=2403.000; delta z=8.679; tolerance z=1.000)"
+}

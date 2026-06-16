@@ -1,0 +1,196 @@
+{
+  "reportId": "dry_run-preflight-20260615T081751854Z-535ab425",
+  "spec": {
+    "schemaVersion": "1",
+    "experimentId": "exp-single-spectrum-001",
+    "specId": "spec-focus-013-zplusminus50um",
+    "experimentType": "spatial_mapping",
+    "objective": "在最近成功采谱的当前位置执行一次更大Z窗口的自动聚焦，并用短积分确认焦点；parentRunId=hw-run-9fb9bdb2；避免回到旧目标点",
+    "subject": {
+      "id": "sample-focused",
+      "kind": "user_sample",
+      "label": "用户已聚焦样品"
+    },
+    "mode": "dry_run",
+    "resources": [
+      {
+        "id": "mc-newton-xyz-stage",
+        "kind": "instrument",
+        "role": "stage"
+      },
+      {
+        "id": "lab-camera",
+        "kind": "instrument",
+        "role": "camera"
+      },
+      {
+        "id": "lab-acquirer",
+        "kind": "instrument",
+        "role": "acquirer"
+      },
+      {
+        "id": "labspec-workstation",
+        "kind": "workspace",
+        "role": "exclusive_lab_station"
+      }
+    ],
+    "limits": {
+      "motion": {
+        "xUm": {
+          "minUm": 874.5,
+          "maxUm": 877
+        },
+        "yUm": {
+          "minUm": 1527,
+          "maxUm": 1529.5
+        },
+        "zUm": {
+          "minUm": 2454.877,
+          "maxUm": 2554.877
+        }
+      },
+      "powerEnergy": {
+        "maxLaserPowerMw": 2
+      },
+      "acquisition": {
+        "maxExposureMs": 1000,
+        "maxUnits": 1
+      }
+    },
+    "plan": {
+      "kind": "points",
+      "points": [
+        {
+          "xUm": 875.849,
+          "yUm": 1528.218,
+          "zUm": 2504.877
+        }
+      ]
+    },
+    "domain": {
+      "raman": {
+        "autofocus": {
+          "enabled": true,
+          "every": "once",
+          "zMinUm": 2454.877,
+          "zMaxUm": 2554.877,
+          "coarseRangeUm": 20,
+          "coarseStepUm": 5,
+          "fineRangeUm": 4,
+          "fineStepUm": 1,
+          "metric": "labspec_spot_compactness",
+          "minConfidence": 0.35,
+          "onFailure": "pause"
+        },
+        "acquisition": {
+          "integrationTimeS": 1,
+          "accumulations": 1,
+          "fromNm": 100,
+          "toNm": 3500,
+          "saveFormat": "txt"
+        }
+      }
+    },
+    "stoppingRules": {
+      "maxRuntimeMinutes": 4,
+      "maxUnits": 1,
+      "stopOnError": true
+    },
+    "operatorApprovalRequired": false
+  },
+  "result": {
+    "valid": true,
+    "issues": [],
+    "unitCount": 1,
+    "estimatedRuntimeMinutes": 0.017,
+    "mode": "dry_run",
+    "liveState": {
+      "mode": "dry_run",
+      "adapters": [
+        {
+          "instrumentId": "mc-newton-xyz-stage",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        },
+        {
+          "instrumentId": "lab-camera",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        },
+        {
+          "instrumentId": "lab-acquirer",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        }
+      ],
+      "outputDirectory": {
+        "path": ".pi/experiment-runs/dry-run",
+        "writable": true
+      },
+      "abortPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "available": true
+      },
+      "intentsPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "writable": true
+      },
+      "approvalsPath": {
+        "path": ".pi/experiment-runs/approvals.jsonl",
+        "writable": true
+      },
+      "readOnlyProbe": {
+        "stage": {
+          "reachable": true,
+          "idn": "memory-stage",
+          "adapter": "memory"
+        },
+        "labspecWorker": {
+          "reachable": true,
+          "latencyMs": 0
+        },
+        "outputDirWritable": true,
+        "dependencies": {
+          "python": "3.13.13",
+          "pyserial": "3.5",
+          "numpy": "2.4.6",
+          "PIL": "12.2.0"
+        },
+        "readOnly": true
+      }
+    },
+    "plannedRun": {
+      "wouldVisitUnits": 1,
+      "wouldUseResources": [
+        "mc-newton-xyz-stage",
+        "lab-camera",
+        "lab-acquirer",
+        "labspec-workstation"
+      ]
+    },
+    "willNotExecute": [
+      "stage motion",
+      "camera exposure",
+      "Raman acquisition",
+      "laser power change",
+      "instrument writes"
+    ],
+    "approvalRecord": {
+      "path": ".pi/experiment-runs/approvals.jsonl",
+      "requiredForHardware": true,
+      "requiredSafetyConfirmations": [
+        "laserPowerConfirmed",
+        "confirmedLaserPowerMw",
+        "labSpecWorkerReady",
+        "windowsPowerPolicyReady"
+      ]
+    },
+    "specHash": "180479d9d3e318771b0b9505b32ad755d2dc3c6b69e2f42863e09013a6714272",
+    "capabilitySnapshotId": "dry_run-preflight-20260615T081751854Z-535ab425-capabilities"
+  },
+  "specHash": "180479d9d3e318771b0b9505b32ad755d2dc3c6b69e2f42863e09013a6714272",
+  "capabilitySnapshotId": "dry_run-preflight-20260615T081751854Z-535ab425-capabilities"
+}

@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-4b7c684e",
+  "experimentId": "exp-single-spectrum-001",
+  "mode": "hardware",
+  "subjectId": "sample-focused",
+  "objective": "针对hw-run-6fec4528的Z轴失败完成operator review后，按原窗口z=2403–2503重试Z-only autofocus；后续硬件执行使用settleTimeout=120s；锚定当前位置x=884,y=1526,z=2453；不做XY correction、不做确认采谱",
+  "unitCount": 1,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "operatorOnlyMonitoring": true,
+  "stopReason": "Stage did not settle within 120000 ms (current x=880.174; target x=884.000; delta x=-3.826; tolerance x=1.000)"
+}

@@ -66,6 +66,12 @@ class MCNewtonXYZStageController:
         self._response_collect_ms = float(response_collect_ms)
         self._segmented_move_threshold_um = float(segmented_move_threshold_um)
         self._segmented_move_step_um = float(segmented_move_step_um)
+        self._axis_motion_profiles: dict[str, tuple[str, str, int, int]] = {
+            "x": ("mm", "slide", 30, 2000),
+            "y": ("mm", "slide", 30, 2000),
+            "z": ("mm", "step", 30, 500),
+        }
+        self._active_motion_profile: tuple[str, str, int, int] | None = None
         self._ser = None
         self._connected = False
         self._enabled_channels: set[int] = set()
@@ -144,24 +150,32 @@ class MCNewtonXYZStageController:
         frequency_hz: int = 2000,
         mode: str = "slide",
         units: str = "mm",
+        z_voltage_v: int = 30,
+        z_frequency_hz: int = 500,
+        z_mode: str = "step",
     ) -> None:
-        """Apply a fast movement profile.
+        """Apply movement profiles.
 
-        The programming guide example uses 500 Hz; this profile uses 2000 Hz,
-        while keeping voltage capped at 30 V for conservative hardware use.
+        The programming guide example uses 500 Hz; this profile uses 2000 Hz
+        for X/Y, while Z uses a conservative step profile because its positive
+        motion underperformed with the XY slide profile.
         """
 
         if voltage_v > 30:
             raise ValueError("fast move profile voltage_v must not exceed 30 V.")
         if frequency_hz > 2000:
             raise ValueError("fast move profile frequency_hz must not exceed 2000 Hz.")
+        if z_voltage_v > 30:
+            raise ValueError("Z move profile z_voltage_v must not exceed 30 V.")
+        if z_frequency_hz > 2000:
+            raise ValueError("Z move profile z_frequency_hz must not exceed 2000 Hz.")
 
-        self.configure_motion(
-            units=units,
-            mode=mode,
-            voltage_v=voltage_v,
-            frequency_hz=frequency_hz,
-        )
+        xy_profile = (units, mode, int(voltage_v), int(frequency_hz))
+        z_profile = (units, z_mode, int(z_voltage_v), int(z_frequency_hz))
+        self._axis_motion_profiles["x"] = xy_profile
+        self._axis_motion_profiles["y"] = xy_profile
+        self._axis_motion_profiles["z"] = z_profile
+        self._apply_axis_motion_profile("x")
 
     def disconnect(self) -> None:
         if not self._connected:
@@ -182,6 +196,18 @@ class MCNewtonXYZStageController:
             y_um=self.get_axis_position_um("y"),
             z_um=self.get_axis_position_um("z"),
         )
+
+    def enable_only_axis(self, axis: str) -> None:
+        """Enable one axis channel and disable all other known stage channels."""
+
+        self._select_axis(axis, disable_others=True)
+
+    def disable_all_axes(self) -> None:
+        """Disable every stage channel currently known to be enabled."""
+
+        for channel in sorted(self._enabled_channels):
+            self._send(f"[ch{channel}:0]")
+            self._enabled_channels.discard(channel)
 
     def get_axis_position_um(self, axis: str, *, preserve_enabled_channels: bool = False) -> float:
         disable_others = False if preserve_enabled_channels else None
@@ -392,9 +418,27 @@ class MCNewtonXYZStageController:
         self._last_targets_um[axis] = target_um
 
     def _send_axis_movetarget(self, axis: str, target_um: float) -> None:
+        self._apply_axis_motion_profile(axis)
         self._select_axis(axis)
         target_mm = target_um / 1000.0
         self._send(f"[movetarget:{target_mm:.6f}]", wait_ms=self._move_cmd_wait_ms)
+
+    def _apply_axis_motion_profile(self, axis: str) -> None:
+        key = axis.lower()
+        if key not in self._axis_motion_profiles:
+            raise ValueError(f"Unsupported axis: {axis}")
+        profile = self._axis_motion_profiles[key]
+        if self._active_motion_profile == profile:
+            return
+        units, mode, voltage_v, frequency_hz = profile
+        self.configure_motion(
+            units=units,
+            mode=mode,
+            voltage_v=voltage_v,
+            frequency_hz=frequency_hz,
+        )
+        self._active_motion_profile = profile
+
     def _select_axis(self, axis: str, *, disable_others: bool | None = None) -> None:
         key = axis.lower()
         if key not in self._channels:

@@ -118,7 +118,7 @@ class AutofocusParams:
     max_saturation_ratio: float = 0.01
 
     # Metric selection
-    metric_name: str = "tenengrad"
+    metric_name: str = "labspec_spot_compactness"
 
     def __post_init__(self) -> None:
         if not (self.z_min_um < self.z_max_um):

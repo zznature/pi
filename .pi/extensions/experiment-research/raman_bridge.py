@@ -121,6 +121,22 @@ class MemoryStage:
     def get_position_um(self) -> StagePosition:
         return self.position
 
+    def get_axis_position_um(self, axis: str, *, preserve_enabled_channels: bool = False) -> float:
+        _ = preserve_enabled_channels
+        if axis == "x":
+            return self.position.x_um
+        if axis == "y":
+            return self.position.y_um
+        if axis == "z":
+            return self.position.z_um
+        raise ValueError(f"Unsupported axis: {axis}")
+
+    def enable_only_axis(self, _axis: str) -> None:
+        return None
+
+    def disable_all_axes(self) -> None:
+        return None
+
     def move_absolute_um(
         self,
         *,
@@ -161,6 +177,9 @@ class XYZStageZAdapter:
         self._xyz_stage = xyz_stage
 
     def get_position_um(self) -> float:
+        get_axis_position_um = getattr(self._xyz_stage, "get_axis_position_um", None)
+        if callable(get_axis_position_um):
+            return float(get_axis_position_um("z", preserve_enabled_channels=True))
         return float(getattr(self._xyz_stage.get_position_um(), "z_um", 0.0))
 
     def move_absolute_um(self, z_um: float) -> None:
@@ -170,10 +189,26 @@ class XYZStageZAdapter:
         self._xyz_stage.move_relative_um(dz_um=float(dz_um))
 
     def wait_settled(self, timeout_ms: int) -> None:
-        self._xyz_stage.wait_settled(int(timeout_ms))
+        wait_settled = getattr(self._xyz_stage, "wait_settled")
+        try:
+            wait_settled(int(timeout_ms), axes={"z"})
+        except TypeError as exc:
+            if "axes" not in str(exc):
+                raise
+            wait_settled(int(timeout_ms))
 
     def stop(self) -> None:
         self._xyz_stage.stop()
+
+    def enter_z_only(self) -> None:
+        enable_only_axis = getattr(self._xyz_stage, "enable_only_axis", None)
+        if callable(enable_only_axis):
+            enable_only_axis("z")
+
+    def exit_z_only(self) -> None:
+        disable_all_axes = getattr(self._xyz_stage, "disable_all_axes", None)
+        if callable(disable_all_axes):
+            disable_all_axes()
 
 
 class BridgeState:
@@ -182,6 +217,7 @@ class BridgeState:
         self.stage: Any | None = None
         self.stage_adapter = "memory"
         self.lock = threading.Lock()
+        self.stage_operation_lock = threading.RLock()
 
     def close(self) -> None:
         with self.lock:
@@ -505,53 +541,53 @@ def action_visit_point(
     abort_event: threading.Event,
     output_lock: threading.Lock,
 ) -> dict[str, Any]:
-    stage = ensure_stage(state, payload)
-    point = parse_payload(payload.get("point"))
-    settle_timeout_ms = int(payload.get("settleTimeoutMs", 1000))
-    if abort_event.is_set():
-        raise BridgeError("aborted", "visit_point aborted before motion")
-    before = stage.get_position_um()
-    target = StagePosition(
-        float(point.get("xUm", getattr(before, "x_um", 0.0))),
-        float(point.get("yUm", getattr(before, "y_um", 0.0))),
-        float(point.get("zUm", getattr(before, "z_um", 0.0))),
-    )
-    dx = abs(target.x_um - getattr(before, "x_um", 0.0))
-    dy = abs(target.y_um - getattr(before, "y_um", 0.0))
-    dz = abs(target.z_um - getattr(before, "z_um", 0.0))
-    skip_move = max(dx, dy, dz) < 2.0
-    if skip_move:
-        debug(f"visit_point skip move: already within 2um (dx={dx:.3f} dy={dy:.3f} dz={dz:.3f})")
-    else:
-        axis_targets = [
-            ("x", "x_um", "xUm", target.x_um, dx),
-            ("y", "y_um", "yUm", target.y_um, dy),
-            ("z", "z_um", "zUm", target.z_um, dz),
-        ]
-        for axis, move_key, wire_key, target_um, delta_um in axis_targets:
-            if wire_key not in point or delta_um < 2.0:
-                continue
-            if abort_event.is_set():
-                state.stop()
-                raise BridgeError("aborted", f"visit_point aborted before {axis.upper()} motion")
-            write_protocol(
-                {
-                    "event": "progress",
-                    "action": "visit_point",
-                    "phase": "move_axis",
-                    "axis": axis,
-                    "targetUm": target_um,
-                },
-                output_lock,
-            )
-            stage.move_absolute_um(**{move_key: target_um})
-            wait_stage_settled(stage, settle_timeout_ms, {axis})
-    if abort_event.is_set():
-        state.stop()
-        raise BridgeError("aborted", "visit_point aborted after motion")
-    after = stage.get_position_um()
-    return {"before": position_to_wire(before), "after": position_to_wire(after)}
-
+    with state.stage_operation_lock:
+        stage = ensure_stage(state, payload)
+        point = parse_payload(payload.get("point"))
+        settle_timeout_ms = int(payload.get("settleTimeoutMs", 1000))
+        if abort_event.is_set():
+            raise BridgeError("aborted", "visit_point aborted before motion")
+        before = stage.get_position_um()
+        target = StagePosition(
+            float(point.get("xUm", getattr(before, "x_um", 0.0))),
+            float(point.get("yUm", getattr(before, "y_um", 0.0))),
+            float(point.get("zUm", getattr(before, "z_um", 0.0))),
+        )
+        dx = abs(target.x_um - getattr(before, "x_um", 0.0))
+        dy = abs(target.y_um - getattr(before, "y_um", 0.0))
+        dz = abs(target.z_um - getattr(before, "z_um", 0.0))
+        skip_move = max(dx, dy, dz) < 2.0
+        if skip_move:
+            debug(f"visit_point skip move: already within 2um (dx={dx:.3f} dy={dy:.3f} dz={dz:.3f})")
+        else:
+            axis_targets = [
+                ("x", "x_um", "xUm", target.x_um),
+                ("y", "y_um", "yUm", target.y_um),
+                ("z", "z_um", "zUm", target.z_um),
+            ]
+            for axis, move_key, wire_key, target_um in axis_targets:
+                if wire_key not in point:
+                    continue
+                if abort_event.is_set():
+                    state.stop()
+                    raise BridgeError("aborted", f"visit_point aborted before {axis.upper()} motion")
+                write_protocol(
+                    {
+                        "event": "progress",
+                        "action": "visit_point",
+                        "phase": "move_axis",
+                        "axis": axis,
+                        "targetUm": target_um,
+                    },
+                    output_lock,
+                )
+                stage.move_absolute_um(**{move_key: target_um})
+                wait_stage_settled(stage, settle_timeout_ms, {axis})
+        if abort_event.is_set():
+            state.stop()
+            raise BridgeError("aborted", "visit_point aborted after motion")
+        after = stage.get_position_um()
+        return {"before": position_to_wire(before), "after": position_to_wire(after)}
 
 def action_autofocus(
     state: BridgeState,
@@ -567,17 +603,21 @@ def action_autofocus(
         raise BridgeError("autofocus_no_peak", f"unsupported autofocus backend: {backend}")
     if abort_event.is_set():
         raise BridgeError("aborted", "autofocus aborted before scan")
-    stage = ensure_stage(state, payload)
-    current = stage.get_position_um()
-    current_z = float(getattr(current, "z_um", 0.0))
-    z_min = float(autofocus.get("zMinUm", current_z))
-    z_max = float(autofocus.get("zMaxUm", current_z))
-    z_best = min(max(float(autofocus.get("zBestUm", current_z)), z_min), z_max)
-    stage.move_absolute_um(z_um=z_best)
-    stage.wait_settled(int(autofocus.get("stageTimeoutMs", payload.get("settleTimeoutMs", 1000))))
-    if abort_event.is_set():
-        state.stop()
-        raise BridgeError("aborted", "autofocus aborted after final move")
+    with state.stage_operation_lock:
+        z_stage = XYZStageZAdapter(ensure_stage(state, payload))
+        z_stage.enter_z_only()
+        try:
+            current_z = z_stage.get_position_um()
+            z_min = float(autofocus.get("zMinUm", current_z))
+            z_max = float(autofocus.get("zMaxUm", current_z))
+            z_best = min(max(float(autofocus.get("zBestUm", current_z)), z_min), z_max)
+            z_stage.move_absolute_um(z_best)
+            z_stage.wait_settled(int(autofocus.get("stageTimeoutMs", payload.get("settleTimeoutMs", 1000))))
+            if abort_event.is_set():
+                state.stop()
+                raise BridgeError("aborted", "autofocus aborted after final move")
+        finally:
+            z_stage.exit_z_only()
     confidence = max(float(autofocus.get("minConfidence", 0.2)), float(autofocus.get("confidence", 0.85)))
     return {
         "status": "ok",
@@ -629,9 +669,8 @@ def action_autofocus_labspec(
             stage_timeout_ms=int(autofocus.get("stageTimeoutMs", 3000)),
             frames_per_z=int(autofocus.get("framesPerZ", 3)),
             min_confidence=float(autofocus.get("minConfidence", 0.2)),
-            metric_name=str(autofocus.get("metric", "tenengrad")),
+            metric_name=str(autofocus.get("metric", "labspec_spot_compactness")),
         )
-        controller = AUTOFOCUS_CONTROLLER(XYZStageZAdapter(ensure_stage(state, {"stage": autofocus.get("stage", {"adapter": "memory"})})), frames)
 
         def on_progress(point: Any) -> None:
             if abort_event.is_set():
@@ -647,7 +686,14 @@ def action_autofocus_labspec(
                 output_lock,
             )
 
-        result = controller.run_single(roi, params, on_progress=on_progress)
+        with state.stage_operation_lock:
+            z_stage = XYZStageZAdapter(ensure_stage(state, {"stage": autofocus.get("stage", {"adapter": "memory"})}))
+            z_stage.enter_z_only()
+            try:
+                controller = AUTOFOCUS_CONTROLLER(z_stage, frames)
+                result = controller.run_single(roi, params, on_progress=on_progress)
+            finally:
+                z_stage.exit_z_only()
     finally:
         frames.disconnect()
 
@@ -662,7 +708,6 @@ def action_autofocus_labspec(
         "finalScore": result.final_score,
         "confidence": result.confidence,
     }
-
 
 def autofocus_error_code(status: str) -> str:
     if status == "no_peak":
