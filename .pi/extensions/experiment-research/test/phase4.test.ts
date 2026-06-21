@@ -92,6 +92,12 @@ test("policy rejects hardware spec without operator approval flag", () => {
 	assert.ok(result.issues.some((issue) => issue.path === "operatorApprovalRequired"));
 });
 
+test("policy allows hardware preflight without operator approval flag", () => {
+	const spec = { ...loadSpec("hardware-spec.json"), operatorApprovalRequired: false };
+	const result = validatePolicy(spec, getLabState(), { toolName: "run_preflight" });
+	assert.equal(result.valid, true);
+});
+
 test("policy rejects hardware spec with extra instruments", () => {
 	const spec = {
 		...loadSpec("hardware-spec.json"),
@@ -154,6 +160,18 @@ test("hardware gate rejects hardware-mode preflight reports", () => {
 		const gate = validateHardwareGate(loadSpec("hardware-spec.json"), baseApproval(reportId), cwd);
 		assert.equal(gate.valid, false);
 		assert.ok(gate.issues.some((issue) => issue.includes("dry_run")));
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
+test("run_preflight accepts hardware spec without operator approval flag", () => {
+	const cwd = tempCwd();
+	try {
+		const spec = { ...loadSpec("hardware-spec.json"), operatorApprovalRequired: false };
+		const result = dispatch("run_preflight", { spec }, { cwd, commandId: "hardware-readonly-preflight" });
+		assert.equal(result.status, "success");
+		assert.equal((result.stateAfter as { mode: string }).mode, "hardware");
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}

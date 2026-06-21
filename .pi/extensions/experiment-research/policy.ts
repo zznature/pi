@@ -12,6 +12,10 @@ export interface PolicyValidationResult {
 	issues: ValidationIssue[];
 }
 
+function isEffectfulRunContext(ctx: PolicyContext): boolean {
+	return ctx.toolName === "run_experiment";
+}
+
 function issue(path: string, message: string): ValidationIssue {
 	return { path, message };
 }
@@ -135,15 +139,15 @@ export function validatePolicy(
 		issues.push(issue("mode", `${ctx.toolName} only supports simulation mode`));
 	}
 
-	if (spec.mode === "hardware") {
+	if (isEffectfulRunContext(ctx) && spec.mode === "hardware") {
 		if (!spec.operatorApprovalRequired) {
 			issues.push(issue("operatorApprovalRequired", "Hardware execution requires operatorApprovalRequired to be true"));
 		}
-	} else if (spec.operatorApprovalRequired) {
+	} else if (isEffectfulRunContext(ctx) && spec.operatorApprovalRequired) {
 		issues.push(issue("operatorApprovalRequired", "Simulation and dry-run checks must not require approval"));
 	}
 
-	if (labState.activeRunId !== null) {
+	if (isEffectfulRunContext(ctx) && labState.activeRunId !== null) {
 		issues.push(
 			issue(
 				"labState.activeRunId",

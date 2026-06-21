@@ -46,6 +46,7 @@ pi extension
 
 - `policy.ts`
   - enforces mode/tool compatibility, active-run exclusion, resource availability, unit limits
+  - treats read-only/preflight contexts as not requiring operator approval; effectful execution still does
   - constrains non-Raman hardware to MC.Newton explicit points
   - constrains Raman hardware to required stage/workspace/camera/acquirer resources and z limits
 - `preflight.ts`
@@ -118,6 +119,7 @@ Source of truth is disk under `.pi/experiment-runs`.
 ## Development Rules
 
 - Add new planner behavior through `schemas.ts` -> `policy.ts`/`preflight.ts` -> `dispatch.ts` -> kernel; keep `tools/*.ts` as wrappers.
+- Classify new actions by effect: read/query/preflight should stay low-friction, while motion/acquisition/power changes must remain gated.
 - Add Raman side-effecting behavior behind operator-only tools or approved `run_experiment` hardware flow.
 - Keep low-level commands blocked in `index.ts`; do not expose direct motion/acquisition tools to the planner.
 - Preserve `specHash` compatibility between dry-run preflight and hardware execution unless intentionally changing the gate contract.
