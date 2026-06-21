@@ -59,3 +59,5 @@
 pi compaction 当作“对话压缩层”，同时为 Raman 加一个外部 durable memory/artifact index：实验状态用 JSON/schema 存储，谱图和图像用文件/artifact 存储，summary 只引用 ID 和关键结论。这样 context window 里放的是索引和当前目标，不是全部实验事实。
 
 ## Safety
+
+长周期实验满足四个性质：安全、可观测、可恢复、可扩展。
