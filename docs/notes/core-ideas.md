@@ -1,5 +1,12 @@
 # LabAgents
 
+- 研究人员用自然语言提出实验目标，agent 编译为可验证的 bounded ExperimentSpec。
+- 实验管理抽象为 experiment/campaign、run、resource lease、artifact、approval、lineage， 避免 schema 绑定某一种仪器流程。
+- 实验经过 simulation、dry_run、hardware 验证后在 kernel 执行。
+- 实验运行与Agent分离, kernel 只执行ExperimentSpec：启动即返回、事件驱动唤醒、planner 不轮询。
+- 实验可从文件记录完整重建。
+- 以 project-local extension 实现，保留 pi-agent 的模型接入、session、工具调用、TUI、 审计对话等现有优势，不改 core。
+
 ## Core principles
 
 1. **Intelligence and execution are split.** The LLM plans, compiles,
