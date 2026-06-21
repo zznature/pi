@@ -1,0 +1,22 @@
+{
+	"approval": {
+		"approvalId": "appr-raman-v2-active-probe",
+		"operator": "operator-name",
+		"approved": true,
+		"ramanSafety": {
+			"laserPowerConfirmed": true,
+			"confirmedLaserPowerMw": 1,
+			"labSpecWorkerReady": true,
+			"windowsPowerPolicyReady": true
+		},
+		"notes": "Operator-approved active smoke probe for current real-capable Raman V2 validation."
+	},
+	"captureFrame": true,
+	"acquireSpectrumSmoke": true,
+	"frameBackend": "labspec_file_bridge",
+	"acquisitionBackend": "labspec_file_bridge",
+	"frameBridgeDir": "<labspec-frame-bridge-dir>",
+	"labspecBridgeDir": "<labspec-spectrum-bridge-dir>",
+	"timeoutS": 30,
+	"pollIntervalS": 1
+}

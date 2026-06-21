@@ -12,7 +12,12 @@ import { planNextExperimentTool } from "./tools/plan-next.ts";
 import { runPreflightTool } from "./tools/preflight.ts";
 import { ramanActiveProbeTool } from "./tools/raman-active-probe.ts";
 import { ramanAutoXyCalibrationTool, ramanFitXyCalibrationTool, ramanRecordXyCalibrationTool } from "./tools/raman-calibration.ts";
-import { ramanHardwareValidationTool } from "./tools/raman-validation.ts";
+import {
+	ramanHardwareValidationDraftTool,
+	ramanHardwareValidationReadinessTool,
+	ramanHardwareValidationTool,
+	ramanValidationSpecPairTool,
+} from "./tools/raman-validation.ts";
 import { runExperimentTool } from "./tools/run-experiment.ts";
 import { validateExperimentSpecTool } from "./tools/validate-spec.ts";
 
@@ -39,7 +44,10 @@ const OPERATOR_TOOL_NAMES = [
 	"raman_record_xy_calibration",
 	"raman_fit_xy_calibration",
 	"raman_auto_xy_calibration",
+	"raman_prepare_hardware_validation_payload",
 	"raman_record_hardware_validation",
+	"raman_check_hardware_validation",
+	"raman_prepare_validation_spec_pair",
 ];
 
 const LOW_LEVEL_TOOL_NAMES = new Set(["move_relative", "move_z", "snap_image", "serial_send", "set_laser_power"]);
@@ -131,7 +139,10 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 	pi.registerTool(ramanRecordXyCalibrationTool);
 	pi.registerTool(ramanFitXyCalibrationTool);
 	pi.registerTool(ramanAutoXyCalibrationTool);
+	pi.registerTool(ramanHardwareValidationDraftTool);
 	pi.registerTool(ramanHardwareValidationTool);
+	pi.registerTool(ramanHardwareValidationReadinessTool);
+	pi.registerTool(ramanValidationSpecPairTool);
 
 	pi.on("session_start", () => {
 		const activeTools = new Set(pi.getActiveTools());

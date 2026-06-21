@@ -81,7 +81,7 @@ function readRamanBridgeProbe(cwd: string): { probe?: RamanReadOnlyProbe; issue?
 			outputDir: dryRunDir,
 		},
 	};
-	const result = spawnSync("python", [bridgePath, "--stage-root", resolve(cwd, "docs", "Raman")], {
+	const result = spawnSync("python3", [bridgePath, "--stage-root", resolve(cwd, "docs", "Raman")], {
 		cwd,
 		input: `${JSON.stringify(request)}\n`,
 		encoding: "utf-8",

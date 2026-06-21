@@ -11,6 +11,8 @@ import {
 	type ResumeSnapshot,
 	type RunRecord,
 	type RunStatus,
+	type SnapshotHardwareReconcile,
+	type SnapshotStagePosition,
 } from "../run-store.ts";
 import type { ExperimentSpec, ToolResult } from "../schemas.ts";
 import { getExperimentPoints, getUnitCount } from "../spec-utils.ts";
@@ -29,6 +31,14 @@ export interface RunState {
 	nextUnitIndex: number;
 	safeToResume: boolean;
 	summaryAvailable: boolean;
+	unitIndex?: number;
+	microstep?: string;
+	commandId?: string;
+	lastKnownStagePosition?: SnapshotStagePosition;
+	pendingAcquisitionId?: string;
+	artifactRefs?: ToolResult["artifacts"];
+	nextPlan?: string[];
+	hardwareReconcile?: SnapshotHardwareReconcile;
 	stopReason?: string;
 }
 
@@ -198,7 +208,7 @@ function summarize(
 }
 
 function stateFrom(record: RunRecord, snapshot: ResumeSnapshot | undefined, summaryAvailable: boolean): RunState {
-	return {
+	const state: RunState = {
 		runId: record.runId,
 		experimentId: record.experimentId,
 		mode: record.mode,
@@ -213,6 +223,15 @@ function stateFrom(record: RunRecord, snapshot: ResumeSnapshot | undefined, summ
 		summaryAvailable,
 		stopReason: snapshot?.reason,
 	};
+	if (snapshot?.unitIndex !== undefined) state.unitIndex = snapshot.unitIndex;
+	if (snapshot?.microstep !== undefined) state.microstep = snapshot.microstep;
+	if (snapshot?.commandId !== undefined) state.commandId = snapshot.commandId;
+	if (snapshot?.lastKnownStagePosition !== undefined) state.lastKnownStagePosition = snapshot.lastKnownStagePosition;
+	if (snapshot?.pendingAcquisitionId !== undefined) state.pendingAcquisitionId = snapshot.pendingAcquisitionId;
+	if (snapshot?.artifactRefs !== undefined) state.artifactRefs = snapshot.artifactRefs;
+	if (snapshot?.nextPlan !== undefined) state.nextPlan = snapshot.nextPlan;
+	if (snapshot?.hardwareReconcile !== undefined) state.hardwareReconcile = snapshot.hardwareReconcile;
+	return state;
 }
 
 export function pollRun(cwd: string, runId: string): RunState {

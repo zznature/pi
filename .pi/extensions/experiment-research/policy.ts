@@ -69,6 +69,9 @@ function validateHardwarePilotScope(spec: ExperimentSpec): ValidationIssue[] {
 		if (requiresFrames && !instrumentIds.includes("lab-camera")) {
 			issues.push(issue("resources", "Raman autofocus or XY correction requires lab-camera"));
 		}
+		if (spec.domain?.thermal?.enabled === true && !instrumentIds.includes("thermal-heating-stage")) {
+			issues.push(issue("resources", "Thermal heating stage waits require thermal-heating-stage"));
+		}
 		if (!spec.limits.motion.zUm) {
 			issues.push(issue("limits.motion.zUm", "Raman hardware runs require explicit zUm limits"));
 		}

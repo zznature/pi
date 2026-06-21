@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import {
 	markRunFinished,
 	markRunRunning,
+	readResumeSnapshot,
 	relativeArtifact,
 	writeResumeSnapshot,
 	type RecordedEvent,
@@ -14,8 +15,15 @@ import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../labspec-bridge.ts";
 import type { ExperimentSpec, HardwarePilotParams, RamanErrorCode, ToolResult } from "../schemas.ts";
 import { getExperimentPoints, getUnitCount, type ExperimentPoint } from "../spec-utils.ts";
 import { evaluateWatchdog } from "../watchdog.ts";
-import { resolveRamanXyCalibration } from "./raman-calibration.ts";
+import {
+	HardwareBridgeV2Client,
+	HardwareBridgeV2ProtocolError,
+	HardwareBridgeV2RequestError,
+	type HardwareBridgeV2Event,
+} from "./hardware-bridge-v2.ts";
+import { normalizeMatrix2x2, resolveRamanXyCalibration } from "./raman-calibration.ts";
 import { RamanBridgeClient, RamanBridgeProtocolError, RamanBridgeRequestError, type RamanBridgeEvent } from "./raman-bridge.ts";
+import { executeRamanV2RunUnit, RamanV2WorkflowAbortError, RamanV2WorkflowPauseError } from "./raman-v2-orchestrator.ts";
 import type { RunState } from "./kernel.ts";
 
 export interface RamanHardwareRunStart {
@@ -93,6 +101,7 @@ interface LabSpecBridgeArchive {
 }
 
 const activeRamanBridges = new Map<string, RamanBridgeClient>();
+const activeRamanStops = new Map<string, () => void>();
 const terminalListeners = new Set<RamanHardwareRunTerminalListener>();
 
 export function subscribeRamanHardwareRunTerminal(listener: RamanHardwareRunTerminalListener): () => void {
@@ -294,8 +303,33 @@ function buildSnapshot(
 	return snapshot;
 }
 
-function stateFromSnapshot(runId: string, spec: ExperimentSpec, status: RunStatus, snapshot: ResumeSnapshot): RunState {
+function buildTerminalSnapshot(
+	spec: ExperimentSpec,
+	runId: string,
+	status: RunStatus | string,
+	completedUnits: number,
+	nextUnitIndex: number,
+	reason: string | undefined,
+	base: ResumeSnapshot | undefined,
+): ResumeSnapshot {
+	const terminal = buildSnapshot(spec, runId, status, completedUnits, nextUnitIndex, reason);
+	if (!base) return terminal;
 	return {
+		...terminal,
+		unitIndex: base.unitIndex,
+		microstep: base.microstep,
+		commandId: base.commandId,
+		lastKnownStagePosition: base.lastKnownStagePosition,
+		pendingAcquisitionId: status === "running" ? base.pendingAcquisitionId : undefined,
+		artifactRefs: base.artifactRefs,
+		nextPlan: base.nextPlan,
+		hardwareReconcile: base.hardwareReconcile,
+		safeToResume: terminal.safeToResume && base.safeToResume,
+	};
+}
+
+function stateFromSnapshot(runId: string, spec: ExperimentSpec, status: RunStatus, snapshot: ResumeSnapshot): RunState {
+	const state: RunState = {
 		runId,
 		experimentId: spec.experimentId,
 		mode: spec.mode,
@@ -310,6 +344,15 @@ function stateFromSnapshot(runId: string, spec: ExperimentSpec, status: RunStatu
 		summaryAvailable: false,
 		stopReason: snapshot.reason,
 	};
+	if (snapshot.unitIndex !== undefined) state.unitIndex = snapshot.unitIndex;
+	if (snapshot.microstep !== undefined) state.microstep = snapshot.microstep;
+	if (snapshot.commandId !== undefined) state.commandId = snapshot.commandId;
+	if (snapshot.lastKnownStagePosition !== undefined) state.lastKnownStagePosition = snapshot.lastKnownStagePosition;
+	if (snapshot.pendingAcquisitionId !== undefined) state.pendingAcquisitionId = snapshot.pendingAcquisitionId;
+	if (snapshot.artifactRefs !== undefined) state.artifactRefs = snapshot.artifactRefs;
+	if (snapshot.nextPlan !== undefined) state.nextPlan = snapshot.nextPlan;
+	if (snapshot.hardwareReconcile !== undefined) state.hardwareReconcile = snapshot.hardwareReconcile;
+	return state;
 }
 
 function buildSummary(
@@ -381,6 +424,7 @@ function isRamanErrorCode(value: string): value is RamanErrorCode {
 		value === "calibration_low_confidence" ||
 		value === "calibration_singular_transform" ||
 		value === "acquisition_failed" ||
+		value === "thermal_timeout" ||
 		value === "aborted" ||
 		value === "bridge_crashed"
 	);
@@ -392,6 +436,18 @@ function errorCodeFrom(error: unknown): RamanErrorCode {
 	}
 	if (error instanceof RamanBridgeProtocolError) {
 		return "bridge_crashed";
+	}
+	if (error instanceof HardwareBridgeV2RequestError && isRamanErrorCode(error.code)) {
+		return error.code;
+	}
+	if (error instanceof HardwareBridgeV2ProtocolError) {
+		return "bridge_crashed";
+	}
+	if (error instanceof RamanV2WorkflowPauseError && isRamanErrorCode(error.code)) {
+		return error.code;
+	}
+	if (error instanceof RamanV2WorkflowAbortError && isRamanErrorCode(error.code)) {
+		return error.code;
 	}
 	return "bridge_crashed";
 }
@@ -436,6 +492,10 @@ function acquisitionPayload(
 		savePath: spectrum.absolutePath,
 		artifactId: spectrum.artifactId,
 	};
+}
+
+function v2SettleDurationMs(pilot: HardwarePilotParams): number {
+	return pilot.stageAdapter === "memory" ? 0 : pilot.settleTimeoutMs;
 }
 
 function autofocusPayload(spec: ExperimentSpec, pilot: HardwarePilotParams): Record<string, unknown> | undefined {
@@ -517,6 +577,7 @@ function finishRun(
 	nextUnitIndex: number,
 	stopReason: string | undefined,
 	operatorOnlyMonitoring: boolean,
+	snapshotBase?: ResumeSnapshot,
 ): RamanHardwareSummary {
 	const completedUnits = readCompletedUnitRecords(reserved.eventsPath).length;
 	const summary = buildSummary(
@@ -529,7 +590,11 @@ function finishRun(
 	);
 	appendRunEvent(reserved, reserved.record.runId, nextSequence(reserved.eventsPath), "run_summary", { summary });
 	writeJson(reserved.record.recordPaths.summary, summary);
-	writeResumeSnapshot(cwd, reserved.record.runId, buildSnapshot(spec, reserved.record.runId, status, completedUnits, nextUnitIndex, stopReason));
+	writeResumeSnapshot(
+		cwd,
+		reserved.record.runId,
+		buildTerminalSnapshot(spec, reserved.record.runId, status, completedUnits, nextUnitIndex, stopReason, snapshotBase),
+	);
 	markRunFinished(cwd, reserved.record.runId, status === "failed" ? "failed" : status === "completed" ? "completed" : status === "paused" ? "paused" : "aborted");
 	return summary;
 }
@@ -567,6 +632,9 @@ async function executeRamanHardwareRun(
 			},
 		});
 		activeRamanBridges.set(reserved.record.runId, bridge);
+		activeRamanStops.set(reserved.record.runId, () => {
+			void bridge?.stop().catch(() => undefined);
+		});
 		await bridge.request("connect", { stage: stagePayload(pilot) });
 		appendRunEvent(reserved, commandId, sequence, "run_started", {
 			unitCount: points.length,
@@ -658,10 +726,186 @@ async function executeRamanHardwareRun(
 		appendRunEvent(reserved, commandId, nextSequence(reserved.eventsPath), "run_stopped", { status: terminalStatus, stopReason });
 	} finally {
 		activeRamanBridges.delete(reserved.record.runId);
+		activeRamanStops.delete(reserved.record.runId);
 		if (bridge) {
 			await bridge.shutdown().catch(() => bridge?.close());
 		}
 		const summary = finishRun(cwd, reserved, spec, terminalStatus, nextUnitIndex, stopReason, pilot.approval.operatorOnlyMonitoring === true);
+		emitRamanHardwareRunTerminal({
+			cwd,
+			runId: reserved.record.runId,
+			experimentId: spec.experimentId,
+			status: terminalStatus,
+			summary,
+			artifacts,
+			records: {
+				runDir: reserved.runDir,
+				eventsPath: reserved.eventsPath,
+				summaryPath: reserved.record.recordPaths.summary,
+				resumeSnapshotPath: reserved.record.recordPaths.resumeSnapshot,
+				artifactsPath: reserved.record.recordPaths.artifacts,
+			},
+		});
+	}
+}
+
+async function executeRamanHardwareRunV2(
+	cwd: string,
+	spec: ExperimentSpec,
+	pilot: HardwarePilotParams,
+	reserved: ReservedRun,
+	commandId: string,
+	startPointIndex: number,
+	artifacts: ToolResult["artifacts"],
+): Promise<void> {
+	let sequence = nextSequence(reserved.eventsPath);
+	let consecutiveErrors = 0;
+	let lastHeartbeatMs = Date.now();
+	let bridge: HardwareBridgeV2Client | undefined;
+	let nextUnitIndex = startPointIndex;
+	let terminalStatus: RamanHardwareTerminalStatus = "completed";
+	let stopReason: string | undefined;
+	const points = getExperimentPoints(spec);
+	try {
+		bridge = new HardwareBridgeV2Client({
+			cwd,
+			python: pilot.stagePython,
+			requestTimeoutMs: requestTimeoutMs(spec, pilot),
+			onEvent: (event: HardwareBridgeV2Event) => {
+				lastHeartbeatMs = Date.now();
+				appendRunEvent(reserved, commandId, nextSequence(reserved.eventsPath), "bridge_event", { bridgeEvent: event });
+			},
+			onStderr: (chunk) => {
+				appendRunEvent(reserved, commandId, nextSequence(reserved.eventsPath), "bridge_stderr", { message: chunk });
+			},
+		});
+		activeRamanStops.set(reserved.record.runId, () => {
+			void bridge?.request("spectrometer", "cancel_acquisition").catch(() => undefined);
+			void bridge?.request("stage", "stop").catch(() => undefined);
+		});
+		await bridge.request("stage", "connect", stagePayload(pilot));
+		appendRunEvent(reserved, commandId, sequence, "run_started", {
+			unitCount: points.length,
+			stageAdapter: pilot.stageAdapter,
+			raman: true,
+			workflowBackend: "v2_bridge",
+		});
+		sequence += 1;
+
+		for (const point of points) {
+			if (point.index < startPointIndex) {
+				nextUnitIndex = point.index + 1;
+				continue;
+			}
+			const decision = evaluateWatchdog({
+				nowMs: Date.now(),
+				lastHeartbeatMs,
+				heartbeatTimeoutMs: pilot.heartbeatTimeoutMs,
+				consecutiveErrors,
+				maxConsecutiveErrors: pilot.maxConsecutiveErrors,
+				intentsPath: pilot.intentsPath,
+				budgetGuard: {
+					completedUnits: readCompletedUnitRecords(reserved.eventsPath).length,
+					maxUnits: spec.stoppingRules.maxUnits,
+					pauseAtRatio: 1,
+				},
+			});
+			if (decision.intent !== "none") {
+				if (decision.intent === "abort") {
+					await bridge.request("stage", "stop").catch(() => undefined);
+					await bridge.request("spectrometer", "cancel_acquisition").catch(() => undefined);
+				}
+				terminalStatus = decision.intent === "abort" ? "aborted" : "paused";
+				stopReason = decision.reason;
+				appendRunEvent(reserved, commandId, sequence, "run_stopped", { status: terminalStatus, stopReason });
+				sequence += 1;
+				break;
+			}
+
+			appendRunEvent(reserved, commandId, sequence, "unit_started", { unitKind: "point", unit: point, workflowBackend: "v2_bridge" });
+			sequence += 1;
+			try {
+				const unit = await executeRamanV2RunUnit({
+					cwd,
+					runId: reserved.record.runId,
+					commandId,
+					spec,
+					point,
+					bridge,
+					settleTimeoutMs: v2SettleDurationMs(pilot),
+					fakeFocusZUm: point.zUm ?? 0,
+					xyTransform: normalizeMatrix2x2(pilot.raman?.xyTransform),
+					xyApplyCorrection: pilot.raman?.xyApplyCorrection,
+					camera: {
+						backend: pilot.raman?.autofocusBackend,
+						bridgeDir: pilot.raman?.frameBridgeDir,
+						timeoutMs: pilot.raman?.labspecTimeoutS === undefined ? undefined : Math.ceil(pilot.raman.labspecTimeoutS * 1000),
+						minCaptureIntervalMs: 400,
+					},
+					acquisition: {
+						backend: pilot.raman?.acquisitionBackend,
+						bridgeDir: pilot.raman?.labspecBridgeDir,
+						timeoutS: pilot.raman?.labspecTimeoutS,
+						pollIntervalS: pilot.raman?.labspecPollIntervalS,
+					},
+					thermal: pilot.thermal,
+				});
+				appendArtifacts(artifacts, unit.artifactRefs);
+				writeJson(reserved.record.recordPaths.artifacts, artifacts);
+				appendRunEvent(reserved, commandId, sequence, "unit_completed", { unitKind: "point", unit, workflowBackend: "v2_bridge" });
+				sequence += 1;
+				consecutiveErrors = 0;
+				nextUnitIndex = point.index + 1;
+			} catch (error) {
+				consecutiveErrors += 1;
+				const errorCode = errorCodeFrom(error);
+				const record = toErrorRecord(point, errorCode, messageFrom(error));
+				appendRunEvent(reserved, commandId, sequence, "unit_error", { unitKind: "point", unit: record, workflowBackend: "v2_bridge" });
+				sequence += 1;
+				nextUnitIndex = point.index;
+				if (error instanceof RamanV2WorkflowPauseError) {
+					terminalStatus = "paused";
+					stopReason = messageFrom(error);
+					appendRunEvent(reserved, commandId, sequence, "run_stopped", { status: terminalStatus, stopReason });
+					sequence += 1;
+					break;
+				}
+				if (error instanceof RamanV2WorkflowAbortError) {
+					terminalStatus = "aborted";
+					stopReason = messageFrom(error);
+					appendRunEvent(reserved, commandId, sequence, "run_stopped", { status: terminalStatus, stopReason });
+					sequence += 1;
+					break;
+				}
+				if (spec.stoppingRules.stopOnError || consecutiveErrors >= pilot.maxConsecutiveErrors || errorCode === "bridge_crashed") {
+					terminalStatus = errorCode === "bridge_crashed" ? "failed" : "aborted";
+					stopReason = messageFrom(error);
+					appendRunEvent(reserved, commandId, sequence, "run_stopped", { status: terminalStatus, stopReason });
+					sequence += 1;
+					break;
+				}
+			}
+		}
+	} catch (error) {
+		terminalStatus = "failed";
+		stopReason = messageFrom(error);
+		appendRunEvent(reserved, commandId, nextSequence(reserved.eventsPath), "run_stopped", { status: terminalStatus, stopReason });
+	} finally {
+		activeRamanStops.delete(reserved.record.runId);
+		if (bridge) {
+			await bridge.shutdown().catch(() => bridge?.close());
+		}
+		const snapshotBase = readResumeSnapshot(cwd, reserved.record.runId);
+		const summary = finishRun(
+			cwd,
+			reserved,
+			spec,
+			terminalStatus,
+			nextUnitIndex,
+			stopReason,
+			pilot.approval.operatorOnlyMonitoring === true,
+			snapshotBase,
+		);
 		emitRamanHardwareRunTerminal({
 			cwd,
 			runId: reserved.record.runId,
@@ -695,7 +939,11 @@ export function startRamanHardwareRun(
 	markRunRunning(cwd, reserved.record.runId);
 	const snapshot = buildSnapshot(spec, reserved.record.runId, "running", 0, startPointIndex);
 	writeResumeSnapshot(cwd, reserved.record.runId, snapshot);
-	void executeRamanHardwareRun(cwd, spec, pilot, reserved, commandId, startPointIndex, spectra, artifacts);
+	if (pilot.raman?.workflowBackend === "v2_bridge") {
+		void executeRamanHardwareRunV2(cwd, spec, pilot, reserved, commandId, startPointIndex, artifacts);
+	} else {
+		void executeRamanHardwareRun(cwd, spec, pilot, reserved, commandId, startPointIndex, spectra, artifacts);
+	}
 	return {
 		runState: stateFromSnapshot(reserved.record.runId, spec, "running", snapshot),
 		artifacts,
@@ -703,6 +951,11 @@ export function startRamanHardwareRun(
 }
 
 export function requestRamanHardwareStop(runId: string): void {
+	const stop = activeRamanStops.get(runId);
+	if (stop) {
+		stop();
+		return;
+	}
 	const bridge = activeRamanBridges.get(runId);
 	if (!bridge) return;
 	void bridge.stop().catch(() => undefined);

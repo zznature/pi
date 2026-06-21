@@ -5,6 +5,7 @@ import { runHardwarePilotKernel } from "./kernel/hardware-pilot.ts";
 import { advanceRun, pollRun, startRun, type RunState } from "./kernel/kernel.ts";
 import { runLabAgentKernel } from "./kernel/lab-agent-kernel.ts";
 import { requestRamanHardwareStop, startRamanHardwareRun } from "./kernel/raman-hardware.ts";
+import { validateRamanHardwareValidationReadiness } from "./kernel/raman-validation.ts";
 import { createStageAdapter } from "./kernel/stage-adapter.ts";
 import { planNextExperiment } from "./planning.ts";
 import { validatePolicy } from "./policy.ts";
@@ -242,11 +243,21 @@ function invalidResumeFromResult(commandId: string, spec: ExperimentSpec, resume
 	);
 }
 
-function realRamanBackendIssues(spec: ExperimentSpec, hardwareExecution: HardwareExecutionParams): string[] {
+function realRamanBackendIssues(cwd: string, spec: ExperimentSpec, hardwareExecution: HardwareExecutionParams): string[] {
 	const ramanSpec = spec.domain?.raman;
 	if (!ramanSpec || hardwareExecution.stageAdapter !== "mc_newton_xyz" || simulatedHardwareAllowed()) return [];
 	const ramanExecution = hardwareExecution.raman;
 	const issues: string[] = [];
+	if (ramanExecution?.workflowBackend === "v2_bridge") {
+		if (!ramanExecution.v2ValidationId) {
+			if (hardwareExecution.approval.bootstrapV2ValidationRun !== true) {
+				issues.push("Real Raman V2 workflow backend requires raman.v2ValidationId from production-ready V2 parity evidence.");
+			}
+		} else {
+			const readiness = validateRamanHardwareValidationReadiness(cwd, ramanExecution.v2ValidationId, "v2_bridge", spec);
+			issues.push(...readiness.issues.map((issue) => issue.message));
+		}
+	}
 	if (ramanSpec.acquisition && ramanExecution?.acquisitionBackend !== "labspec_file_bridge") {
 		issues.push("Real Raman acquisition requires raman.acquisitionBackend to be labspec_file_bridge.");
 	}
@@ -256,6 +267,9 @@ function realRamanBackendIssues(spec: ExperimentSpec, hardwareExecution: Hardwar
 	if (ramanSpec.xyCorrection?.enabled === true && ramanExecution?.xyCorrectionBackend !== "phase_correlation") {
 		issues.push("Real Raman XY correction requires raman.xyCorrectionBackend to be phase_correlation.");
 	}
+	if (spec.domain?.thermal?.enabled === true && spec.domain.thermal.waitBeforeAcquisition !== false) {
+		issues.push("Real Raman thermal waiting is not yet supported because the thermal backend is currently fake-only.");
+	}
 	return issues;
 }
 
@@ -263,6 +277,7 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 	const hardwareExecutionOrResult = resolveHardwareExecutionParams(commandId, params);
 	if ("status" in hardwareExecutionOrResult) return hardwareExecutionOrResult;
 	const hardwareExecution = hardwareExecutionOrResult;
+	const cwd = getCwd(ctx);
 
 	if (params.resumeFrom !== undefined) {
 		const invalidResumeFrom = invalidResumeFromResult(commandId, spec, params.resumeFrom);
@@ -281,15 +296,16 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 		);
 	}
 
-	const ramanBackendIssues = realRamanBackendIssues(spec, hardwareExecution);
+	const ramanBackendIssues = realRamanBackendIssues(cwd, spec, hardwareExecution);
 	if (ramanBackendIssues.length > 0) {
 		return createErrorResult(
 			commandId,
-			"Real Raman hardware execution cannot use fake or unspecified Raman backends.",
+			"Real Raman hardware execution failed the backend or V2 parity evidence gate.",
 			"simulated_hardware_not_allowed",
 			[
 				"Use LabSpec file-bridge acquisition and autofocus backends for real Raman hardware.",
-				"Use phase_correlation for real Raman XY correction, or run with the simulated hardware guard explicitly enabled.",
+				"Use phase_correlation for real Raman XY correction.",
+				"Provide raman.v2ValidationId for real V2 workflow runs, or use approval.bootstrapV2ValidationRun only for the first operator-approved V2 validation minimum run.",
 			],
 			{ valid: false, issues: ramanBackendIssues, raman: hardwareExecution.raman ?? {} },
 			true,
@@ -297,7 +313,6 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 		);
 	}
 
-	const cwd = getCwd(ctx);
 	const gate = validateHardwareGate(spec, hardwareExecution.approval, cwd);
 	if (!gate.valid) {
 		return createErrorResult(

@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 
-const InstrumentKindSchema = Type.Union([Type.Literal("stage"), Type.Literal("camera"), Type.Literal("acquirer")]);
+const InstrumentKindSchema = Type.Union([Type.Literal("stage"), Type.Literal("camera"), Type.Literal("acquirer"), Type.Literal("thermal")]);
 const LeasePolicySchema = Type.Union([Type.Literal("exclusive"), Type.Literal("shared-read"), Type.Literal("operator-only")]);
 
 const SoftwareLimitsSchema = Type.Object(
@@ -87,6 +87,18 @@ const SIMULATION_CAPABILITIES = {
 			dryRunAvailable: false,
 			leasePolicy: "exclusive",
 		},
+		{
+			id: "sim-thermal-heating-stage",
+			resourceKind: "instrument",
+			kind: "thermal",
+			units: ["degC", "s"],
+			coordinateConvention: "sample heating stage temperature control",
+			softwareLimits: {},
+			hazards: ["simulated thermal control only"],
+			simulationAvailable: true,
+			dryRunAvailable: false,
+			leasePolicy: "exclusive",
+		},
 	],
 } satisfies Capabilities;
 
@@ -135,6 +147,19 @@ const DRY_RUN_CAPABILITIES = {
 				maxExposureMs: 500,
 			},
 			hazards: ["real acquirer adapter probed read-only"],
+			simulationAvailable: false,
+			dryRunAvailable: true,
+			hardwarePilotAvailable: true,
+			leasePolicy: "exclusive",
+		},
+		{
+			id: "thermal-heating-stage",
+			resourceKind: "instrument",
+			kind: "thermal",
+			units: ["degC", "s"],
+			coordinateConvention: "sample heating stage temperature control",
+			softwareLimits: {},
+			hazards: ["hot surface", "thermal drift"],
 			simulationAvailable: false,
 			dryRunAvailable: true,
 			hardwarePilotAvailable: true,

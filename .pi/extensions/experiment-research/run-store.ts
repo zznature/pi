@@ -130,6 +130,19 @@ export interface RecordedApproval {
 	raman?: boolean;
 }
 
+export interface SnapshotStagePosition {
+	xUm: number;
+	yUm: number;
+	zUm: number;
+}
+
+export interface SnapshotHardwareReconcile {
+	decision: "resume" | "pause" | "abort";
+	reason: string;
+	checkedAt: string;
+	checks: Record<string, unknown>;
+}
+
 export interface ResumeSnapshot {
 	schemaVersion: "1";
 	runId: string;
@@ -139,11 +152,19 @@ export interface ResumeSnapshot {
 	completedUnits: number;
 	totalUnits: number;
 	unitKind: string;
+	unitIndex?: number;
+	microstep?: string;
+	commandId?: string;
 	nextUnitIndex: number;
 	resumeFrom?: string;
 	safeToResume: boolean;
 	requiresOperatorApproval: boolean;
 	intentWatermark?: number;
+	lastKnownStagePosition?: SnapshotStagePosition;
+	pendingAcquisitionId?: string;
+	artifactRefs?: ToolResult["artifacts"];
+	nextPlan?: string[];
+	hardwareReconcile?: SnapshotHardwareReconcile;
 	reason?: string;
 	createdAt: string;
 }

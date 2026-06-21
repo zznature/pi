@@ -29,7 +29,10 @@ planner default active set:
 - `raman_record_xy_calibration`
 - `raman_fit_xy_calibration`
 - `raman_auto_xy_calibration`
+- `raman_prepare_hardware_validation_payload`
 - `raman_record_hardware_validation`
+- `raman_check_hardware_validation`
+- `raman_prepare_validation_spec_pair`
 
 ## Capabilities
 
@@ -67,6 +70,18 @@ Raman readiness currently includes:
   `pixelPerUm`, and write the calibration artifact. The no-hardware path uses a
   memory stage with synthetic frames; the real path uses MC.Newton plus the
   LabSpec frame bridge and still requires supervised hardware validation;
+- operator-only Raman hardware validation draft preparation through
+  `raman_prepare_hardware_validation_payload`, which assembles a schema-valid
+  draft payload from evidence identifiers and instrument IDs while intentionally
+  leaving operator approval, real-hardware attestation, and checklist booleans
+  unset until the operator completes the final review. A copyable current
+  real-capable draft example lives at
+  `fixtures/raman-v2-real-validation-payload.draft.json`;
+  matching operator input examples for dry-run preflight, active probe, and the
+  first bootstrap real V2 minimum run live at
+  `fixtures/raman-v2-real-validation-preflight-input.json`,
+  `fixtures/raman-v2-real-validation-active-probe-input.json`, and
+  `fixtures/raman-v2-real-validation-bootstrap-run-input.json`;
 - operator-reviewed Raman hardware validation records through
   `raman_record_hardware_validation`, collecting read-only preflight, active
   smoke, minimum Raman run, optional calibration, safety checklist evidence,
@@ -77,11 +92,31 @@ Raman readiness currently includes:
   do not use fake or memory backends. The minimum Raman run must also include a
   completed unit with `labspec_file_bridge` spectrum metadata, while the active
   probe must include both LabSpec frame capture and spectrum smoke artifacts.
+  When `evidence.workflowBackend === "v2_bridge"`, the minimum Raman run must
+  also carry matching V2 parity evidence for enabled capabilities: autofocus
+  requires `unit.autofocus`, XY correction requires `unit.xyCorrection`,
+  thermal waiting requires `unit.thermal`, and autofocus/XY runs require real
+  frame artifacts on disk.
+  The first supervised real V2 minimum run may use
+  `hardwareExecution.approval.bootstrapV2ValidationRun = true` as an
+  operator-only bootstrap path before the first production-ready
+  `v2ValidationId` exists; later real V2 runs must switch to explicit
+  `hardwareExecution.raman.v2ValidationId`.
   The referenced read-only preflight and minimum Raman run must share the same
   canonical `specHash`; the validation record stores an `evidenceDigest` with
   SHA-256 hashes for the referenced preflight, active probe, run records, and
   optional calibration artifact, plus the active probe frame/spectrum artifacts
-  and minimum-run spectrum artifacts;
+  and minimum-run spectrum artifacts. Real `v2_bridge` hardware runs must pass
+  `hardwareExecution.raman.v2ValidationId` pointing at a production-ready V2
+  validation record before the Raman hardware gate opens. Current real hardware
+  execution still rejects `thermal.waitBeforeAcquisition` because the thermal
+  backend is fake-only; use the current real-capable validation spec pair for
+  production-ready V2 evidence, and treat thermal parity as a future full-surface
+  target until a real backend exists;
+- operator-only Raman validation readiness checks through
+  `raman_check_hardware_validation`, which can re-verify stored evidence and,
+  when given a candidate ExperimentSpec, also verify that the validation record
+  covers the requested Raman capability surface before real hardware execution;
 - Raman hardware gates require a `labspec-workstation` workspace lease and
   explicit `ramanSafety` laser-power confirmation in the operator approval;
 - bridge-backed Raman `run_experiment` execution for the minimal

@@ -234,9 +234,23 @@ const RamanDomainSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+const ThermalDomainSchema = Type.Object(
+	{
+		enabled: Type.Boolean(),
+		targetTemperatureC: Type.Number(),
+		toleranceC: Type.Optional(Type.Number({ minimum: 0 })),
+		stableWindowS: Type.Optional(Type.Number({ minimum: 0 })),
+		timeoutS: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		pollIntervalS: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		waitBeforeAcquisition: Type.Optional(Type.Boolean()),
+	},
+	{ additionalProperties: false },
+);
+
 const DomainSchema = Type.Object(
 	{
 		raman: Type.Optional(RamanDomainSchema),
+		thermal: Type.Optional(ThermalDomainSchema),
 	},
 	{ additionalProperties: false },
 );
@@ -256,6 +270,7 @@ const OperatorApprovalSchema = Type.Object(
 		operator: Type.String({ minLength: 1 }),
 		approved: Type.Boolean(),
 		dryRunReportId: Type.String({ minLength: 1 }),
+		bootstrapV2ValidationRun: Type.Optional(Type.Boolean()),
 		operatorOnlyMonitoring: Type.Optional(Type.Boolean()),
 		ramanSafety: Type.Optional(RamanSafetyConfirmationSchema),
 		notes: Type.Optional(Type.String()),
@@ -284,6 +299,8 @@ const HardwareExecutionSchema = Type.Object(
 		raman: Type.Optional(
 			Type.Object(
 				{
+					workflowBackend: Type.Optional(Type.Union([Type.Literal("v1_bridge"), Type.Literal("v2_bridge")])),
+					v2ValidationId: Type.Optional(Type.String({ minLength: 1 })),
 					acquisitionBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("labspec_file_bridge")])),
 					autofocusBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("labspec_file_bridge")])),
 					xyCorrectionBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("phase_correlation")])),
@@ -295,6 +312,15 @@ const HardwareExecutionSchema = Type.Object(
 					xyCurrentFramePath: Type.Optional(Type.String({ minLength: 1 })),
 					xyTransform: Type.Optional(Matrix2x2Schema),
 					xyApplyCorrection: Type.Optional(Type.Boolean()),
+				},
+				{ additionalProperties: false },
+			),
+		),
+		thermal: Type.Optional(
+			Type.Object(
+				{
+					backend: Type.Optional(Type.Literal("fake")),
+					simulateDurationMs: Type.Optional(Type.Integer({ minimum: 0 })),
 				},
 				{ additionalProperties: false },
 			),
@@ -371,6 +397,7 @@ export const RamanErrorCodeSchema = Type.Union([
 	Type.Literal("calibration_low_confidence"),
 	Type.Literal("calibration_singular_transform"),
 	Type.Literal("acquisition_failed"),
+	Type.Literal("thermal_timeout"),
 	Type.Literal("aborted"),
 	Type.Literal("bridge_crashed"),
 ]);
@@ -621,6 +648,7 @@ export const RamanHardwareValidationParamsSchema = Type.Object(
 				activeProbeRecordPath: Type.String({ minLength: 1 }),
 				minimumRamanRunId: Type.String({ minLength: 1 }),
 				xyCalibrationId: Type.Optional(Type.String({ minLength: 1 })),
+				workflowBackend: Type.Optional(Type.Union([Type.Literal("v1_bridge"), Type.Literal("v2_bridge")])),
 			},
 			{ additionalProperties: false },
 		),
@@ -638,6 +666,45 @@ export const RamanHardwareValidationParamsSchema = Type.Object(
 			{ additionalProperties: false },
 		),
 		notes: Type.Optional(Type.String()),
+	},
+	{ additionalProperties: false },
+);
+
+export const RamanHardwareValidationReadinessParamsSchema = Type.Object(
+	{
+		validationId: Type.String({ minLength: 1 }),
+		workflowBackend: Type.Union([Type.Literal("v1_bridge"), Type.Literal("v2_bridge")]),
+		spec: Type.Optional(ExperimentSpecSchema),
+	},
+	{ additionalProperties: false },
+);
+
+export const RamanHardwareValidationDraftParamsSchema = Type.Object(
+	{
+		validationId: Type.Optional(Type.String({ minLength: 1 })),
+		operator: Type.String({ minLength: 1 }),
+		observedAt: Type.String({ minLength: 1 }),
+		evidence: Type.Object(
+			{
+				readOnlyPreflightReportId: Type.String({ minLength: 1 }),
+				activeProbeRecordPath: Type.String({ minLength: 1 }),
+				minimumRamanRunId: Type.String({ minLength: 1 }),
+				xyCalibrationId: Type.Optional(Type.String({ minLength: 1 })),
+				workflowBackend: Type.Union([Type.Literal("v1_bridge"), Type.Literal("v2_bridge")]),
+			},
+			{ additionalProperties: false },
+		),
+		instrumentIds: RamanHardwareValidationInstrumentIdsSchema,
+		environmentNotes: Type.Optional(Type.String()),
+		notes: Type.Optional(Type.String()),
+		confirmedLaserPowerMw: Type.Optional(Type.Number({ minimum: 0 })),
+	},
+	{ additionalProperties: false },
+);
+
+export const RamanValidationSpecPairParamsSchema = Type.Object(
+	{
+		spec: ExperimentSpecSchema,
 	},
 	{ additionalProperties: false },
 );
@@ -671,6 +738,9 @@ export type RamanRecordXyCalibrationParams = Static<typeof RamanRecordXyCalibrat
 export type RamanFitXyCalibrationParams = Static<typeof RamanFitXyCalibrationParamsSchema>;
 export type RamanAutoXyCalibrationParams = Static<typeof RamanAutoXyCalibrationParamsSchema>;
 export type RamanHardwareValidationParams = Static<typeof RamanHardwareValidationParamsSchema>;
+export type RamanHardwareValidationReadinessParams = Static<typeof RamanHardwareValidationReadinessParamsSchema>;
+export type RamanHardwareValidationDraftParams = Static<typeof RamanHardwareValidationDraftParamsSchema>;
+export type RamanValidationSpecPairParams = Static<typeof RamanValidationSpecPairParamsSchema>;
 export type GetExperimentStateParams = Static<typeof GetExperimentStateParamsSchema>;
 
 export interface ValidationIssue {
@@ -801,6 +871,19 @@ function validateRamanDomainSemantics(spec: ExperimentSpec): ValidationIssue[] {
 	return issues;
 }
 
+function validateThermalDomainSemantics(spec: ExperimentSpec): ValidationIssue[] {
+	const issues: ValidationIssue[] = [];
+	const thermal = spec.domain?.thermal;
+	if (!thermal?.enabled) return issues;
+	if (thermal.toleranceC !== undefined && thermal.toleranceC <= 0) {
+		issues.push({ path: "domain.thermal.toleranceC", message: "toleranceC must be positive when provided" });
+	}
+	if (thermal.pollIntervalS !== undefined && thermal.timeoutS !== undefined && thermal.pollIntervalS > thermal.timeoutS) {
+		issues.push({ path: "domain.thermal.pollIntervalS", message: "pollIntervalS must not exceed timeoutS" });
+	}
+	return issues;
+}
+
 function validateExperimentSpecSemantics(spec: ExperimentSpec): ValidationIssue[] {
 	const issues = validateGridOrPointsPresence(spec);
 
@@ -814,6 +897,7 @@ function validateExperimentSpecSemantics(spec: ExperimentSpec): ValidationIssue[
 		issues.push({ path: "plan.kind", message: "Current kernels require spatial grid or points plans" });
 	}
 	issues.push(...validateRamanDomainSemantics(spec));
+	issues.push(...validateThermalDomainSemantics(spec));
 
 	return issues;
 }

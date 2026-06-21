@@ -80,7 +80,7 @@ export class RamanBridgeClient {
 		const repoRoot = dirname(dirname(dirname(extensionDir)));
 		const bridgePath = options.bridgePath ?? join(extensionDir, "raman_bridge.py");
 		const stageRoot = options.stageRoot ?? resolve(repoRoot, "docs", "Raman");
-		this.child = spawn(options.python ?? "python", [bridgePath, "--stage-root", stageRoot], {
+		this.child = spawn(options.python ?? "python3", [bridgePath, "--stage-root", stageRoot], {
 			cwd: options.cwd,
 			stdio: ["pipe", "pipe", "pipe"],
 		});

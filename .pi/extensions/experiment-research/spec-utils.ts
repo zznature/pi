@@ -47,3 +47,27 @@ export function getUnitCount(spec: ExperimentSpec): number {
 	if (spec.plan.kind === "steps") return spec.plan.steps.length;
 	return getExperimentPoints(spec).length;
 }
+
+export function deriveDryRunSpecFromHardware(spec: ExperimentSpec): ExperimentSpec {
+	return {
+		...spec,
+		mode: "dry_run",
+		operatorApprovalRequired: false,
+	};
+}
+
+export interface RamanValidationCoverage {
+	autofocus: boolean;
+	xyCorrection: boolean;
+	thermalWait: boolean;
+	acquisition: boolean;
+}
+
+export function getRamanValidationCoverage(spec: ExperimentSpec): RamanValidationCoverage {
+	return {
+		autofocus: spec.domain?.raman?.autofocus?.enabled === true,
+		xyCorrection: spec.domain?.raman?.xyCorrection?.enabled === true,
+		thermalWait: spec.domain?.thermal?.enabled === true && spec.domain.thermal.waitBeforeAcquisition !== false,
+		acquisition: !!spec.domain?.raman?.acquisition,
+	};
+}
