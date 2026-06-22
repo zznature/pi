@@ -1,7 +1,7 @@
 # Development Rules
 
 Goal: Develop experimental research agents based on pi-agent. Intend to build fist auto-research demo on Raman experiments.
-Status: Minimum Viable Product (MVP).
+Build a Minimum Viable Product (MVP) for in-lab tests.
 
 ## Thinking from First Principles
 
@@ -83,11 +83,8 @@ Write insight block contents in Chinese as preferred, keep technical terms in En
 
 ## Git
 
-Multiple pi sessions may be running in this cwd at the same time, each modifying different files. Git operations that touch unstaged, staged, or untracked files outside your own changes will stomp on other sessions' work. Follow these rules:
+Follow these rules for committing:
 
-Committing:
-
-- Only commit files YOU changed in THIS session.
 - Stage explicit paths (`git add <path1> <path2>`); never `git add -A` / `git add .`.
 - Before committing, run `git status` and verify you are only staging your files.
 - `packages/ai/src/models.generated.ts` may always be included alongside your files.
