@@ -156,7 +156,7 @@ interface HardwareActionContract {
 | G5 | 已完成 | microstep snapshot、resume/reconcile、artifact 对账已落地。`test:raman-v2-resume` 已覆盖 resume/pause/abort 分支。 |
 | G6 | 已完成 | autofocus、XY correction、spectrum lifecycle 的 TS orchestration 已落地。`test:raman-v2-orchestrator` 与 `test:raman-v2-hardware-run` 已覆盖编排、恢复点和 LabSpec file-bridge 路径。 |
 | G7 | 已完成（仅 fake thermal） | thermal domain、resource lease 和 wait 语义已接入 V2；但当前 real runtime 仍拒绝 thermal waiting，因此这不等于 real thermal parity 已完成。 |
-| G8.1-G8.4 | 已完成 | `v2ValidationId` gate、parity checks、`validatedCoverage`、spec pair / payload draft / readiness tooling、runbook 和 `lab_config` 已补齐。`test:raman-v2-validation` 当前为 18/18 通过。 |
+| G8.1-G8.4 | 已完成 | `v2ValidationId` gate、parity checks、`validatedCoverage`、spec pair / payload draft / readiness tooling、runbook 和 `sample_registry` 已补齐。`test:raman-v2-validation` 当前为 18/18 通过。 |
 | G8.5 | 未完成 | 还没有首份 production-ready 的 **real-hardware** V2 validation record。当前缺口不在架构，而在现场证据链。 |
 | G8.6 | 未开始 | 在 G8.5 完成前，不应冻结或删除 V1；当前仍需保留 operator-only fallback。 |
 
@@ -181,7 +181,7 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
 - 仅在 `G1-G7` 已完成、V2 fake-hardware 回归通过后执行。
 - 不开启 `PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE=1`。
 - 明确本次验证的真实仪器标识：`labspecWorkstation`、`stageController`、`camera`、`acquirer`。
-- 若现场还没有固定这些逻辑 ID，先在 `docs/experiment_extension/lab_config.md` 中建立本次 validation 的资源映射表。
+- 若现场还没有固定这些逻辑 ID，应在独立的 instrument registry 或现场 runbook 中建立本次 validation 的资源映射表，不要写入 `sample_registry`。
 - 若 spec 启用了 `xyCorrection`，必须先准备可用的 `xyCalibrationId`。
 - 若 spec 启用了 `thermal.waitBeforeAcquisition`，最小验证 run 必须真的经过温度稳定等待，而不是关闭该步骤来缩短验证时间。
 

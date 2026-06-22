@@ -251,7 +251,11 @@ test("hardware bridge v2 exposes no-hardware Raman algorithm primitives", async 
 			current,
 			maxShiftPx: 2,
 		});
-		assert.deepEqual(asRecord(shift.pixelShift), { dx: 1, dy: 1 });
+		// FFT phase correlation returns sub-pixel shift; exact value varies with the
+		// numpy version, so assert against an integer pixel target within tolerance.
+		const pixelShift = asRecord(shift.pixelShift);
+		assert.ok(Math.abs(Number(pixelShift.dx) - 1) < 0.05, `dx ~= 1, got ${pixelShift.dx}`);
+		assert.ok(Math.abs(Number(pixelShift.dy) - 1) < 0.05, `dy ~= 1, got ${pixelShift.dy}`);
 		assert.equal(typeof shift.confidence, "number");
 
 		const fit = await bridge.request<Record<string, unknown>>("calibration", "fit_matrix", {
@@ -360,7 +364,7 @@ test("hardware bridge v2 camera primitive captures fake frames for TS orchestrat
 		assert.equal(frame.width, 8);
 		assert.equal(frame.height, 8);
 		assert.ok(Array.isArray(frame.image));
-		assert.match(await readFile(framePath, "utf-8"), /^P2\n8 8\n255\n/);
+		assert.match(await readFile(framePath, "utf-8"), /^P2\r?\n8 8\r?\n255\r?\n/);
 		assert.ok(events.some((event) => event.domain === "camera" && event.action === "capture_frame"));
 
 		await bridge.shutdown();
@@ -604,8 +608,8 @@ test("hardware bridge v2 spectrometer lifecycle supports LabSpec file-bridge req
 		const acquisitionId = String(begun.acquisitionId);
 		const fileBridge = asRecord(begun.fileBridge);
 		assert.equal(fileBridge.requestId, acquisitionId);
-		assert.match(String(fileBridge.requestPath), /requests\/acq_\d+\.ini$/);
-		assert.match(String(fileBridge.resultPath), /results\/acq_\d+\.ini$/);
+		assert.match(String(fileBridge.requestPath), /[/\\]requests[/\\]acq_\d+\.ini$/);
+		assert.match(String(fileBridge.resultPath), /[/\\]results[/\\]acq_\d+\.ini$/);
 
 		const worker = await fakeLabspecWorker(bridgeDir);
 		assert.equal(worker.requestId, acquisitionId);
