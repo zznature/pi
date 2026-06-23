@@ -8,6 +8,7 @@ This project-local extension implements the bounded experiment loop described in
 The extension is loaded from `.pi/extensions/experiment-research`. It registers
 planner macro tools only:
 
+- `get_lab_capabilities`
 - `get_lab_state`
 - `get_experiment_state`
 - `validate_experiment_spec`
@@ -25,6 +26,7 @@ planner default active set:
 - `abort_run`
 - `poll_run`
 - `request_operator`
+- `record_hardware_coordinate_audit`
 - `raman_active_probe`
 - `raman_record_xy_calibration`
 - `raman_fit_xy_calibration`
@@ -61,6 +63,12 @@ Raman readiness currently includes:
   `raman_record_xy_calibration`, persisted under
   `.pi/experiment-runs/lab/calibrations` and referenced by
   `domain.raman.xyCorrection.transformArtifactId`;
+- operator-approved hardware coordinate audit records through
+  `record_hardware_coordinate_audit`, persisted under
+  `.pi/experiment-runs/lab/coordinate-audits` and referenced by
+  `hardwareExecution.coordinateAuditId` for supervised real hardware runs.
+  The audit binds the reviewed `subject + plan` coordinates rather than the
+  whole ExperimentSpec so non-coordinate edits do not invalidate the audit;
 - operator-approved Raman XY calibration fitting through
   `raman_fit_xy_calibration`, which estimates `pixelPerUm` from non-collinear
   stage shifts and reference/current frame pairs before writing the same
@@ -118,7 +126,8 @@ Raman readiness currently includes:
   when given a candidate ExperimentSpec, also verify that the validation record
   covers the requested Raman capability surface before real hardware execution;
 - Raman hardware gates require a `labspec-workstation` workspace lease and
-  explicit `ramanSafety` laser-power confirmation in the operator approval;
+  explicit `ramanSafety` laser-power confirmation plus exposure-energy
+  confirmation when `limits.powerEnergy.maxExposureEnergyMj` is set;
 - bridge-backed Raman `run_experiment` execution for the minimal
   `visit_point + acquire` path, returning immediately with a `runId` and
   updating `poll_run` state through `resume.snapshot.json`;
@@ -144,7 +153,8 @@ acquisition/autofocus path and `phase_correlation` XY correction path against
 the real LabSpec worker, camera stream, stage, and operator safety workflow.
 
 Hardware execution requires a matching dry-run `specHash`, a capability
-snapshot, and explicit operator approval.
+snapshot, explicit operator approval, and for supervised real hardware on the
+MC.Newton path, a matching `hardwareExecution.coordinateAuditId`.
 
 New `run_experiment` hardware calls should pass `hardwareExecution` parameters.
 The legacy `hardwarePilot` parameter remains accepted during migration, but a
@@ -155,11 +165,12 @@ single call must not provide both aliases.
 1. Compile a bounded `ExperimentSpec`.
 2. Run `validate_experiment_spec`.
 3. Run `run_preflight`.
-4. For hardware, review the dry-run report and record operator approval.
-5. Run `run_experiment`.
-6. Run `analyze_run`.
-7. Run `plan_next_experiment`.
-8. Compile the returned strategy into the next bounded `ExperimentSpec`.
+4. For supervised real hardware, record and review a hardware coordinate audit.
+5. For hardware, review the dry-run report and record operator approval.
+6. Run `run_experiment`.
+7. Run `analyze_run`.
+8. Run `plan_next_experiment`.
+9. Compile the returned strategy into the next bounded `ExperimentSpec`.
 
 The agent must not change run parameters while a run is active.
 
