@@ -72,6 +72,7 @@ const RamanSafetyConfirmationSchema = Type.Object(
 	{
 		laserPowerConfirmed: Type.Boolean(),
 		confirmedLaserPowerMw: Type.Number({ minimum: 0 }),
+		confirmedExposureEnergyMj: Type.Optional(Type.Number({ minimum: 0 })),
 		labSpecWorkerReady: Type.Optional(Type.Boolean()),
 		windowsPowerPolicyReady: Type.Optional(Type.Boolean()),
 		notes: Type.Optional(Type.String()),
@@ -278,6 +279,20 @@ const OperatorApprovalSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+const PreflightOperatorApprovalSchema = Type.Object(
+	{
+		approvalId: Type.Optional(Type.String({ minLength: 1 })),
+		operator: Type.Optional(Type.String({ minLength: 1 })),
+		approved: Type.Optional(Type.Boolean()),
+		dryRunReportId: Type.Optional(Type.String({ minLength: 1 })),
+		bootstrapV2ValidationRun: Type.Optional(Type.Boolean()),
+		operatorOnlyMonitoring: Type.Optional(Type.Boolean()),
+		ramanSafety: Type.Optional(RamanSafetyConfirmationSchema),
+		notes: Type.Optional(Type.String()),
+	},
+	{ additionalProperties: false },
+);
+
 const RamanActiveProbeApprovalSchema = Type.Object(
 	{
 		approvalId: Type.String({ minLength: 1 }),
@@ -289,42 +304,53 @@ const RamanActiveProbeApprovalSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+const MaintenanceApprovalSchema = Type.Object(
+	{
+		approvalId: Type.String({ minLength: 1 }),
+		operator: Type.String({ minLength: 1 }),
+		approved: Type.Boolean(),
+		notes: Type.Optional(Type.String()),
+	},
+	{ additionalProperties: false },
+);
+
+const RamanExecutionSchema = Type.Object(
+	{
+		workflowBackend: Type.Optional(Type.Union([Type.Literal("v1_bridge"), Type.Literal("v2_bridge")])),
+		v2ValidationId: Type.Optional(Type.String({ minLength: 1 })),
+		acquisitionBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("labspec_file_bridge")])),
+		autofocusBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("labspec_file_bridge")])),
+		xyCorrectionBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("phase_correlation")])),
+		labspecBridgeDir: Type.Optional(Type.String({ minLength: 1 })),
+		frameBridgeDir: Type.Optional(Type.String({ minLength: 1 })),
+		labspecTimeoutS: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		labspecPollIntervalS: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		xyReferenceFramePath: Type.Optional(Type.String({ minLength: 1 })),
+		xyCurrentFramePath: Type.Optional(Type.String({ minLength: 1 })),
+		xyTransform: Type.Optional(Matrix2x2Schema),
+		xyApplyCorrection: Type.Optional(Type.Boolean()),
+	},
+	{ additionalProperties: false },
+);
+
+const ThermalExecutionSchema = Type.Object(
+	{
+		backend: Type.Optional(Type.Literal("fake")),
+		simulateDurationMs: Type.Optional(Type.Integer({ minimum: 0 })),
+	},
+	{ additionalProperties: false },
+);
+
 const HardwareExecutionSchema = Type.Object(
 	{
 		stageAdapter: Type.Union([Type.Literal("memory"), Type.Literal("mc_newton_xyz")]),
+		coordinateAuditId: Type.Optional(Type.String({ minLength: 1 })),
 		stagePort: Type.Optional(Type.String({ minLength: 1 })),
 		stagePython: Type.Optional(
 			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to 'python' on PATH" }),
 		),
-		raman: Type.Optional(
-			Type.Object(
-				{
-					workflowBackend: Type.Optional(Type.Union([Type.Literal("v1_bridge"), Type.Literal("v2_bridge")])),
-					v2ValidationId: Type.Optional(Type.String({ minLength: 1 })),
-					acquisitionBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("labspec_file_bridge")])),
-					autofocusBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("labspec_file_bridge")])),
-					xyCorrectionBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("phase_correlation")])),
-					labspecBridgeDir: Type.Optional(Type.String({ minLength: 1 })),
-					frameBridgeDir: Type.Optional(Type.String({ minLength: 1 })),
-					labspecTimeoutS: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
-					labspecPollIntervalS: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
-					xyReferenceFramePath: Type.Optional(Type.String({ minLength: 1 })),
-					xyCurrentFramePath: Type.Optional(Type.String({ minLength: 1 })),
-					xyTransform: Type.Optional(Matrix2x2Schema),
-					xyApplyCorrection: Type.Optional(Type.Boolean()),
-				},
-				{ additionalProperties: false },
-			),
-		),
-		thermal: Type.Optional(
-			Type.Object(
-				{
-					backend: Type.Optional(Type.Literal("fake")),
-					simulateDurationMs: Type.Optional(Type.Integer({ minimum: 0 })),
-				},
-				{ additionalProperties: false },
-			),
-		),
+		raman: Type.Optional(RamanExecutionSchema),
+		thermal: Type.Optional(ThermalExecutionSchema),
 		settleTimeoutMs: Type.Integer({ minimum: 1 }),
 		heartbeatTimeoutMs: Type.Integer({ minimum: 1 }),
 		maxConsecutiveErrors: Type.Integer({ minimum: 1 }),
@@ -334,6 +360,25 @@ const HardwareExecutionSchema = Type.Object(
 	{ additionalProperties: false },
 );
 const HardwarePilotSchema = HardwareExecutionSchema;
+
+const PreflightHardwareExecutionSchema = Type.Object(
+	{
+		stageAdapter: Type.Union([Type.Literal("memory"), Type.Literal("mc_newton_xyz")]),
+		coordinateAuditId: Type.Optional(Type.String({ minLength: 1 })),
+		stagePort: Type.Optional(Type.String({ minLength: 1 })),
+		stagePython: Type.Optional(
+			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to 'python' on PATH" }),
+		),
+		raman: Type.Optional(RamanExecutionSchema),
+		thermal: Type.Optional(ThermalExecutionSchema),
+		settleTimeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
+		heartbeatTimeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
+		maxConsecutiveErrors: Type.Optional(Type.Integer({ minimum: 1 })),
+		intentsPath: Type.Optional(Type.String({ minLength: 1 })),
+		approval: Type.Optional(PreflightOperatorApprovalSchema),
+	},
+	{ additionalProperties: false },
+);
 
 export const ExperimentSpecSchema = Type.Object(
 	{
@@ -371,6 +416,7 @@ export const ErrorCodeSchema = Type.Union([
 	Type.Literal("invalid_experiment_spec"),
 	Type.Literal("policy_rejected"),
 	Type.Literal("preflight_failed"),
+	Type.Literal("raman_launch_gate_failed"),
 	Type.Literal("hardware_pilot_params_required"),
 	Type.Literal("hardware_gate_failed"),
 	Type.Literal("invalid_resume_from"),
@@ -431,6 +477,7 @@ export const ValidateExperimentSpecParamsSchema = Type.Object(
 export const RunPreflightParamsSchema = Type.Object(
 	{
 		spec: Type.Unknown({ description: "ExperimentSpec candidate to preflight" }),
+		hardwareExecution: Type.Optional(PreflightHardwareExecutionSchema),
 	},
 	{ additionalProperties: false },
 );
@@ -718,12 +765,25 @@ export const GetExperimentStateParamsSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+export const HardwareCoordinateAuditParamsSchema = Type.Object(
+	{
+		coordinateAuditId: Type.Optional(Type.String({ minLength: 1 })),
+		approval: MaintenanceApprovalSchema,
+		subject: SubjectSchema,
+		plan: PlanSchema,
+		observedAt: Type.Optional(Type.String({ minLength: 1 })),
+		notes: Type.Optional(Type.String()),
+	},
+	{ additionalProperties: false },
+);
+
 export type ExperimentSpec = Static<typeof ExperimentSpecSchema>;
 export type ToolResult = Static<typeof ToolResultSchema>;
 export type ErrorCode = Static<typeof ErrorCodeSchema>;
 export type RamanErrorCode = Static<typeof RamanErrorCodeSchema>;
 export type ValidateExperimentSpecParams = Static<typeof ValidateExperimentSpecParamsSchema>;
 export type RunPreflightParams = Static<typeof RunPreflightParamsSchema>;
+export type PreflightHardwareExecutionParams = Static<typeof PreflightHardwareExecutionSchema>;
 export type RunExperimentParams = Static<typeof RunExperimentParamsSchema>;
 export type HardwareExecutionParams = Static<typeof HardwareExecutionSchema>;
 export type HardwarePilotParams = HardwareExecutionParams;
@@ -742,6 +802,7 @@ export type RamanHardwareValidationReadinessParams = Static<typeof RamanHardware
 export type RamanHardwareValidationDraftParams = Static<typeof RamanHardwareValidationDraftParamsSchema>;
 export type RamanValidationSpecPairParams = Static<typeof RamanValidationSpecPairParamsSchema>;
 export type GetExperimentStateParams = Static<typeof GetExperimentStateParamsSchema>;
+export type HardwareCoordinateAuditParams = Static<typeof HardwareCoordinateAuditParamsSchema>;
 
 export interface ValidationIssue {
 	path: string;
@@ -819,6 +880,12 @@ function getPlanZValues(spec: ExperimentSpec): number[] {
 	return [];
 }
 
+function estimateRamanExposureEnergyMj(spec: ExperimentSpec, laserPowerMw: number): number | undefined {
+	const acquisition = spec.domain?.raman?.acquisition;
+	if (!acquisition) return undefined;
+	return laserPowerMw * acquisition.integrationTimeS * acquisition.accumulations;
+}
+
 function validateRamanDomainSemantics(spec: ExperimentSpec): ValidationIssue[] {
 	const issues: ValidationIssue[] = [];
 	const raman = spec.domain?.raman;
@@ -865,6 +932,18 @@ function validateRamanDomainSemantics(spec: ExperimentSpec): ValidationIssue[] {
 		const estimatedMinutes = (acquisition.integrationTimeS * acquisition.accumulations * getPlanPointCount(spec)) / 60;
 		if (estimatedMinutes > spec.stoppingRules.maxRuntimeMinutes) {
 			issues.push({ path: "stoppingRules.maxRuntimeMinutes", message: "Raman acquisition estimate exceeds maxRuntimeMinutes" });
+		}
+		const maxExposureEnergyMj = spec.limits.powerEnergy.maxExposureEnergyMj;
+		const worstCaseExposureEnergyMj = estimateRamanExposureEnergyMj(spec, spec.limits.powerEnergy.maxLaserPowerMw);
+		if (
+			maxExposureEnergyMj !== undefined &&
+			worstCaseExposureEnergyMj !== undefined &&
+			worstCaseExposureEnergyMj > maxExposureEnergyMj
+		) {
+			issues.push({
+				path: "limits.powerEnergy.maxExposureEnergyMj",
+				message: "Raman acquisition energy at maxLaserPowerMw exceeds maxExposureEnergyMj",
+			});
 		}
 	}
 

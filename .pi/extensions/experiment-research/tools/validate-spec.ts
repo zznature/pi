@@ -47,6 +47,8 @@ export const validateExperimentSpecTool = {
 	promptSnippet: "Validate a candidate ExperimentSpec without touching hardware",
 	promptGuidelines: [
 		"Use validate_experiment_spec before proposing any experiment run.",
+		"For real hardware planning, collect operator-audited absolute coordinates before compiling a hardware ExperimentSpec.",
+		"For supervised real hardware runs, plan to reference an operator-reviewed coordinateAuditId from hardwareExecution.coordinateAuditId.",
 		"Do not call hardware or execution tools when validate_experiment_spec returns an error.",
 	],
 	parameters: ValidateExperimentSpecParamsSchema,

@@ -184,6 +184,12 @@ export interface HardwareGateResult {
 	capabilitySnapshotId?: string;
 }
 
+function estimateConfirmedRamanExposureEnergyMj(spec: ExperimentSpec, confirmedLaserPowerMw: number): number | undefined {
+	const acquisition = spec.domain?.raman?.acquisition;
+	if (!acquisition) return undefined;
+	return confirmedLaserPowerMw * acquisition.integrationTimeS * acquisition.accumulations;
+}
+
 function validateRamanSafetyConfirmation(
 	spec: ExperimentSpec,
 	approval: HardwarePilotParams["approval"],
@@ -200,6 +206,23 @@ function validateRamanSafetyConfirmation(
 	}
 	if (safety.confirmedLaserPowerMw > spec.limits.powerEnergy.maxLaserPowerMw) {
 		issues.push("confirmed Raman laser power exceeds spec limits.powerEnergy.maxLaserPowerMw");
+	}
+	const maxExposureEnergyMj = spec.limits.powerEnergy.maxExposureEnergyMj;
+	if (maxExposureEnergyMj !== undefined) {
+		if (safety.confirmedExposureEnergyMj === undefined) {
+			issues.push("Raman acquisition with maxExposureEnergyMj requires confirmed exposure energy");
+			return;
+		}
+		const derivedExposureEnergyMj = estimateConfirmedRamanExposureEnergyMj(spec, safety.confirmedLaserPowerMw);
+		if (
+			derivedExposureEnergyMj !== undefined &&
+			Math.abs(safety.confirmedExposureEnergyMj - derivedExposureEnergyMj) > 1e-9
+		) {
+			issues.push("confirmed Raman exposure energy does not match confirmed laser power and acquisition settings");
+		}
+		if (safety.confirmedExposureEnergyMj > maxExposureEnergyMj) {
+			issues.push("confirmed Raman exposure energy exceeds spec limits.powerEnergy.maxExposureEnergyMj");
+		}
 	}
 }
 

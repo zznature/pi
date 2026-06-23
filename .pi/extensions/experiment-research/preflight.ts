@@ -41,6 +41,16 @@ function estimateRuntimeMinutes(spec: ExperimentSpec, unitCount: number): number
 	return Number(exposureMinutes.toFixed(3));
 }
 
+function getRequiredRamanSafetyConfirmations(spec: ExperimentSpec): string[] | undefined {
+	if (!spec.domain?.raman?.acquisition) return undefined;
+	const confirmations = ["laserPowerConfirmed", "confirmedLaserPowerMw"];
+	if (spec.limits.powerEnergy.maxExposureEnergyMj !== undefined) {
+		confirmations.push("confirmedExposureEnergyMj");
+	}
+	confirmations.push("labSpecWorkerReady", "windowsPowerPolicyReady");
+	return confirmations;
+}
+
 export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labState: LabState, cwd: string = "."): PreflightResult {
 	const issues: ValidationIssue[] = [];
 	const unitCount = getUnitCount(spec);
@@ -102,9 +112,7 @@ export function preflight(spec: ExperimentSpec, capabilities: Capabilities, labS
 				? {
 						path: liveState?.probe.approvalsPath.path ?? ".pi/experiment-runs/approvals.jsonl",
 						requiredForHardware: true,
-						requiredSafetyConfirmations: spec.domain?.raman?.acquisition
-							? ["laserPowerConfirmed", "confirmedLaserPowerMw", "labSpecWorkerReady", "windowsPowerPolicyReady"]
-							: undefined,
+						requiredSafetyConfirmations: getRequiredRamanSafetyConfirmations(spec),
 					}
 				: undefined,
 		calibrationArtifacts: calibrationArtifacts.length > 0 ? calibrationArtifacts : undefined,
