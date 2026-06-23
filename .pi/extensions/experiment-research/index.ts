@@ -5,7 +5,8 @@ import { EXPERIMENT_RESEARCH_PROMPT } from "./prompt.ts";
 import type { ToolResult } from "./schemas.ts";
 import { analyzeRunTool } from "./tools/analyze-run.ts";
 import { getExperimentStateTool } from "./tools/experiment-state.ts";
-import { getLabStateTool } from "./tools/lab-state.ts";
+import { recordHardwareCoordinateAuditTool } from "./tools/hardware-coordinate-audit.ts";
+import { getLabCapabilitiesTool, getLabStateTool } from "./tools/lab-state.ts";
 import { advanceRunTool, pollRunTool, startRunTool } from "./tools/lifecycle.ts";
 import { abortRunTool, pauseRunTool, requestOperatorTool } from "./tools/operator.ts";
 import { planNextExperimentTool } from "./tools/plan-next.ts";
@@ -22,6 +23,7 @@ import { runExperimentTool } from "./tools/run-experiment.ts";
 import { validateExperimentSpecTool } from "./tools/validate-spec.ts";
 
 const PLANNER_TOOL_NAMES = [
+	"get_lab_capabilities",
 	"get_lab_state",
 	"get_experiment_state",
 	"validate_experiment_spec",
@@ -40,6 +42,7 @@ const OPERATOR_TOOL_NAMES = [
 	"abort_run",
 	"poll_run",
 	"request_operator",
+	"record_hardware_coordinate_audit",
 	"raman_active_probe",
 	"raman_record_xy_calibration",
 	"raman_fit_xy_calibration",
@@ -123,6 +126,7 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool(getLabStateTool);
+	pi.registerTool(getLabCapabilitiesTool);
 	pi.registerTool(getExperimentStateTool);
 	pi.registerTool(validateExperimentSpecTool);
 	pi.registerTool(runPreflightTool);
@@ -135,6 +139,7 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 	pi.registerTool(pauseRunTool);
 	pi.registerTool(abortRunTool);
 	pi.registerTool(requestOperatorTool);
+	pi.registerTool(recordHardwareCoordinateAuditTool);
 	pi.registerTool(ramanActiveProbeTool);
 	pi.registerTool(ramanRecordXyCalibrationTool);
 	pi.registerTool(ramanFitXyCalibrationTool);
