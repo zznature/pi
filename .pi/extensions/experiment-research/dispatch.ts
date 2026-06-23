@@ -2,6 +2,7 @@ import { loadCapabilities } from "./capabilities.ts";
 import { analyzeRecordedRun, type RunAnalysis } from "./analysis.ts";
 import { getLabState } from "./lab-state.ts";
 import { runHardwarePilotKernel } from "./kernel/hardware-pilot.ts";
+import { validateHardwareCoordinateAuditReadiness } from "./kernel/hardware-coordinate-audit.ts";
 import { advanceRun, pollRun, startRun, type RunState } from "./kernel/kernel.ts";
 import { runLabAgentKernel } from "./kernel/lab-agent-kernel.ts";
 import { requestRamanHardwareStop, startRamanHardwareRun } from "./kernel/raman-hardware.ts";
@@ -51,6 +52,7 @@ import {
 	type OperatorIntentParams,
 	type PlanNextExperimentParams,
 	type PollRunParams,
+	type PreflightHardwareExecutionParams,
 	type RunExperimentParams,
 	type RunPreflightParams,
 	type StartRunParams,
@@ -183,11 +185,65 @@ function runPreflight(commandId: string, params: RunPreflightParams, ctx?: Dispa
 		result.mode === "dry_run" || result.mode === "hardware"
 			? appendPreflightReport(specOrResult, result, capabilities, getCwd(ctx))
 			: undefined;
+	const launchPreviewRequired = requiresHardwareLaunchReadinessPreview(specOrResult, params.hardwareExecution);
+	const launchIssues = [
+		...(params.hardwareExecution ? realHardwareCoordinateAuditIssues(getCwd(ctx), specOrResult, params.hardwareExecution) : []),
+		...realRamanPreflightIssues(getCwd(ctx), specOrResult, params.hardwareExecution),
+	];
+	const stateAfter = records ? { ...result, specHash: records.specHash, capabilitySnapshotId: records.capabilitySnapshotId, records } : result;
+	const stateWithLaunchReadiness =
+		launchPreviewRequired || params.hardwareExecution
+			? {
+					...stateAfter,
+					launchReadiness: {
+						required: launchPreviewRequired,
+						evaluated: params.hardwareExecution !== undefined,
+						ready: params.hardwareExecution !== undefined && launchIssues.length === 0,
+						issues: launchIssues,
+					},
+				}
+			: stateAfter;
+
+	if (launchIssues.length > 0) {
+		const summary =
+			params.hardwareExecution === undefined
+				? `Preflight passed for ${result.unitCount} ${result.mode} unit(s), but real Raman launch readiness was not evaluated.`
+				: `Preflight passed for ${result.unitCount} ${result.mode} unit(s), but the planned real hardware launch is not ready.`;
+		const nextActions =
+			params.hardwareExecution === undefined
+				? [
+						"Call run_preflight again with the planned hardwareExecution preview to evaluate real Raman launch readiness.",
+						"For v2_bridge, use approval.bootstrapV2ValidationRun only for the first supervised real V2 minimum run; otherwise provide raman.v2ValidationId.",
+					]
+				: [
+						"Resolve the reported real hardware launch readiness issues before run_experiment.",
+						"Record and reference hardwareExecution.coordinateAuditId before supervised real hardware execution.",
+						...(params.hardwareExecution.raman?.workflowBackend === "v2_bridge"
+							? [
+									"For v2_bridge, use approval.bootstrapV2ValidationRun only for the first supervised real V2 minimum run; otherwise provide raman.v2ValidationId.",
+								]
+							: []),
+					];
+		return {
+			...createSuccessResult(
+				commandId,
+				summary,
+				stateWithLaunchReadiness,
+				nextActions,
+				records?.artifacts,
+				undefined,
+				specOrResult.experimentId,
+			),
+			status: "warning",
+		};
+	}
 
 	return createSuccessResult(
 		commandId,
-		`Preflight passed for ${result.unitCount} ${result.mode} unit(s).`,
-		records ? { ...result, specHash: records.specHash, capabilitySnapshotId: records.capabilitySnapshotId, records } : result,
+		launchPreviewRequired && params.hardwareExecution
+			? `Preflight passed for ${result.unitCount} ${result.mode} unit(s), and the planned real hardware launch preview is ready.`
+			: `Preflight passed for ${result.unitCount} ${result.mode} unit(s).`,
+		stateWithLaunchReadiness,
 		result.mode === "simulation"
 			? ["Call run_experiment with the same ExperimentSpec."]
 			: ["Review the dry-run readiness report before considering operator-approved hardware execution."],
@@ -229,6 +285,14 @@ function simulatedHardwareAllowed(): boolean {
 	return process.env.PI_EXPERIMENT_ALLOW_SIMULATED_HARDWARE === "1";
 }
 
+function isRealHardwareExecution(stageAdapter: HardwareExecutionParams["stageAdapter"] | PreflightHardwareExecutionParams["stageAdapter"]): boolean {
+	return stageAdapter === "mc_newton_xyz" && !simulatedHardwareAllowed();
+}
+
+function requiresRealRamanLaunchReadiness(spec: ExperimentSpec): boolean {
+	return spec.domain?.raman !== undefined && !simulatedHardwareAllowed();
+}
+
 function invalidResumeFromResult(commandId: string, spec: ExperimentSpec, resumeFrom: number): ToolResult | undefined {
 	const unitCount = getUnitCount(spec);
 	if (resumeFrom <= unitCount) return undefined;
@@ -243,14 +307,33 @@ function invalidResumeFromResult(commandId: string, spec: ExperimentSpec, resume
 	);
 }
 
-function realRamanBackendIssues(cwd: string, spec: ExperimentSpec, hardwareExecution: HardwareExecutionParams): string[] {
+type RamanLaunchExecutionPreview = HardwareExecutionParams | PreflightHardwareExecutionParams;
+
+function realHardwareCoordinateAuditIssues(
+	cwd: string,
+	spec: ExperimentSpec,
+	hardwareExecution: Pick<RamanLaunchExecutionPreview, "stageAdapter" | "coordinateAuditId">,
+): string[] {
+	if (!isRealHardwareExecution(hardwareExecution.stageAdapter)) return [];
+	if (!hardwareExecution.coordinateAuditId) {
+		return ["Supervised real hardware execution requires hardwareExecution.coordinateAuditId from an operator-reviewed coordinate audit record."];
+	}
+	const readiness = validateHardwareCoordinateAuditReadiness(cwd, hardwareExecution.coordinateAuditId, spec);
+	return readiness.ok ? [] : readiness.issues.map((issue) => issue.message);
+}
+
+function realRamanBackendIssues(cwd: string, spec: ExperimentSpec, hardwareExecution: RamanLaunchExecutionPreview): string[] {
 	const ramanSpec = spec.domain?.raman;
-	if (!ramanSpec || hardwareExecution.stageAdapter !== "mc_newton_xyz" || simulatedHardwareAllowed()) return [];
+	if (!ramanSpec) return [];
 	const ramanExecution = hardwareExecution.raman;
 	const issues: string[] = [];
+	if (hardwareExecution.stageAdapter !== "mc_newton_xyz") {
+		issues.push("Real Raman hardware execution requires stageAdapter mc_newton_xyz; memory is simulated only.");
+		return issues;
+	}
 	if (ramanExecution?.workflowBackend === "v2_bridge") {
 		if (!ramanExecution.v2ValidationId) {
-			if (hardwareExecution.approval.bootstrapV2ValidationRun !== true) {
+			if (hardwareExecution.approval?.bootstrapV2ValidationRun !== true) {
 				issues.push("Real Raman V2 workflow backend requires raman.v2ValidationId from production-ready V2 parity evidence.");
 			}
 		} else {
@@ -271,6 +354,29 @@ function realRamanBackendIssues(cwd: string, spec: ExperimentSpec, hardwareExecu
 		issues.push("Real Raman thermal waiting is not yet supported because the thermal backend is currently fake-only.");
 	}
 	return issues;
+}
+
+function realRamanPreflightIssues(
+	cwd: string,
+	spec: ExperimentSpec,
+	hardwareExecution: PreflightHardwareExecutionParams | undefined,
+): string[] {
+	if (!requiresRealRamanLaunchReadiness(spec)) return [];
+	if (!hardwareExecution) {
+		return [
+			"Provide hardwareExecution preview in run_preflight to evaluate real Raman launch readiness before run_experiment.",
+			"For v2_bridge, decide whether this is the first supervised bootstrap run or a later run that must provide raman.v2ValidationId.",
+		];
+	}
+	return realRamanBackendIssues(cwd, spec, hardwareExecution);
+}
+
+function requiresHardwareLaunchReadinessPreview(
+	spec: ExperimentSpec,
+	hardwareExecution: PreflightHardwareExecutionParams | undefined,
+): boolean {
+	if (requiresRealRamanLaunchReadiness(spec)) return true;
+	return hardwareExecution !== undefined && isRealHardwareExecution(hardwareExecution.stageAdapter);
 }
 
 function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: RunExperimentParams, ctx?: DispatchContext): ToolResult {
@@ -296,12 +402,28 @@ function runHardwareExperiment(commandId: string, spec: ExperimentSpec, params: 
 		);
 	}
 
-	const ramanBackendIssues = realRamanBackendIssues(cwd, spec, hardwareExecution);
+	const coordinateAuditIssues = realHardwareCoordinateAuditIssues(cwd, spec, hardwareExecution);
+	if (coordinateAuditIssues.length > 0) {
+		return createErrorResult(
+			commandId,
+			"Real hardware execution failed the coordinate audit gate.",
+			"hardware_gate_failed",
+			[
+				"Record an operator-reviewed hardware coordinate audit for the current subject and spatial plan.",
+				"Provide the returned coordinateAuditId in hardwareExecution.coordinateAuditId before supervised real hardware execution.",
+			],
+			{ valid: false, issues: coordinateAuditIssues, coordinateAuditId: hardwareExecution.coordinateAuditId },
+			true,
+			spec.experimentId,
+		);
+	}
+
+	const ramanBackendIssues = requiresRealRamanLaunchReadiness(spec) ? realRamanBackendIssues(cwd, spec, hardwareExecution) : [];
 	if (ramanBackendIssues.length > 0) {
 		return createErrorResult(
 			commandId,
 			"Real Raman hardware execution failed the backend or V2 parity evidence gate.",
-			"simulated_hardware_not_allowed",
+			"raman_launch_gate_failed",
 			[
 				"Use LabSpec file-bridge acquisition and autofocus backends for real Raman hardware.",
 				"Use phase_correlation for real Raman XY correction.",

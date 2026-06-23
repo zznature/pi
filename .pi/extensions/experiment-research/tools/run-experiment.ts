@@ -10,7 +10,8 @@ export const runExperimentTool = {
 	promptGuidelines: [
 		"Use run_experiment for simulation specs that passed preflight.",
 		"Use hardwareExecution for new hardware calls; legacy hardwarePilot is accepted only during migration.",
-		"For hardware specs, require a matching dry-run preflight report, explicit operator approval, and any Raman-specific safety gates.",
+		"For hardware specs, require a matching dry-run preflight report, explicit operator approval, hardwareExecution.coordinateAuditId for supervised real hardware, and any Raman-specific safety gates.",
+		"For Raman workflowBackend v2_bridge, branch before launch: use approval.bootstrapV2ValidationRun only for the first supervised real V2 minimum run; otherwise provide hardwareExecution.raman.v2ValidationId.",
 	],
 	parameters: RunExperimentParamsSchema,
 	executionMode: "sequential",

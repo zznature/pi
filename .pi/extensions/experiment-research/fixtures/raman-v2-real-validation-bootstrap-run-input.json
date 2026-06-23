@@ -76,6 +76,7 @@
 	},
 	"hardwareExecution": {
 		"stageAdapter": "mc_newton_xyz",
+		"coordinateAuditId": "<coordinate-audit-id>",
 		"raman": {
 			"workflowBackend": "v2_bridge",
 			"acquisitionBackend": "labspec_file_bridge",

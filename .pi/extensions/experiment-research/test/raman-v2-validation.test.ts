@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { dispatch } from "../dispatch.ts";
+import { recordHardwareCoordinateAudit } from "../kernel/hardware-coordinate-audit.ts";
 import { recordRamanXyCalibration } from "../kernel/raman-calibration.ts";
 import { recordRamanHardwareValidation, validateRamanHardwareValidationReadiness } from "../kernel/raman-validation.ts";
 import { hashExperimentSpec } from "../run-store.ts";
@@ -131,6 +132,20 @@ function seedCalibration(cwd: string): void {
 			sourceNotes: "seeded V2 validation calibration",
 		},
 		{ cwd, commandId: "seed-v2-validation-calibration" },
+	);
+	assert.equal(result.status, "success");
+}
+
+function seedCoordinateAudit(cwd: string, spec: ExperimentSpec, coordinateAuditId = "seeded-coordinate-audit"): void {
+	const result = recordHardwareCoordinateAudit(
+		{
+			coordinateAuditId,
+			approval: { approvalId: `appr-${coordinateAuditId}`, operator: "tester", approved: true },
+			subject: spec.subject,
+			plan: spec.plan,
+			notes: "seeded coordinate audit",
+		},
+		{ cwd, commandId: `record-${coordinateAuditId}` },
 	);
 	assert.equal(result.status, "success");
 }
@@ -283,6 +298,27 @@ function validationParams(
 	};
 }
 
+function realV2LaunchPreview(options: { bootstrapV2ValidationRun?: boolean; coordinateAuditId?: string; v2ValidationId?: string } = {}) {
+	return {
+		stageAdapter: "mc_newton_xyz" as const,
+		...(options.coordinateAuditId ? { coordinateAuditId: options.coordinateAuditId } : {}),
+		raman: {
+			workflowBackend: "v2_bridge" as const,
+			...(options.v2ValidationId ? { v2ValidationId: options.v2ValidationId } : {}),
+			acquisitionBackend: "labspec_file_bridge" as const,
+			autofocusBackend: "labspec_file_bridge" as const,
+			xyCorrectionBackend: "phase_correlation" as const,
+		},
+		...(options.bootstrapV2ValidationRun === undefined
+			? {}
+			: {
+					approval: {
+						bootstrapV2ValidationRun: options.bootstrapV2ValidationRun,
+					},
+				}),
+	};
+}
+
 test("Raman V2 validation requires explicit v2_bridge workflow evidence when requested", () => {
 	const cwd = tempCwd();
 	try {
@@ -413,6 +449,10 @@ test("Raman V2 validation spec fixtures stay schema-valid and semantically align
 	assert.equal(validateSchema(RunPreflightParamsSchema, realPreflightInput).valid, true);
 	const preflightInputRecord = asRecord(realPreflightInput);
 	assert.equal(hashExperimentSpec(preflightInputRecord.spec as ExperimentSpec), hashExperimentSpec(realDryRunSpec));
+	const preflightHardwareExecution = asRecord(preflightInputRecord.hardwareExecution);
+	assert.equal(preflightHardwareExecution.coordinateAuditId, "<coordinate-audit-id>");
+	assert.equal(asRecord(preflightHardwareExecution.raman).workflowBackend, "v2_bridge");
+	assert.equal(asRecord(preflightHardwareExecution.approval).bootstrapV2ValidationRun, true);
 
 	assert.equal(validateSchema(RamanActiveProbeParamsSchema, realActiveProbeInput).valid, true);
 	const activeProbeInputRecord = asRecord(realActiveProbeInput);
@@ -424,6 +464,7 @@ test("Raman V2 validation spec fixtures stay schema-valid and semantically align
 	const bootstrapRunInputRecord = asRecord(realBootstrapRunInput);
 	assert.equal(hashExperimentSpec(bootstrapRunInputRecord.spec as ExperimentSpec), hashExperimentSpec(realHardwareSpec));
 	const hardwareExecution = asRecord(bootstrapRunInputRecord.hardwareExecution);
+	assert.equal(hardwareExecution.coordinateAuditId, "<coordinate-audit-id>");
 	assert.equal(asRecord(hardwareExecution.raman).workflowBackend, "v2_bridge");
 	assert.equal(asRecord(hardwareExecution.approval).bootstrapV2ValidationRun, true);
 });
@@ -823,6 +864,145 @@ test("Raman V2 validation readiness rejects tampered validatedCoverage metadata"
 	}
 });
 
+test("real Raman V2 preflight warns when launch readiness preview is missing", () => {
+	const cwd = tempCwd();
+	return withSimulatedHardwareDisabled(() => {
+		try {
+			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			seedCalibration(cwd);
+
+			const result = dispatch("run_preflight", { spec }, { cwd, commandId: "missing-v2-preflight-preview" });
+			assert.equal(result.status, "warning");
+			assert.match(result.summary, /launch readiness was not evaluated/);
+			const launchReadiness = asRecord(asRecord(result.stateAfter).launchReadiness);
+			assert.equal(launchReadiness.required, true);
+			assert.equal(launchReadiness.evaluated, false);
+			assert.equal(launchReadiness.ready, false);
+			const issues = launchReadiness.issues;
+			assert.ok(Array.isArray(issues));
+			assert.ok(issues.some((issue) => String(issue).includes("hardwareExecution preview")));
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+});
+
+test("real Raman V2 preflight warns when a planned v2_bridge launch lacks bootstrap approval and v2ValidationId", () => {
+	const cwd = tempCwd();
+	return withSimulatedHardwareDisabled(() => {
+		try {
+			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			seedCalibration(cwd);
+			seedCoordinateAudit(cwd, spec, "missing-v2-preflight-coordinate-audit");
+
+			const result = dispatch(
+				"run_preflight",
+				{ spec, hardwareExecution: realV2LaunchPreview({ coordinateAuditId: "missing-v2-preflight-coordinate-audit" }) },
+				{ cwd, commandId: "missing-v2-preflight-evidence" },
+			);
+			assert.equal(result.status, "warning");
+			assert.match(result.summary, /launch is not ready/);
+			const launchReadiness = asRecord(asRecord(result.stateAfter).launchReadiness);
+			assert.equal(launchReadiness.required, true);
+			assert.equal(launchReadiness.evaluated, true);
+			assert.equal(launchReadiness.ready, false);
+			const issues = launchReadiness.issues;
+			assert.ok(Array.isArray(issues));
+			assert.ok(issues.some((issue) => String(issue).includes("raman.v2ValidationId")));
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+});
+
+test("real Raman V2 preflight accepts an operator-approved bootstrap preview for the first supervised run", () => {
+	const cwd = tempCwd();
+	return withSimulatedHardwareDisabled(() => {
+		try {
+			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			seedCalibration(cwd);
+			seedCoordinateAudit(cwd, spec, "bootstrap-v2-preflight-coordinate-audit");
+
+			const result = dispatch(
+				"run_preflight",
+				{
+					spec,
+					hardwareExecution: realV2LaunchPreview({
+						bootstrapV2ValidationRun: true,
+						coordinateAuditId: "bootstrap-v2-preflight-coordinate-audit",
+					}),
+				},
+				{ cwd, commandId: "bootstrap-v2-preflight-preview" },
+			);
+			assert.equal(result.status, "success");
+			assert.match(result.summary, /launch preview is ready/);
+			const launchReadiness = asRecord(asRecord(result.stateAfter).launchReadiness);
+			assert.equal(launchReadiness.required, true);
+			assert.equal(launchReadiness.evaluated, true);
+			assert.equal(launchReadiness.ready, true);
+			assert.deepEqual(launchReadiness.issues, []);
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+});
+
+test("real Raman V2 preflight accepts production-ready v2ValidationId evidence in the launch preview", () => {
+	const cwd = tempCwd();
+	return withSimulatedHardwareDisabled(() => {
+		try {
+			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			seedPreflight(cwd, "seeded-v2-preflight", dryRunVariant(spec));
+			seedCoordinateAudit(cwd, spec, "ready-v2-preflight-coordinate-audit");
+			const activeProbeRecordPath = seedActiveProbe(cwd);
+			seedCalibration(cwd);
+			seedRamanRun(cwd, "seeded-v2-real-capable-run", {
+				workflowBackend: "v2_bridge",
+				spec,
+				includeFrameArtifact: true,
+				unit: {
+					autofocus: {
+						bestZUm: 0.5,
+						confidence: 0.92,
+						frameArtifactIds: ["frame-point-0"],
+					},
+					xyCorrection: {
+						dxUm: 0.4,
+						dyUm: -0.2,
+						confidence: 0.94,
+					},
+				},
+			});
+			const validation = recordRamanHardwareValidation(
+				validationParams(activeProbeRecordPath, "seeded-v2-real-capable-run", "v2_bridge", "ready-preflight-v2-validation"),
+				{ cwd, commandId: "record-ready-preflight-v2-validation" },
+			);
+			assert.equal(validation.status, "success");
+
+			const result = dispatch(
+				"run_preflight",
+				{
+					spec,
+					hardwareExecution: realV2LaunchPreview({
+						coordinateAuditId: "ready-v2-preflight-coordinate-audit",
+						v2ValidationId: "ready-preflight-v2-validation",
+					}),
+				},
+				{ cwd, commandId: "ready-v2-preflight-evidence" },
+			);
+			assert.equal(result.status, "success");
+			assert.match(result.summary, /launch preview is ready/);
+			const launchReadiness = asRecord(asRecord(result.stateAfter).launchReadiness);
+			assert.equal(launchReadiness.required, true);
+			assert.equal(launchReadiness.evaluated, true);
+			assert.equal(launchReadiness.ready, true);
+			assert.deepEqual(launchReadiness.issues, []);
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+});
+
 test("real Raman V2 dispatch requires production-ready V2 validation evidence before hardware gate", () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
@@ -838,8 +1018,10 @@ test("real Raman V2 dispatch requires production-ready V2 validation evidence be
 			assert.equal(validation.status, "success");
 
 			const spec = loadSpec("raman-hardware-spec.json");
+			seedCoordinateAudit(cwd, spec, "ready-v2-coordinate-audit");
 			const hardwareExecution = {
 				stageAdapter: "mc_newton_xyz",
+				coordinateAuditId: "ready-v2-coordinate-audit",
 				raman: {
 					workflowBackend: "v2_bridge",
 					acquisitionBackend: "labspec_file_bridge",
@@ -864,7 +1046,7 @@ test("real Raman V2 dispatch requires production-ready V2 validation evidence be
 			};
 
 			const missingValidation = dispatch("run_experiment", { spec, hardwareExecution }, { cwd, commandId: "missing-v2-evidence" });
-			assert.equal(missingValidation.errorCode, "simulated_hardware_not_allowed");
+			assert.equal(missingValidation.errorCode, "raman_launch_gate_failed");
 			assert.match(missingValidation.summary, /V2 parity evidence gate/);
 			const missingIssues = asRecord(missingValidation.stateAfter).issues as string[];
 			assert.ok(missingIssues.some((issue) => issue.includes("v2ValidationId")));
@@ -895,12 +1077,14 @@ test("real Raman V2 dispatch allows an operator-approved bootstrap validation ru
 	return withSimulatedHardwareDisabled(() => {
 		try {
 			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			seedCoordinateAudit(cwd, spec, "bootstrap-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
 				{
 					spec,
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
+						coordinateAuditId: "bootstrap-v2-coordinate-audit",
 						raman: {
 							workflowBackend: "v2_bridge",
 							acquisitionBackend: "labspec_file_bridge",
@@ -958,12 +1142,14 @@ test("real Raman V2 dispatch rejects tampered validation evidence before the har
 			);
 
 			const spec = loadSpec("raman-hardware-spec.json");
+			seedCoordinateAudit(cwd, spec, "tampered-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
 				{
 					spec,
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
+						coordinateAuditId: "tampered-v2-coordinate-audit",
 						raman: {
 							workflowBackend: "v2_bridge",
 							v2ValidationId: "tampered-v2-validation",
@@ -990,7 +1176,7 @@ test("real Raman V2 dispatch rejects tampered validation evidence before the har
 				},
 				{ cwd, commandId: "tampered-v2-evidence" },
 			);
-			assert.equal(result.errorCode, "simulated_hardware_not_allowed");
+			assert.equal(result.errorCode, "raman_launch_gate_failed");
 			const issues = asRecord(result.stateAfter).issues as string[];
 			assert.ok(issues.some((issue) => issue.includes("evidenceDigest")));
 		} finally {
@@ -1004,12 +1190,14 @@ test("real Raman V2 dispatch rejects thermal waiting until a real thermal backen
 	return withSimulatedHardwareDisabled(() => {
 		try {
 			const spec = loadSpec("raman-v2-validation-hardware-spec.json");
+			seedCoordinateAudit(cwd, spec, "thermal-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
 				{
 					spec,
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
+						coordinateAuditId: "thermal-v2-coordinate-audit",
 						raman: {
 							workflowBackend: "v2_bridge",
 							acquisitionBackend: "labspec_file_bridge",
@@ -1035,7 +1223,7 @@ test("real Raman V2 dispatch rejects thermal waiting until a real thermal backen
 				},
 				{ cwd, commandId: "thermal-v2-evidence" },
 			);
-			assert.equal(result.errorCode, "simulated_hardware_not_allowed");
+			assert.equal(result.errorCode, "raman_launch_gate_failed");
 			const issues = asRecord(result.stateAfter).issues as string[];
 			assert.ok(issues.some((issue) => issue.includes("thermal waiting is not yet supported")));
 		} finally {
@@ -1059,12 +1247,14 @@ test("real Raman V2 dispatch rejects validation evidence that does not cover the
 			assert.equal(validation.status, "success");
 
 			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			seedCoordinateAudit(cwd, spec, "thin-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
 				{
 					spec,
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
+						coordinateAuditId: "thin-v2-coordinate-audit",
 						raman: {
 							workflowBackend: "v2_bridge",
 							v2ValidationId: "thin-v2-validation",
@@ -1091,7 +1281,7 @@ test("real Raman V2 dispatch rejects validation evidence that does not cover the
 				},
 				{ cwd, commandId: "thin-v2-evidence" },
 			);
-			assert.equal(result.errorCode, "simulated_hardware_not_allowed");
+			assert.equal(result.errorCode, "raman_launch_gate_failed");
 			const issues = asRecord(result.stateAfter).issues as string[];
 			assert.ok(issues.some((issue) => issue.includes("does not cover autofocus")));
 			assert.ok(issues.some((issue) => issue.includes("does not cover XY correction")));
