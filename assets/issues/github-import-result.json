@@ -1,0 +1,69 @@
+﻿[
+    {
+        "localId":  "ISSUE-01-real-raman-v2-launch-path-must-be-self-consistent-and-planner-visible",
+        "title":  "ISSUE-01: Real Raman V2 launch path must be self-consistent and planner-visible",
+        "number":  1,
+        "url":  "https://github.com/zznature/pi/issues/1",
+        "milestone":  "M1 real-v2-launch-trust",
+        "labels":  [
+                       "area:runtime",
+                       "area:prompt",
+                       "area:planner",
+                       "area:tooling",
+                       "risk:safety",
+                       "risk:operator-trust",
+                       "risk:planner-misfire",
+                       "blocks:mvp-lab-demo"
+                   ],
+        "dependsOn":  [
+
+                      ],
+        "blocks":  [
+                       "ISSUE-02",
+                       "ISSUE-03"
+                   ],
+        "sourceFile":  "ISSUE-01-real-raman-v2-launch-path-must-be-self-consistent-and-planner-visible.md"
+    },
+    {
+        "localId":  "ISSUE-02-simplify-planner-hardware-planning-surface-and-lab-state-reads",
+        "title":  "ISSUE-02: Simplify planner hardware planning surface and lab-state reads",
+        "number":  2,
+        "url":  "https://github.com/zznature/pi/issues/2",
+        "milestone":  "M2 planner-surface-simplification",
+        "labels":  [
+                       "area:planner",
+                       "area:prompt",
+                       "area:tooling",
+                       "risk:operator-trust",
+                       "risk:planner-misfire",
+                       "blocks:mvp-lab-demo"
+                   ],
+        "dependsOn":  [
+                          "ISSUE-01"
+                      ],
+        "blocks":  [
+
+                   ],
+        "sourceFile":  "ISSUE-02-simplify-planner-hardware-planning-surface-and-lab-state-reads.md"
+    },
+    {
+        "localId":  "ISSUE-03-add-a-first-class-raman-autofocus-only-mode",
+        "title":  "ISSUE-03: Add a first-class Raman autofocus-only mode",
+        "number":  3,
+        "url":  "https://github.com/zznature/pi/issues/3",
+        "milestone":  "M3 raman-autofocus-model",
+        "labels":  [
+                       "area:schema",
+                       "area:runtime",
+                       "risk:planner-misfire",
+                       "blocks:mvp-lab-demo"
+                   ],
+        "dependsOn":  [
+                          "ISSUE-01"
+                      ],
+        "blocks":  [
+
+                   ],
+        "sourceFile":  "ISSUE-03-add-a-first-class-raman-autofocus-only-mode.md"
+    }
+]
