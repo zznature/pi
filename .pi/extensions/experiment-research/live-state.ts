@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Capabilities } from "./capabilities.ts";
 import { DEFAULT_LABSPEC_BRIDGE_DIR } from "./labspec-bridge.ts";
+import { resolveProjectPython } from "./python-runtime.ts";
 import type { ExperimentSpec, ValidationIssue } from "./schemas.ts";
 import { getInstrumentResourceIds } from "./spec-utils.ts";
 
@@ -81,7 +82,18 @@ function readRamanBridgeProbe(cwd: string): { probe?: RamanReadOnlyProbe; issue?
 			outputDir: dryRunDir,
 		},
 	};
-	const result = spawnSync("python3", [bridgePath, "--stage-root", resolve(cwd, "docs", "Raman")], {
+	let python: string;
+	try {
+		python = resolveProjectPython(cwd).pythonPath;
+	} catch (error) {
+		return {
+			issue: {
+				path: "liveState.readOnlyProbe",
+				message: `Raman bridge probe failed: ${error instanceof Error ? error.message : String(error)}`,
+			},
+		};
+	}
+	const result = spawnSync(python, [bridgePath, "--stage-root", resolve(cwd, "docs", "Raman")], {
 		cwd,
 		input: `${JSON.stringify(request)}\n`,
 		encoding: "utf-8",

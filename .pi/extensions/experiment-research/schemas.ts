@@ -352,7 +352,7 @@ const HardwareExecutionSchema = Type.Object(
 		coordinateAuditExemption: Type.Optional(Type.Literal("bounded_z_adjustment")),
 		stagePort: Type.Optional(Type.String({ minLength: 1 })),
 		stagePython: Type.Optional(
-			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to 'python' on PATH" }),
+			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to the project .venv interpreter" }),
 		),
 		raman: Type.Optional(RamanExecutionSchema),
 		thermal: Type.Optional(ThermalExecutionSchema),
@@ -373,7 +373,7 @@ const PreflightHardwareExecutionSchema = Type.Object(
 		coordinateAuditExemption: Type.Optional(Type.Literal("bounded_z_adjustment")),
 		stagePort: Type.Optional(Type.String({ minLength: 1 })),
 		stagePython: Type.Optional(
-			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to 'python' on PATH" }),
+			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to the project .venv interpreter" }),
 		),
 		raman: Type.Optional(RamanExecutionSchema),
 		thermal: Type.Optional(ThermalExecutionSchema),

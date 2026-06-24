@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { resolveProjectPython } from "../../python-runtime.ts";
 
 export type RamanBridgeAction =
 	| "connect"
@@ -80,7 +81,7 @@ export class RamanBridgeClient {
 		const repoRoot = dirname(dirname(dirname(extensionDir)));
 		const bridgePath = options.bridgePath ?? join(extensionDir, "raman_bridge.py");
 		const stageRoot = options.stageRoot ?? resolve(repoRoot, "docs", "Raman");
-		this.child = spawn(options.python ?? "python3", [bridgePath, "--stage-root", stageRoot], {
+		this.child = spawn(resolveProjectPython(options.cwd, options.python).pythonPath, [bridgePath, "--stage-root", stageRoot], {
 			cwd: options.cwd,
 			stdio: ["pipe", "pipe", "pipe"],
 		});

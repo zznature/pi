@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveProjectPython } from "../../python-runtime.ts";
 import type { HardwarePilotParams } from "../../schemas.ts";
 import type { ExperimentPoint } from "../../spec-utils.ts";
 
@@ -57,10 +58,10 @@ export class PythonMCNewtonStageAdapter implements StageAdapter {
 	private readonly cwd: string;
 	private readonly python: string;
 
-	constructor(port: string, cwd: string, python: string = "python") {
+	constructor(port: string, cwd: string, python?: string) {
 		this.port = port;
 		this.cwd = cwd;
-		this.python = python;
+		this.python = resolveProjectPython(cwd, python).pythonPath;
 		const extensionDir = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 		this.bridgePath = join(extensionDir, "stage_bridge.py");
 	}
