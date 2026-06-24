@@ -91,7 +91,7 @@ class FocusStrategy(Protocol):
 class AutofocusParams:
     """Configuration parameters for a single autofocus run."""
 
-    # Required — declared first so dataclass field ordering is satisfied
+    # Required - declared first so dataclass field ordering is satisfied
     z_min_um: float
     z_max_um: float
 
@@ -111,6 +111,9 @@ class AutofocusParams:
 
     # Mechanics
     backlash_um: float = 3.0
+    coarse_stage_tolerance_um: float = 5.0
+    fine_stage_tolerance_um: float = 5.0
+    final_stage_tolerance_um: float = 5.0
 
     # Quality thresholds
     min_confidence: float = 0.2
@@ -128,6 +131,9 @@ class AutofocusParams:
             ("coarse_step_um", self.coarse_step_um),
             ("fine_range_um", self.fine_range_um),
             ("fine_step_um", self.fine_step_um),
+            ("coarse_stage_tolerance_um", self.coarse_stage_tolerance_um),
+            ("fine_stage_tolerance_um", self.fine_stage_tolerance_um),
+            ("final_stage_tolerance_um", self.final_stage_tolerance_um),
         ]:
             if val <= 0:
                 raise ValueError(f"{name} must be positive, got {val}")

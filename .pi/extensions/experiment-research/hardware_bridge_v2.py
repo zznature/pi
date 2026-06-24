@@ -299,11 +299,15 @@ class BridgeRuntime:
             x_channel=int(channels.get("x", 1)),
             y_channel=int(channels.get("y", 2)),
             z_channel=int(channels.get("z", 3)),
-            default_cmd_wait_ms=100.0,
+            exclusive_channel=True,
             stability_tolerance_um=0.5,
-            settle_correction_attempts=3,
+            z_target_tolerance_um=5.0,
+            settle_correction_attempts=0,
+            z_settle_microstep_correction=False,
         )
         stage.connect()
+        if not bool(payload.get("readOnly", False)):
+            stage.apply_fast_move_profile()
         return stage
 
     def connect_stage(self, payload: JsonObject) -> JsonObject:
@@ -575,6 +579,13 @@ def position_to_wire(position: Any) -> JsonObject:
         "yUm": float(getattr(position, "y_um", 0.0)),
         "zUm": float(getattr(position, "z_um", 0.0)),
     }
+
+
+def stage_command_trace(stage: Any) -> list[JsonObject]:
+    commands = getattr(stage, "last_move_commands", None)
+    if not isinstance(commands, list):
+        return []
+    return [command for command in commands if isinstance(command, dict)]
 
 
 def parse_acquisition_id(payload: JsonObject) -> str | None:
@@ -1343,7 +1354,13 @@ def action_stage_connect(runtime: BridgeRuntime, payload: JsonObject, _context: 
 
 
 def action_stage_get_position(runtime: BridgeRuntime, payload: JsonObject, _context: BridgeContext) -> JsonObject:
-    stage = runtime.ensure_stage(payload)
+    read_payload = dict(payload)
+    stage_payload = read_payload.get("stage")
+    if isinstance(stage_payload, dict):
+        read_payload["stage"] = {**stage_payload, "readOnly": True}
+    elif "adapter" in read_payload:
+        read_payload["readOnly"] = True
+    stage = runtime.ensure_stage(read_payload)
     return {"adapter": runtime.stage_adapter, "position": position_to_wire(stage.get_position_um())}
 
 
@@ -1356,10 +1373,28 @@ def action_stage_move_absolute(runtime: BridgeRuntime, payload: JsonObject, cont
     z_um = optional_number(payload.get("zUm"), "zUm")
     if x_um is None and y_um is None and z_um is None:
         raise BridgeError("invalid_request", "stage.move_absolute requires at least one of xUm, yUm, or zUm")
-    stage.move_absolute_um(x_um=x_um, y_um=y_um, z_um=z_um)
-    context.emit({"domain": "stage", "action": "move_absolute", "phase": "commanded", "target": {"xUm": x_um, "yUm": y_um, "zUm": z_um}})
+    timeout_ms = int(payload.get("timeoutMs", payload.get("settleTimeoutMs", 1000)))
+    move_and_wait = getattr(stage, "move_absolute_and_wait_um", None)
+    if callable(move_and_wait):
+        move_and_wait(x_um=x_um, y_um=y_um, z_um=z_um, timeout_ms=timeout_ms)
+    else:
+        stage.move_absolute_um(x_um=x_um, y_um=y_um, z_um=z_um)
+        stage.wait_settled(timeout_ms)
+    move_commands = stage_command_trace(stage)
+    context.emit({
+        "domain": "stage",
+        "action": "move_absolute",
+        "phase": "settled",
+        "target": {"xUm": x_um, "yUm": y_um, "zUm": z_um},
+        "moveCommands": move_commands,
+    })
     sleep_with_stop(runtime, int(payload.get("simulateDurationMs", 0)))
-    return {"adapter": runtime.stage_adapter, "before": before, "position": position_to_wire(stage.get_position_um())}
+    return {
+        "adapter": runtime.stage_adapter,
+        "before": before,
+        "position": position_to_wire(stage.get_position_um()),
+        "moveCommands": move_commands,
+    }
 
 
 def action_stage_wait_settled(runtime: BridgeRuntime, payload: JsonObject, _context: BridgeContext) -> JsonObject:

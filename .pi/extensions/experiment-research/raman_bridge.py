@@ -197,6 +197,11 @@ class XYZStageZAdapter:
                 raise
             wait_settled(int(timeout_ms))
 
+    def set_target_tolerance_um(self, tolerance_um: float) -> None:
+        setter = getattr(self._xyz_stage, "set_axis_target_tolerance_um", None)
+        if callable(setter):
+            setter("z", float(tolerance_um))
+
     def stop(self) -> None:
         self._xyz_stage.stop()
 
@@ -301,12 +306,46 @@ def wait_stage_settled(stage: Any, timeout_ms: int, axes: set[str] | None = None
         stage.wait_settled(timeout_ms)
 
 
+def move_stage_axis_and_wait(stage: Any, axis: str, target_um: float, timeout_ms: int) -> None:
+    move_key = f"{axis}_um"
+    move_and_wait = getattr(stage, "move_absolute_and_wait_um", None)
+    if callable(move_and_wait):
+        move_and_wait(**{move_key: target_um}, timeout_ms=timeout_ms)
+        return
+    stage.move_absolute_um(**{move_key: target_um})
+    wait_stage_settled(stage, timeout_ms, {axis})
+
+
+def move_stage_absolute_and_wait(
+    stage: Any,
+    *,
+    x_um: float | None = None,
+    y_um: float | None = None,
+    z_um: float | None = None,
+    timeout_ms: int,
+) -> None:
+    move_and_wait = getattr(stage, "move_absolute_and_wait_um", None)
+    if callable(move_and_wait):
+        move_and_wait(x_um=x_um, y_um=y_um, z_um=z_um, timeout_ms=timeout_ms)
+        return
+    for axis, target_um in {"x": x_um, "y": y_um, "z": z_um}.items():
+        if target_um is not None:
+            move_stage_axis_and_wait(stage, axis, float(target_um), timeout_ms)
+
+
 def position_to_wire(position: Any) -> dict[str, float]:
     return {
         "xUm": float(getattr(position, "x_um", 0.0)),
         "yUm": float(getattr(position, "y_um", 0.0)),
         "zUm": float(getattr(position, "z_um", 0.0)),
     }
+
+
+def stage_command_trace(stage: Any) -> list[dict[str, Any]]:
+    commands = getattr(stage, "last_move_commands", None)
+    if not isinstance(commands, list):
+        return []
+    return [command for command in commands if isinstance(command, dict)]
 
 
 def load_real_stage(stage_root: Path, payload: dict[str, Any]) -> Any:
@@ -323,10 +362,11 @@ def load_real_stage(stage_root: Path, payload: dict[str, Any]) -> Any:
         x_channel=int(channels.get("x", 1)),
         y_channel=int(channels.get("y", 2)),
         z_channel=int(channels.get("z", 3)),
-        default_cmd_wait_ms=100.0,
-        exclusive_channel=False,
+        exclusive_channel=True,
         stability_tolerance_um=0.5,
-        settle_correction_attempts=3,
+        z_target_tolerance_um=5.0,
+        settle_correction_attempts=0,
+        z_settle_microstep_correction=False,
     )
     stage.connect()
     stage.apply_fast_move_profile()
@@ -581,13 +621,16 @@ def action_visit_point(
                     },
                     output_lock,
                 )
-                stage.move_absolute_um(**{move_key: target_um})
-                wait_stage_settled(stage, settle_timeout_ms, {axis})
+                move_stage_axis_and_wait(stage, axis, target_um, settle_timeout_ms)
         if abort_event.is_set():
             state.stop()
             raise BridgeError("aborted", "visit_point aborted after motion")
         after = stage.get_position_um()
-        return {"before": position_to_wire(before), "after": position_to_wire(after)}
+        return {
+            "before": position_to_wire(before),
+            "after": position_to_wire(after),
+            "moveCommands": stage_command_trace(stage),
+        }
 
 def action_autofocus(
     state: BridgeState,
@@ -644,18 +687,23 @@ def action_autofocus_labspec(
     ):
         raise BridgeError("frame_timeout", "autofocus dependencies were not loaded")
 
+    from mapping import DEFAULT_LABSPEC_BRIDGE_DIR
+
     bridge_dir_value = autofocus.get("bridgeDir")
-    if not isinstance(bridge_dir_value, str) or not bridge_dir_value:
-        raise BridgeError("frame_timeout", "labspec_file_bridge autofocus requires bridgeDir")
-    frames = LABSPEC_FRAME_PROVIDER(Path(bridge_dir_value), stop_on_disconnect=False)
+    bridge_dir = Path(bridge_dir_value) if isinstance(bridge_dir_value, str) and bridge_dir_value.strip() else DEFAULT_LABSPEC_BRIDGE_DIR
+    frames = LABSPEC_FRAME_PROVIDER(bridge_dir, stop_on_disconnect=False)
     try:
         width, height = frames.connect()
         roi_payload = parse_payload(autofocus.get("roi"))
+        default_roi_width = min(256, int(width))
+        default_roi_height = min(256, int(height))
+        default_roi_x = max(0, (int(width) - default_roi_width) // 2)
+        default_roi_y = max(0, (int(height) - default_roi_height) // 2)
         roi = AUTOFOCUS_ROI(
-            x=int(roi_payload.get("x", 0)),
-            y=int(roi_payload.get("y", 0)),
-            width=int(roi_payload.get("width", width)),
-            height=int(roi_payload.get("height", height)),
+            x=int(roi_payload.get("x", default_roi_x)),
+            y=int(roi_payload.get("y", default_roi_y)),
+            width=int(roi_payload.get("width", default_roi_width)),
+            height=int(roi_payload.get("height", default_roi_height)),
         )
         params = AUTOFOCUS_PARAMS(
             z_min_um=float(autofocus.get("zMinUm")),
@@ -668,6 +716,9 @@ def action_autofocus_labspec(
             frame_timeout_ms=int(autofocus.get("frameTimeoutMs", 500)),
             stage_timeout_ms=int(autofocus.get("stageTimeoutMs", 3000)),
             frames_per_z=int(autofocus.get("framesPerZ", 3)),
+            coarse_stage_tolerance_um=float(autofocus.get("coarseStageToleranceUm", 5.0)),
+            fine_stage_tolerance_um=float(autofocus.get("fineStageToleranceUm", 5.0)),
+            final_stage_tolerance_um=float(autofocus.get("finalStageToleranceUm", 5.0)),
             min_confidence=float(autofocus.get("minConfidence", 0.2)),
             metric_name=str(autofocus.get("metric", "labspec_spot_compactness")),
         )
@@ -997,8 +1048,13 @@ def action_calibrate_xy_sequence(
                     {"event": "progress", "action": "calibrate_xy_sequence", "phase": "move", "index": index},
                     output_lock,
                 )
-                stage.move_absolute_um(x_um=target["x_um"], y_um=target["y_um"], z_um=target["z_um"])
-                stage.wait_settled(settle_timeout_ms)
+                move_stage_absolute_and_wait(
+                    stage,
+                    x_um=target["x_um"],
+                    y_um=target["y_um"],
+                    z_um=target["z_um"],
+                    timeout_ms=settle_timeout_ms,
+                )
                 dx_px = fake_pixel_per_um[0][0] * shift["dxUm"] + fake_pixel_per_um[0][1] * shift["dyUm"]
                 dy_px = fake_pixel_per_um[1][0] * shift["dxUm"] + fake_pixel_per_um[1][1] * shift["dyUm"]
                 current_path = output_dir / f"calibration_current_{index}.pgm"
@@ -1039,8 +1095,13 @@ def action_calibrate_xy_sequence(
                         {"event": "progress", "action": "calibrate_xy_sequence", "phase": "move", "index": index},
                         output_lock,
                     )
-                    stage.move_absolute_um(x_um=target["x_um"], y_um=target["y_um"], z_um=target["z_um"])
-                    stage.wait_settled(settle_timeout_ms)
+                    move_stage_absolute_and_wait(
+                        stage,
+                        x_um=target["x_um"],
+                        y_um=target["y_um"],
+                        z_um=target["z_um"],
+                        timeout_ms=settle_timeout_ms,
+                    )
                     frame = provider.wait_for_next(after_ts=after_ts, timeout_ms=frame_timeout_ms)
                     after_ts = float(frame.timestamp)
                     current_path = output_dir / f"calibration_current_{index}.png"
@@ -1065,12 +1126,13 @@ def action_calibrate_xy_sequence(
         return fit
     finally:
         try:
-            stage.move_absolute_um(
+            move_stage_absolute_and_wait(
+                stage,
                 x_um=float(getattr(initial, "x_um", 0.0)),
                 y_um=float(getattr(initial, "y_um", 0.0)),
                 z_um=float(getattr(initial, "z_um", 0.0)),
+                timeout_ms=settle_timeout_ms,
             )
-            stage.wait_settled(settle_timeout_ms)
         except Exception as error:
             print(f"raman_bridge calibration restore failed: {error}", file=sys.stderr, flush=True)
 

@@ -1,4 +1,4 @@
-"""AutofocusController — top-level orchestrator for single-point autofocus."""
+"""AutofocusController - top-level orchestrator for single-point autofocus."""
 
 import logging
 import statistics
@@ -8,8 +8,7 @@ from autofocus.models import (
     AutofocusParams, FocusPoint, ScanCurve, FocusStatus, FocusResult,
 )
 from autofocus.exceptions import (
-    OutOfRangeError, NoPeakError, LowConfidenceError,
-    StageTimeoutError, FrameTimeoutError,
+    OutOfRangeError, StageTimeoutError, FrameTimeoutError,
 )
 from autofocus.scanner import ZScanner
 from autofocus.metrics import MetricStrategy
@@ -39,7 +38,7 @@ class AutofocusController:
         fine: Optional[ScanCurve] = None,
     ) -> FocusResult:
         """Build and log a failed FocusResult."""
-        log.warning("Autofocus aborted: %s — %s", status.value, message)
+        log.warning("Autofocus aborted: %s - %s", status.value, message)
         return FocusResult(
             status=status, z_best_um=None, final_score=None,
             confidence=0.0, coarse=coarse, fine=fine, message=message,
@@ -51,7 +50,7 @@ class AutofocusController:
         params: AutofocusParams,
         on_progress: Optional[Callable[[FocusPoint], None]] = None,
     ) -> FocusResult:
-        """Run a full coarse→fine autofocus and return the outcome."""
+        """Run a full coarse->fine autofocus and return the outcome."""
         # 1. Resolve strategy and build scanner.
         strategy = self._strategy or MetricStrategy(params.metric_name)
         scanner = ZScanner(self.stage, self.frames, strategy, params)
@@ -98,7 +97,7 @@ class AutofocusController:
         if prominence < params.coarse_min_prominence:
             return self._result_error(
                 FocusStatus.NO_PEAK,
-                "Focus curve too flat — likely low texture; try a different ROI.",
+                "Focus curve too flat - likely low texture; try a different ROI.",
                 coarse=coarse,
             )
         top3 = sorted(coarse.points, key=lambda p: p.score, reverse=True)[:3]
@@ -141,11 +140,13 @@ class AutofocusController:
         if z_best is None:
             z_best = fine.best().z_um
 
-        # 9. Backlash-compensated final move: overshoot then approach from below.
-        pre_z = max(z_best - params.backlash_um, params.z_min_um)
+        # 9. Final positioning: approach the best Z from above, then move down to target.
+        pre_z = min(z_best + params.backlash_um, params.z_max_um)
+        scanner._set_stage_tolerance(params.final_stage_tolerance_um)
         try:
-            self.stage.move_absolute_um(pre_z)
-            self.stage.wait_settled(params.stage_timeout_ms)
+            if pre_z > z_best:
+                self.stage.move_absolute_um(pre_z)
+                self.stage.wait_settled(params.stage_timeout_ms)
             self.stage.move_absolute_um(z_best)
             self.stage.wait_settled(params.stage_timeout_ms)
         except (StageTimeoutError, StageError) as e:
@@ -155,7 +156,7 @@ class AutofocusController:
 
         # 10. Final verification sample.
         try:
-            final_point = scanner.sample_score(z_best, roi)
+            final_point = scanner.score_current_position(roi)
         except FrameTimeoutError as e:
             return self._result_error(
                 FocusStatus.FRAME_ERROR, f"Final verification: {e}", coarse=coarse, fine=fine
@@ -169,7 +170,7 @@ class AutofocusController:
         if final_point.score < 0.7 * fine_best_score:
             return FocusResult(
                 status=FocusStatus.LOW_CONFIDENCE,
-                z_best_um=z_best,
+                z_best_um=final_point.z_um,
                 final_score=final_point.score,
                 confidence=0.0,
                 coarse=coarse, fine=fine,
@@ -195,7 +196,7 @@ class AutofocusController:
         # 12. Return result.
         return FocusResult(
             status=status,
-            z_best_um=z_best,
+            z_best_um=final_point.z_um,
             final_score=final_point.score,
             confidence=c,
             coarse=coarse,

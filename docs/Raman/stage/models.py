@@ -33,6 +33,10 @@ class ZStage(Protocol):
         """Command an absolute Z move."""
         ...
 
+    def set_target_tolerance_um(self, tolerance_um: float) -> None:
+        """Set acceptable absolute target error for subsequent Z moves."""
+        ...
+
     def move_relative_um(self, dz_um: float) -> None:
         """Command a relative Z move."""
         ...
@@ -61,6 +65,21 @@ class XYZStage(Protocol):
         z_um: float | None = None,
     ) -> None:
         """Command an absolute move; None means keep that axis unchanged."""
+        ...
+
+    def move_absolute_and_wait_um(
+        self,
+        *,
+        x_um: float | None = None,
+        y_um: float | None = None,
+        z_um: float | None = None,
+        timeout_ms: int,
+    ) -> None:
+        """Command an absolute move and wait for each target axis to settle."""
+        ...
+
+    def set_axis_target_tolerance_um(self, axis: str, tolerance_um: float) -> None:
+        """Set acceptable absolute target error for one axis."""
         ...
 
     def move_relative_um(

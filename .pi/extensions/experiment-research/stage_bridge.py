@@ -32,6 +32,13 @@ def _position_dict(position) -> dict[str, float]:
     return {"xUm": position.x_um, "yUm": position.y_um, "zUm": position.z_um}
 
 
+def _stage_command_trace(stage) -> list[dict]:
+    commands = getattr(stage, "last_move_commands", None)
+    if not isinstance(commands, list):
+        return []
+    return [command for command in commands if isinstance(command, dict)]
+
+
 def main() -> int:
     args = parse_args()
     stage_root = Path(args.stage_root).resolve()
@@ -45,7 +52,7 @@ def main() -> int:
     # [check:pos?] returns a value (the Z axis returns nothing at 5 ms). Use a
     # 100 ms command wait so every position query gets one clean response and no
     # reply carries over into the next read.
-    with MCNewtonXYZStageController(args.port, default_cmd_wait_ms=100.0, exclusive_channel=False) as stage:
+    with MCNewtonXYZStageController(args.port, default_cmd_wait_ms=100.0, exclusive_channel=True) as stage:
         stage.apply_fast_move_profile()
         if args.action == "position":
             print(json.dumps(_position_dict(stage.get_position_um())))
@@ -57,10 +64,18 @@ def main() -> int:
             z_um = payload.get("zUm")
             if z_um is not None:
                 move_kwargs["z_um"] = z_um
-            stage.move_absolute_um(**move_kwargs)
-            stage.wait_settled(int(payload["settleTimeoutMs"]))
+            move_and_wait = getattr(stage, "move_absolute_and_wait_um", None)
+            if callable(move_and_wait):
+                move_and_wait(**move_kwargs, timeout_ms=int(payload["settleTimeoutMs"]))
+            else:
+                stage.move_absolute_um(**move_kwargs)
+                stage.wait_settled(int(payload["settleTimeoutMs"]))
             after = stage.get_position_um()
-            print(json.dumps({"before": _position_dict(before), "after": _position_dict(after)}))
+            print(json.dumps({
+                "before": _position_dict(before),
+                "after": _position_dict(after),
+                "moveCommands": _stage_command_trace(stage),
+            }))
             return 0
 
         if args.action == "stop":

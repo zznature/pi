@@ -1,18 +1,45 @@
-"""MC.NewtonLT-06 multi-channel XYZ stage controller."""
+"""MC.NewtonLT-06 XYZ stage controller backed by the vendor Python SDK."""
 
 from __future__ import annotations
 
-import re
+import contextlib
+import sys
 import time
-
-import serial
+from pathlib import Path
+from typing import Any, Callable, TypeVar
 
 from stage.exceptions import StageCommandError, StageConnectionError, StageTimeoutError
 from stage.models import StagePosition
 
 
+_T = TypeVar("_T")
+
+
+def _ensure_vendor_sdk_importable() -> None:
+    try:
+        import NewtonLT06.MCNewtonLT06  # noqa: F401
+        return
+    except ModuleNotFoundError:
+        pass
+
+    stage_file = Path(__file__).resolve()
+    candidate_roots = [
+        stage_file.parents[2],
+        stage_file.parents[3] / "assets" / "manuals",
+    ]
+    for root in candidate_roots:
+        wheel_path = root / "MCNewtonLT06 Python SDK v1.0.0" / "mcnewtonlt06-1.0.0-py3-none-any.whl"
+        if wheel_path.exists():
+            sys.path.insert(0, str(wheel_path))
+            return
+
+
+_ensure_vendor_sdk_importable()
+from NewtonLT06.MCNewtonLT06 import ChannelSwitch, MCNewtonLT06, MFMCNewtonStatus
+
+
 class MCNewtonXYZStageController:
-    """XYZStage implementation for one MC.Newton controller with per-axis channels."""
+    """XYZ stage implementation using one MC.Newton controller with per-axis channels."""
 
     def __init__(
         self,
@@ -22,7 +49,7 @@ class MCNewtonXYZStageController:
         x_channel: int = 1,
         y_channel: int = 2,
         z_channel: int = 3,
-        read_timeout: float = 1.0,
+        read_timeout: float = 2.0,
         default_cmd_wait_ms: float = 5.0,
         idn_wait_ms: float = 100.0,
         idn_retries: int = 3,
@@ -32,51 +59,67 @@ class MCNewtonXYZStageController:
         exclusive_channel: bool = True,
         x_target_tolerance_um: float = 1.0,
         y_target_tolerance_um: float = 1.0,
-        z_target_tolerance_um: float = 1.0,
+        z_target_tolerance_um: float = 5.0,
         stability_tolerance_um: float = 0.2,
-        settle_correction_attempts: int = 10,
+        settle_correction_attempts: int = 0,
         settle_correction_threshold_um: float = 100.0,
+        settle_correction_step_um: float = 2.0,
+        settle_correction_min_step_um: float = 0.5,
+        settle_correction_max_step_um: float = 10.0,
+        settle_correction_fraction: float = 0.5,
+        z_settle_microstep_correction: bool = False,
         response_collect_ms: float = 50.0,
-        segmented_move_threshold_um: float = 10.0,
-        segmented_move_step_um: float = 5.0,
+        segmented_move_threshold_um: float = 0.0,
+        segmented_move_step_um: float = 0.0,
+        cap_nf: int = 1,
     ) -> None:
+        _ = (
+            default_cmd_wait_ms,
+            idn_wait_ms,
+            idn_retries,
+            move_cmd_wait_ms,
+            settle_correction_attempts,
+            settle_correction_threshold_um,
+            settle_correction_step_um,
+            settle_correction_min_step_um,
+            settle_correction_max_step_um,
+            settle_correction_fraction,
+            z_settle_microstep_correction,
+            response_collect_ms,
+            segmented_move_threshold_um,
+            segmented_move_step_um,
+        )
         self._port = port
-        self._baudrate = baudrate
+        self._baudrate = int(baudrate)
+        self._read_timeout = float(read_timeout)
+        self._move_cmd_wait_ms = float(move_cmd_wait_ms)
         self._channels = {
             "x": int(x_channel),
             "y": int(y_channel),
             "z": int(z_channel),
         }
-        self._read_timeout = read_timeout
-        self._default_cmd_wait_ms = default_cmd_wait_ms
-        self._idn_wait_ms = idn_wait_ms
-        self._idn_retries = idn_retries
-        self._move_cmd_wait_ms = move_cmd_wait_ms
-        self._channel_switch_wait_ms = channel_switch_wait_ms
-        self._disable_on_disconnect = disable_on_disconnect
-        self._exclusive_channel = exclusive_channel
+        self._channel_switch_wait_ms = float(channel_switch_wait_ms)
+        self._disable_on_disconnect = bool(disable_on_disconnect)
+        self._exclusive_channel = bool(exclusive_channel)
         self._target_tolerances_um = {
             "x": float(x_target_tolerance_um),
             "y": float(y_target_tolerance_um),
             "z": float(z_target_tolerance_um),
         }
         self._stability_tolerance_um = float(stability_tolerance_um)
-        self._settle_correction_attempts = int(settle_correction_attempts)
-        self._settle_correction_threshold_um = float(settle_correction_threshold_um)
-        self._response_collect_ms = float(response_collect_ms)
-        self._segmented_move_threshold_um = float(segmented_move_threshold_um)
-        self._segmented_move_step_um = float(segmented_move_step_um)
+        self._cap_nf = int(cap_nf)
         self._axis_motion_profiles: dict[str, tuple[str, str, int, int]] = {
             "x": ("mm", "slide", 30, 2000),
             "y": ("mm", "slide", 30, 2000),
-            "z": ("mm", "step", 30, 500),
+            "z": ("mm", "step", 30, 750),
         }
-        self._active_motion_profile: tuple[str, str, int, int] | None = None
-        self._ser = None
+        self._configured_axis_profiles: dict[str, tuple[str, str, int, int]] = {}
+        self._sdk: MCNewtonLT06 | None = None
         self._connected = False
         self._enabled_channels: set[int] = set()
         self._last_targets_um: dict[str, float] = {}
         self._last_pulse_axes: set[str] = set()
+        self.last_move_commands: list[dict[str, float | str | bool]] = []
 
     def __enter__(self) -> "MCNewtonXYZStageController":
         self.connect()
@@ -86,25 +129,25 @@ class MCNewtonXYZStageController:
         self.disconnect()
 
     def connect(self) -> None:
-        self._ser = serial.Serial(
-            port=self._port,
-            baudrate=self._baudrate,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=self._read_timeout,
-        )
+        if self._connected:
+            return
+        try:
+            self._sdk = self._call_sdk_class(MCNewtonLT06, self._port, self._baudrate, self._read_timeout)
+        except Exception as exc:
+            raise StageConnectionError(f"Cannot open MC.Newton SDK connection on {self._port}: {exc}") from exc
 
-        idn = ""
-        for _ in range(max(1, self._idn_retries)):
-            idn = self._send("[*IDN?]", wait_ms=self._idn_wait_ms)
-            if idn and "Newton" in idn:
-                break
-        if not idn or "Newton" not in idn:
-            self._ser.close()
-            raise StageConnectionError(f"IDN check failed: unexpected response '{idn}'")
+        device = getattr(self._sdk, "device", None)
+        if device is None or not getattr(device, "is_open", False):
+            raise StageConnectionError(f"Cannot open MC.Newton SDK connection on {self._port}")
+
+        status, hard_idn = self._sdk_call(self._sdk.hard_idn)
+        self._require_status(status, "hard_idn")
+        if "Newton" not in str(hard_idn):
+            raise StageConnectionError(f"IDN check failed: unexpected response '{hard_idn}'")
 
         self._connected = True
+        self._disable_controller_channels()
+        self._require_status(self._sdk_call(self._sdk.set_cap, self._cap_nf), "set_cap")
 
     def configure_motion(
         self,
@@ -114,20 +157,24 @@ class MCNewtonXYZStageController:
         mode: str | None = None,
         units: str | None = None,
     ) -> None:
-        """Configure controller motion parameters from the MC.Newton command set."""
+        self._ensure_connected()
+        assert self._sdk is not None
 
         if units is not None:
             normalized_units = units.strip().lower()
-            if normalized_units not in {"mm", "angle"}:
+            if normalized_units == "mm":
+                self._require_status(self._sdk_call(self._sdk.change_units_mm), "change_units_mm")
+            elif normalized_units == "angle":
+                self._require_status(self._sdk_call(self._sdk.change_units_angle), "change_units_angle")
+            else:
                 raise ValueError("units must be 'mm' or 'angle'.")
-            self._send(f"[changeunits:{normalized_units}]")
 
         if mode is not None:
             normalized_mode = mode.strip().lower()
             if normalized_mode == "slide":
-                self._send("[-slid-]")
+                self._require_status(self._sdk_call(self._sdk.move_slid), "move_slid")
             elif normalized_mode == "step":
-                self._send("[-step-]")
+                self._require_status(self._sdk_call(self._sdk.move_step), "move_step")
             else:
                 raise ValueError("mode must be 'slide' or 'step'.")
 
@@ -135,13 +182,14 @@ class MCNewtonXYZStageController:
             voltage = int(voltage_v)
             if voltage < 0 or voltage > 999:
                 raise ValueError("voltage_v must be between 0 and 999.")
-            self._send(f"[volt:+{voltage:03d}V]")
+            self._require_status(self._sdk_call(self._sdk.set_volt, voltage), "set_volt")
 
         if frequency_hz is not None:
             frequency = int(frequency_hz)
             if frequency <= 0 or frequency > 99999:
                 raise ValueError("frequency_hz must be between 1 and 99999.")
-            self._send(f"[freq:{frequency:05d}Hz]")
+            self._require_status(self._sdk_call(self._sdk.set_freq, frequency), "set_freq")
+        self._configured_axis_profiles.clear()
 
     def apply_fast_move_profile(
         self,
@@ -151,16 +199,9 @@ class MCNewtonXYZStageController:
         mode: str = "slide",
         units: str = "mm",
         z_voltage_v: int = 30,
-        z_frequency_hz: int = 500,
+        z_frequency_hz: int = 750,
         z_mode: str = "step",
     ) -> None:
-        """Apply movement profiles.
-
-        The programming guide example uses 500 Hz; this profile uses 2000 Hz
-        for X/Y, while Z uses a conservative step profile because its positive
-        motion underperformed with the XY slide profile.
-        """
-
         if voltage_v > 30:
             raise ValueError("fast move profile voltage_v must not exceed 30 V.")
         if frequency_hz > 2000:
@@ -175,20 +216,18 @@ class MCNewtonXYZStageController:
         self._axis_motion_profiles["x"] = xy_profile
         self._axis_motion_profiles["y"] = xy_profile
         self._axis_motion_profiles["z"] = z_profile
-        self._apply_axis_motion_profile("x")
+        self._configured_axis_profiles.clear()
 
     def disconnect(self) -> None:
-        if not self._connected:
+        if not self._connected or self._sdk is None:
             return
         if self._disable_on_disconnect:
-            for channel in sorted(self._enabled_channels):
-                try:
-                    self._send(f"[ch{channel}:0]")
-                except Exception:
-                    pass
-        if self._ser is not None:
-            self._ser.close()
-        self._connected = False
+            self._disable_controller_channels()
+        try:
+            self._sdk_call(self._sdk.disconnect)
+        finally:
+            self._sdk = None
+            self._connected = False
 
     def get_position_um(self) -> StagePosition:
         return StagePosition(
@@ -198,25 +237,31 @@ class MCNewtonXYZStageController:
         )
 
     def enable_only_axis(self, axis: str) -> None:
-        """Enable one axis channel and disable all other known stage channels."""
-
         self._select_axis(axis, disable_others=True)
 
     def disable_all_axes(self) -> None:
-        """Disable every stage channel currently known to be enabled."""
-
+        self._ensure_connected()
+        assert self._sdk is not None
         for channel in sorted(self._enabled_channels):
-            self._send(f"[ch{channel}:0]")
-            self._enabled_channels.discard(channel)
+            self._require_status(self._sdk_call(self._sdk.channel_set, channel, ChannelSwitch.OFF), "channel_set")
+        self._enabled_channels.clear()
 
     def get_axis_position_um(self, axis: str, *, preserve_enabled_channels: bool = False) -> float:
-        disable_others = False if preserve_enabled_channels else None
-        self._select_axis(axis, disable_others=disable_others)
-        response = self._send("[check:pos?]")
-        try:
-            return self._parse_position_um(response)
-        except (ValueError, AttributeError) as exc:
-            raise StageCommandError(f"Cannot parse {axis.upper()} position response: '{response}'") from exc
+        _ = preserve_enabled_channels
+        self._select_axis(axis, disable_others=True)
+        assert self._sdk is not None
+        status, position_mm = self._sdk_call(self._sdk.check_position)
+        self._require_status(status, f"check_position({axis})")
+        return float(position_mm) * 1000.0
+
+    def set_axis_target_tolerance_um(self, axis: str, tolerance_um: float) -> None:
+        key = axis.lower()
+        if key not in self._target_tolerances_um:
+            raise ValueError(f"Unsupported axis: {axis}")
+        tolerance = float(tolerance_um)
+        if tolerance <= 0:
+            raise ValueError("tolerance_um must be positive.")
+        self._target_tolerances_um[key] = tolerance
 
     def move_absolute_um(
         self,
@@ -228,9 +273,24 @@ class MCNewtonXYZStageController:
         targets = {"x": x_um, "y": y_um, "z": z_um}
         self._last_targets_um = {}
         for axis, target_um in targets.items():
+            if target_um is not None:
+                self._move_axis_absolute_um(axis, float(target_um))
+
+    def move_absolute_and_wait_um(
+        self,
+        *,
+        x_um: float | None = None,
+        y_um: float | None = None,
+        z_um: float | None = None,
+        timeout_ms: int,
+    ) -> None:
+        targets = {"x": x_um, "y": y_um, "z": z_um}
+        self._last_targets_um = {}
+        for axis, target_um in targets.items():
             if target_um is None:
                 continue
             self._move_axis_absolute_um(axis, float(target_um))
+            self.wait_settled(timeout_ms, axes={axis})
 
     def move_to_position_um(
         self,
@@ -238,13 +298,12 @@ class MCNewtonXYZStageController:
         *,
         timeout_ms: int,
     ) -> StagePosition:
-        """Move all axes to target, wait until settled, and return final position."""
-        self.move_absolute_um(
+        self.move_absolute_and_wait_um(
             x_um=target.x_um,
             y_um=target.y_um,
             z_um=target.z_um,
+            timeout_ms=timeout_ms,
         )
-        self.wait_settled(timeout_ms)
         return self.get_position_um()
 
     def move_relative_um(
@@ -268,12 +327,13 @@ class MCNewtonXYZStageController:
 
         target_axes = self._normalize_wait_axes(axes)
         t_start = time.monotonic()
-        corrections = {axis: 0 for axis in target_axes}
         previous = {axis: self.get_axis_position_um(axis, preserve_enabled_channels=True) for axis in target_axes}
-        while True:
-            time.sleep(0.050)
-            current = {axis: self.get_axis_position_um(axis, preserve_enabled_channels=True) for axis in target_axes}
 
+        while True:
+            time.sleep(0.100)
+            remaining = {axis: self.read_remaining_pulses(axis) for axis in target_axes}
+            current = {axis: self.get_axis_position_um(axis, preserve_enabled_channels=True) for axis in target_axes}
+            all_pulses_done = all(value <= 0 for value in remaining.values())
             all_stable = all(
                 abs(current[axis] - previous[axis]) < self._stability_tolerance_um
                 for axis in current
@@ -283,69 +343,38 @@ class MCNewtonXYZStageController:
                 for axis, target in self._last_targets_um.items()
                 if axis in target_axes
             )
-            if all_stable and all_reached:
+            if all_pulses_done and all_stable and all_reached:
                 return
-            if all_stable and not all_reached:
-                corrected = self._try_correct_stable_target_error(current, corrections)
-                if corrected:
-                    previous = {
-                        axis: self.get_axis_position_um(axis, preserve_enabled_channels=True)
-                        for axis in target_axes
-                    }
-                    continue
 
             previous = current
             elapsed_ms = (time.monotonic() - t_start) * 1000.0
             if elapsed_ms > timeout_ms:
                 current_text = ", ".join(f"{axis}={value:.3f}" for axis, value in current.items())
                 target_text = ", ".join(f"{axis}={value:.3f}" for axis, value in self._last_targets_um.items())
+                pulse_text = ", ".join(f"{axis}={value}" for axis, value in remaining.items())
                 delta_text = ", ".join(
                     f"{axis}={current[axis] - target:.3f}"
                     for axis, target in self._last_targets_um.items()
+                    if axis in current
                 )
                 tolerance_text = ", ".join(
                     f"{axis}={self._target_tolerances_um.get(axis, 1.0):.3f}"
                     for axis in self._last_targets_um
+                    if axis in target_axes
                 )
                 raise StageTimeoutError(
                     f"Stage did not settle within {timeout_ms} ms "
-                    f"(current {current_text}; target {target_text}; "
-                    f"delta {delta_text}; tolerance {tolerance_text})"
+                    f"(current {current_text}; target {target_text}; delta {delta_text}; "
+                    f"remaining pulses {pulse_text}; tolerance {tolerance_text})"
                 )
 
     def stop(self) -> None:
+        if self._sdk is None:
+            return
         try:
-            self._send("[stop]")
+            self._sdk_call(self._sdk.move_stop)
         except Exception:
             pass
-
-    def _normalize_wait_axes(self, axes: set[str] | None) -> set[str]:
-        if axes is None:
-            return set(self._last_targets_um)
-        normalized = {axis.lower() for axis in axes}
-        unknown = normalized.difference(self._channels)
-        if unknown:
-            raise ValueError(f"Unsupported wait axes: {sorted(unknown)}")
-        return normalized.intersection(self._last_targets_um)
-
-    def _try_correct_stable_target_error(
-        self,
-        current: dict[str, float],
-        corrections: dict[str, int],
-    ) -> bool:
-        corrected = False
-        for axis, current_um in current.items():
-            target_um = self._last_targets_um[axis]
-            error_um = target_um - current_um
-            reached = abs(error_um) < self._target_tolerances_um.get(axis, 1.0)
-            close_enough_to_retry = abs(error_um) <= self._settle_correction_threshold_um
-            can_retry = corrections[axis] < self._settle_correction_attempts
-            if reached or not close_enough_to_retry or not can_retry:
-                continue
-            corrections[axis] += 1
-            self._move_axis_absolute_um(axis, target_um)
-            corrected = True
-        return corrected
 
     def move_axis_pulses(self, axis: str, pulses: int) -> None:
         if pulses == 0:
@@ -354,8 +383,12 @@ class MCNewtonXYZStageController:
         if abs_pulses > 999999:
             raise ValueError("pulse count must be <= 999999")
         self._select_axis(axis)
-        sign = "+" if pulses > 0 else "-"
-        self._send(f"[{sign}:{abs_pulses:06d}]", wait_ms=self._move_cmd_wait_ms)
+        assert self._sdk is not None
+        if pulses > 0:
+            status = self._sdk_call(self._sdk.move_open_pulse_positive, abs_pulses)
+        else:
+            status = self._sdk_call(self._sdk.move_open_pulse_negative, abs_pulses)
+        self._require_status(status, "move_open_pulse")
         self._last_pulse_axes.add(axis.lower())
 
     def move_relative_pulses(
@@ -369,15 +402,11 @@ class MCNewtonXYZStageController:
             self.move_axis_pulses(axis, pulses)
 
     def read_remaining_pulses(self, axis: str) -> int:
-        self._select_axis(axis)
-        response = self._send("[read:pulse?]")
-        text = response.strip().replace("[", "").replace("]", "")
-        try:
-            return int(text)
-        except ValueError as exc:
-            raise StageCommandError(
-                f"Cannot parse {axis.upper()} remaining pulse response: '{response}'"
-            ) from exc
+        self._select_axis(axis, disable_others=True)
+        assert self._sdk is not None
+        status, pulse = self._sdk_call(self._sdk.read_pulse)
+        self._require_status(status, f"read_pulse({axis})")
+        return int(pulse)
 
     def wait_pulses_complete(self, timeout_ms: int) -> None:
         if not self._last_pulse_axes:
@@ -397,49 +426,66 @@ class MCNewtonXYZStageController:
                     f"Stage pulses did not complete within {timeout_ms} ms "
                     f"(remaining {remaining_text})"
                 )
-            time.sleep(0.050)
+            time.sleep(0.100)
 
     def _move_axis_absolute_um(self, axis: str, target_um: float) -> None:
-        current_um = self.get_axis_position_um(axis, preserve_enabled_channels=True)
-        distance_um = target_um - current_um
-        step_um = self._segmented_move_step_um
-        if (
-            self._segmented_move_threshold_um > 0
-            and step_um > 0
-            and abs(distance_um) > self._segmented_move_threshold_um
-        ):
-            direction = 1.0 if distance_um > 0 else -1.0
-            next_target_um = current_um
-            while abs(target_um - next_target_um) > step_um:
-                next_target_um += direction * step_um
-                self._send_axis_movetarget(axis, next_target_um)
-                time.sleep(0.050)
-        self._send_axis_movetarget(axis, target_um)
-        self._last_targets_um[axis] = target_um
-
-    def _send_axis_movetarget(self, axis: str, target_um: float) -> None:
-        self._apply_axis_motion_profile(axis)
         self._select_axis(axis)
+        self._apply_axis_motion_profile(axis)
         target_mm = target_um / 1000.0
-        self._send(f"[movetarget:{target_mm:.6f}]", wait_ms=self._move_cmd_wait_ms)
+        self._send_move_target_mm(axis, target_mm)
+        self._last_targets_um[axis.lower()] = target_um
+
+    def _normalize_wait_axes(self, axes: set[str] | None) -> set[str]:
+        if axes is None:
+            return set(self._last_targets_um)
+        normalized = {axis.lower() for axis in axes}
+        unknown = normalized.difference(self._channels)
+        if unknown:
+            raise ValueError(f"Unsupported wait axes: {sorted(unknown)}")
+        return normalized.intersection(self._last_targets_um)
 
     def _apply_axis_motion_profile(self, axis: str) -> None:
         key = axis.lower()
         if key not in self._axis_motion_profiles:
             raise ValueError(f"Unsupported axis: {axis}")
         profile = self._axis_motion_profiles[key]
-        if self._active_motion_profile == profile:
+        if self._configured_axis_profiles.get(key) == profile:
             return
         units, mode, voltage_v, frequency_hz = profile
+        assert self._sdk is not None
+        self._require_status(self._sdk_call(self._sdk.set_cap, self._cap_nf), f"set_cap({axis})")
         self.configure_motion(
             units=units,
             mode=mode,
             voltage_v=voltage_v,
             frequency_hz=frequency_hz,
         )
-        self._active_motion_profile = profile
+        self._configured_axis_profiles[key] = profile
+
+    def _send_move_target_mm(self, axis: str, target_mm: float) -> None:
+        assert self._sdk is not None
+        status, response = self._sdk_call(self._sdk.move_close_target, target_mm)
+        tolerated_empty_target_error = (
+            status == MFMCNewtonStatus.TargetSetError
+            and not response
+        )
+        self.last_move_commands.append({
+            "axis": axis.lower(),
+            "method": "sdk.move_close_target",
+            "target_mm": target_mm,
+            "status": getattr(status, "name", str(status)),
+            "response": str(response),
+            "tolerated": tolerated_empty_target_error,
+        })
+        if status == MFMCNewtonStatus.NoError or tolerated_empty_target_error:
+            return
+        raise StageCommandError(
+            f"move_close_target({axis}) failed with SDK status {status} and response {response!r}"
+        )
 
     def _select_axis(self, axis: str, *, disable_others: bool | None = None) -> None:
+        self._ensure_connected()
+        assert self._sdk is not None
         key = axis.lower()
         if key not in self._channels:
             raise ValueError(f"Unsupported axis: {axis}")
@@ -449,41 +495,41 @@ class MCNewtonXYZStageController:
         if disable_others:
             for enabled in sorted(self._enabled_channels):
                 if enabled != channel:
-                    self._send(f"[ch{enabled}:0]")
+                    self._require_status(
+                        self._sdk_call(self._sdk.channel_set, enabled, ChannelSwitch.OFF),
+                        "channel_set",
+                    )
                     self._enabled_channels.discard(enabled)
-        self._send(f"[ch{channel}:1]")
-        self._enabled_channels.add(channel)
-        time.sleep(self._channel_switch_wait_ms / 1000.0)
+        if channel not in self._enabled_channels:
+            self._require_status(self._sdk_call(self._sdk.channel_set, channel, ChannelSwitch.ON), "channel_set")
+            self._enabled_channels.add(channel)
+            time.sleep(self._channel_switch_wait_ms / 1000.0)
 
-    def _send(self, cmd: str, wait_ms: float | None = None) -> str:
-        if self._ser is None:
-            raise StageConnectionError("Serial port is not connected.")
-        if wait_ms is None:
-            wait_ms = self._default_cmd_wait_ms
-        try:
-            self._ser.reset_input_buffer()
-        except Exception:
-            pass
-        self._ser.write(cmd.encode("ascii"))
-        time.sleep(wait_ms / 1000.0)
-        chunks = []
-        deadline = time.monotonic() + self._response_collect_ms / 1000.0
-        while True:
-            chunk = self._ser.read_all()
-            if chunk:
-                chunks.append(chunk)
-                if b"]" in b"".join(chunks):
-                    break
-            elif not chunks:
-                break
-            if time.monotonic() >= deadline:
-                break
-            time.sleep(0.005)
-        return b"".join(chunks).decode("ascii", errors="replace").strip()
+    def _ensure_connected(self) -> None:
+        if not self._connected or self._sdk is None:
+            raise StageConnectionError("MC.Newton SDK is not connected.")
+
+    def _disable_controller_channels(self) -> None:
+        self._ensure_connected()
+        assert self._sdk is not None
+        for channel in range(1, 7):
+            try:
+                self._sdk_call(self._sdk.channel_set, channel, ChannelSwitch.OFF)
+            except Exception:
+                pass
+        self._enabled_channels.clear()
 
     @staticmethod
-    def _parse_position_um(response: str) -> float:
-        matches = re.findall(r"\[pos:([+-]?\d+(?:\.\d+)?)\]", response or "")
-        if not matches:
-            raise ValueError(response)
-        return float(matches[-1]) * 1000.0
+    def _call_sdk_class(factory: Callable[..., _T], *args: Any, **kwargs: Any) -> _T:
+        with contextlib.redirect_stdout(sys.stderr):
+            return factory(*args, **kwargs)
+
+    @staticmethod
+    def _sdk_call(call: Callable[..., _T], *args: Any, **kwargs: Any) -> _T:
+        with contextlib.redirect_stdout(sys.stderr):
+            return call(*args, **kwargs)
+
+    @staticmethod
+    def _require_status(status: Any, operation: str) -> None:
+        if status != MFMCNewtonStatus.NoError:
+            raise StageCommandError(f"{operation} failed with SDK status {status}")
