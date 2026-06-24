@@ -74,6 +74,7 @@ Use a 3-point hardware spec derived from task 02, then call `abort_run` after th
   },
   "domain": {
     "raman": {
+      "operationIntent": "acquire_only",
       "acquisition": {
         "integrationTimeS": 0.5,
         "accumulations": 1,
@@ -87,8 +88,7 @@ Use a 3-point hardware spec derived from task 02, then call `abort_run` after th
     "maxRuntimeMinutes": 3,
     "maxUnits": 3,
     "stopOnError": true
-  },
-  "operatorApprovalRequired": false
+  }
 }
 ```
 
@@ -108,4 +108,3 @@ Do not proceed to larger maps until:
 - Task 05 has demonstrated abort behavior.
 - The operator has reviewed artifacts and confirmed no visible sample damage.
 - Any increase in laser power, exposure, grid size, or map area is encoded as a new `ExperimentSpec`.
-

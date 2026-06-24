@@ -17,9 +17,9 @@ Use pi-agent only through bounded experiment tools:
 ```text
 compile task inputs into ExperimentSpec
   -> validate_experiment_spec
-  -> run_preflight
-  -> operator review and approval for hardware
-  -> run_experiment
+  -> run_preflight (+ hardwareExecution preview for real-hardware backend checks)
+  -> optional operator / traceability review
+  -> run_experiment with hardwareExecution
   -> poll_run while hardware run is active
   -> analyze_run
   -> plan_next_experiment only after analysis
@@ -45,8 +45,8 @@ Only task 04 is the first real mapping task. Tasks 01-03 exist to keep the mappi
 A task passes only if:
 
 - The executed spec is saved under `.pi/experiment-runs`.
-- Hardware execution references a matching dry-run preflight report.
-- Operator approval records confirmed Raman laser power.
+- Real-hardware backend settings were previewed in `run_preflight` before launch.
+- Hardware launch stayed inside the bounded Z and laser-power envelope.
 - Every point has position metadata and either a spectrum artifact or a structured error.
 - `analyze_run` is executed before any next run is planned.
 - Abort or failure leaves the system in a state where the operator can inspect partial records.
@@ -66,4 +66,3 @@ Start conservatively until the film damage threshold is known:
 | Stop on error | true for first hardware tasks |
 
 Longer exposure or higher power is a follow-up experiment, not an ad-hoc change during a run.
-

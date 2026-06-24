@@ -42,6 +42,15 @@ The recorded lab session that motivated these issues is:
 5. Keep the old `ER-*.md` files as detailed implementation notes until the 3
    top-level issues are closed.
 
+## Focused implementation checklists
+
+- `CHECKLIST-safety-alignment-and-bridge-asserts.md`
+  - Goal: resolve the current safety-contract drift and add bridge-side runtime
+    autofocus motion assertions before further Raman MVP simplification.
+  - Covers:
+    - `ISSUE-01` launch-path self-consistency and planner visibility
+    - `ISSUE-03` autofocus safety/runtime semantics
+
 ## Suggested labels
 
 - Area:
@@ -102,4 +111,3 @@ powershell -ExecutionPolicy Bypass -File .\assets\issues\import-github-issues.ps
 - Dependency metadata such as `Depends on` / `Blocks` is preserved in the issue
   body and echoed in the local result map; GitHub native dependency linking is
   not created automatically.
-

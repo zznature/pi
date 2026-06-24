@@ -9,7 +9,7 @@ Verify that pi-agent can compile and preflight a Raman mapping `ExperimentSpec` 
 1. Compile the task inputs into a `dry_run` `ExperimentSpec`.
 2. Call `validate_experiment_spec` with the spec.
 3. Call `run_preflight` with the same spec.
-4. Save the returned dry-run report ID for later hardware approval.
+4. Save the returned dry-run report ID if your lab wants to keep a traceable dry-run reference for the later hardware run.
 
 Do not call `run_experiment` for this task. `dry_run` is preflight-only.
 
@@ -27,7 +27,7 @@ Do not call `run_experiment` for this task. `dry_run` is preflight-only.
 
 ## ExperimentSpec Template
 
-The matching hardware spec must keep all fields identical except `mode` and `operatorApprovalRequired`.
+The matching hardware spec should keep the scientific intent identical and change only the execution mode.
 
 ```json
 {
@@ -70,6 +70,7 @@ The matching hardware spec must keep all fields identical except `mode` and `ope
   },
   "domain": {
     "raman": {
+      "operationIntent": "acquire_only",
       "acquisition": {
         "integrationTimeS": 0.5,
         "accumulations": 1,
@@ -83,8 +84,7 @@ The matching hardware spec must keep all fields identical except `mode` and `ope
     "maxRuntimeMinutes": 2,
     "maxUnits": 2,
     "stopOnError": true
-  },
-  "operatorApprovalRequired": false
+  }
 }
 ```
 
@@ -94,7 +94,7 @@ The matching hardware spec must keep all fields identical except `mode` and `ope
 - `run_preflight` returns success.
 - Preflight `willNotExecute` includes stage motion, Raman acquisition, laser power change, and instrument writes.
 - A preflight report exists under `.pi/experiment-runs/preflights`.
-- The report exposes a `specHash` that can be used for the matching hardware gate.
+- The report exposes a `specHash` that can be reused as traceability evidence for the matching hardware run.
 
 ## Fail Criteria
 
@@ -103,4 +103,3 @@ The matching hardware spec must keep all fields identical except `mode` and `ope
 - Planned point count exceeds `limits.acquisition.maxUnits` or `stoppingRules.maxUnits`.
 - Runtime estimate exceeds `stoppingRules.maxRuntimeMinutes`.
 - Live read-only probe cannot access required bridge paths or hardware readiness signals.
-

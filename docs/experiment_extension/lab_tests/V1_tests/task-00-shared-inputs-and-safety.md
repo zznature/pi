@@ -35,7 +35,7 @@ Collect the minimum information required before pi-agent is allowed to compile o
 - Use `stopOnError: true` for first hardware contact with the sample.
 - Use `maxConsecutiveErrors: 2` or lower until stage, LabSpec, and file bridge behavior are validated.
 
-## pi-agent HardwarePilot Template
+## pi-agent hardwareExecution Template
 
 Use this structure with `run_experiment` for hardware tasks. Replace IDs and paths with the actual lab values.
 
@@ -45,6 +45,7 @@ Use this structure with `run_experiment` for hardware tasks. Replace IDs and pat
   "stagePort": "COM17",
   "stagePython": "python",
   "raman": {
+    "laserPowerMw": 0.2,
     "acquisitionBackend": "labspec_file_bridge",
     "autofocusBackend": "labspec_file_bridge",
     "xyCorrectionBackend": "phase_correlation",
@@ -55,10 +56,7 @@ Use this structure with `run_experiment` for hardware tasks. Replace IDs and pat
   },
   "settleTimeoutMs": 5000,
   "heartbeatTimeoutMs": 10000,
-  "maxConsecutiveErrors": 2,
-  "raman": {
-    "laserPowerMw": 0.2
-  }
+  "maxConsecutiveErrors": 2
 }
 ```
 
@@ -71,3 +69,4 @@ Use this structure with `run_experiment` for hardware tasks. Replace IDs and pat
 - The full planned XY area stays inside the operator-approved region.
 - No planned Raman Z motion exceeds `limits.motion.zUm.maxUm`.
 - Emergency stop and shutter behavior are verified before hardware run.
+- If the lab records `coordinateAuditId`, `v2ValidationId`, or operator approval payloads, treat them as readiness / traceability evidence rather than launch blockers.

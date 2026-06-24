@@ -10,9 +10,8 @@ This task is not a mapping task. It is a single- or two-point hardware pilot.
 
 1. Use the same spec body as task 01, but set:
    - `mode: "hardware"`
-   - `operatorApprovalRequired: true`
-2. Ensure task 01 passed with the matching dry-run preflight report.
-3. Call `run_experiment` with the hardware spec and `hardwarePilot`.
+2. Ensure task 01 passed so the backend/settings preview was already checked.
+3. Call `run_experiment` with the hardware spec and `hardwareExecution`.
 4. Call `poll_run` until the run reaches a terminal state.
 5. Call `analyze_run` with the returned `runId`.
 
@@ -28,7 +27,7 @@ This task is not a mapping task. It is a single- or two-point hardware pilot.
 
 ## Hardware ExperimentSpec
 
-Keep this spec identical to task 01 except for `mode` and `operatorApprovalRequired`.
+Keep this spec identical to task 01 except for `mode`.
 
 ```json
 {
@@ -71,6 +70,7 @@ Keep this spec identical to task 01 except for `mode` and `operatorApprovalRequi
   },
   "domain": {
     "raman": {
+      "operationIntent": "acquire_only",
       "acquisition": {
         "integrationTimeS": 0.5,
         "accumulations": 1,
@@ -84,12 +84,11 @@ Keep this spec identical to task 01 except for `mode` and `operatorApprovalRequi
     "maxRuntimeMinutes": 2,
     "maxUnits": 2,
     "stopOnError": true
-  },
-  "operatorApprovalRequired": true
+  }
 }
 ```
 
-## HardwarePilot Parameters
+## hardwareExecution Parameters
 
 Use the shared template from task 00. Required fields for this task:
 
@@ -97,6 +96,10 @@ Use the shared template from task 00. Required fields for this task:
 - `stagePort`
 - `raman.acquisitionBackend: "labspec_file_bridge"`
 - `raman.labspecBridgeDir`
+- `raman.laserPowerMw <= limits.powerEnergy.maxLaserPowerMw`
+
+Optional traceability metadata:
+
 - `approval.dryRunReportId`
 - `approval.ramanSafety.laserPowerConfirmed: true`
 - `approval.ramanSafety.confirmedLaserPowerMw <= limits.powerEnergy.maxLaserPowerMw`

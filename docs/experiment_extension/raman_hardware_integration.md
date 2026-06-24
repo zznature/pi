@@ -171,7 +171,7 @@ interface HardwareActionContract {
 | G5 | 已完成 | microstep snapshot、resume/reconcile、artifact 对账已落地。`test:raman-v2-resume` 已覆盖 resume/pause/abort 分支。 |
 | G6 | 已完成 | TS 侧 unit orchestration、恢复点管理，以及 autofocus / XY correction / spectrum 的 bridge-backed action integration 已落地。`test:raman-v2-orchestrator` 与 `test:raman-v2-hardware-run` 已覆盖编排、恢复点和 LabSpec file-bridge 路径。 |
 | G7 | 已完成（仅 fake thermal） | thermal domain、resource lease 和 wait 语义已接入 V2；但当前 real runtime 仍拒绝 thermal waiting，因此这不等于 real thermal parity 已完成。 |
-| G8.1-G8.4 | 已完成 | `v2ValidationId` gate、parity checks、`validatedCoverage`、spec pair / payload draft / readiness tooling、runbook 和 `sample_registry` 已补齐。`test:raman-v2-validation` 当前为 18/18 通过。 |
+| G8.1-G8.4 | 已完成 | parity checks、`validatedCoverage`、spec pair / payload draft / readiness tooling、runbook 和 `sample_registry` 已补齐。`v2ValidationId` 当前作为 traceability metadata，而非 MVP launch gate。 |
 | G8.5 | 未完成 | 还没有首份 production-ready 的 **real-hardware** V2 validation record。当前缺口不在架构，而在现场证据链。 |
 | G8.6 | 未开始 | 在 G8.5 完成前，不应冻结或删除 V1；当前仍需保留 operator-only fallback。 |
 
@@ -179,7 +179,7 @@ interface HardwareActionContract {
 
 | Goal ID | 当前建议的 `/goal` objective | 完成定义 |
 | --- | --- | --- |
-| G8.5 | `Produce the first production-ready V2 Raman validation record on real hardware so future mc_newton_xyz + v2_bridge runs can pass the v2ValidationId gate.` | 形成一份带 `workflowBackend: "v2_bridge"`、可被 `raman_check_hardware_validation` 判定为 production-ready 的真实 validation record。 |
+| G8.5 | `Produce the first production-ready V2 Raman validation record on real hardware as optional traceability for future mc_newton_xyz + v2_bridge runs.` | 形成一份带 `workflowBackend: "v2_bridge"`、可被 `raman_check_hardware_validation` 判定为 production-ready 的真实 validation record。 |
 | G8.6 | `Freeze the V1 Raman bridge behind operator-only fallback after the real-hardware V2 validation evidence is accepted.` | 默认真实路径切到 `v2_bridge`，V1 仅保留 operator fallback，并同步更新迁移说明与测试。 |
 
 对当前阶段还应明确两点：
@@ -288,9 +288,7 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
       "approved": true,
       "ramanSafety": {
         "laserPowerConfirmed": true,
-        "confirmedLaserPowerMw": 1,
-        "labSpecWorkerReady": true,
-        "windowsPowerPolicyReady": true
+        "confirmedLaserPowerMw": 1
       },
       "notes": "Operator-approved active smoke probe for current real-capable Raman V2 validation."
     },
@@ -346,7 +344,7 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
 - `.pi/experiment-runs/runs/<runId>/resume.snapshot.json`
 - autofocus curve / reference frame / phase-correlation 中间 artifact
 
-对 **首份** current real-capable V2 minimum run，当前 runtime 允许一个受控的 operator-only bootstrap 入口：如果还没有任何 production-ready `v2ValidationId`，可以在 `hardwareExecution.approval.bootstrapV2ValidationRun` 中显式设为 `true`，仅用于生成这次最小验证 run 的证据链。这个 flag 不是通用豁免；一旦首份 production-ready validation record 生成，后续真实 V2 run 必须改为显式提供 `hardwareExecution.raman.v2ValidationId`。
+对 **首份** current real-capable V2 minimum run，`hardwareExecution.approval.bootstrapV2ValidationRun` 现在只作为 traceability metadata：如果实验室想显式区分“首份验证 run”，可以设置它；不设置也不会阻断 MVP launch。后续真实 V2 run 也可以选择附带 `hardwareExecution.raman.v2ValidationId` 作为证据链引用，但它不再是 runtime gate。
 
 首份 bootstrap minimum run 可直接参考下面这类调用：
 
@@ -374,9 +372,7 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
         "bootstrapV2ValidationRun": true,
         "ramanSafety": {
           "laserPowerConfirmed": true,
-          "confirmedLaserPowerMw": 1,
-          "labSpecWorkerReady": true,
-          "windowsPowerPolicyReady": true
+          "confirmedLaserPowerMw": 1
         }
       }
     }
@@ -384,11 +380,11 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
 }
 ```
 
-如果现场并不是跑“首份” real V2 minimum run，而是在已有 production-ready validation record 之后做普通真实 V2 运行，就不要再设置 `bootstrapV2ValidationRun`。
+如果现场并不是跑“首份” real V2 minimum run，而是在已有 production-ready validation record 之后做普通真实 V2 运行，就没必要再设置 `bootstrapV2ValidationRun`，除非实验室希望保留这类 provenance 标记。
 
 ### Step 6. 人工审阅与 validation record 固化
 
-operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation`。这一步不是重新跑硬件，而是把证据链固定成一份可以被 runtime gate 读取的 validation record。
+operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation`。这一步不是重新跑硬件，而是把证据链固定成一份可供后续 readiness review、traceability 复核，以及可选 `v2ValidationId` 引用的 validation record。
 
 如果现场想先把字段拼装成一份可审阅草稿，再逐项确认 checklist / approval / hardware attestation，建议先调用 `raman_prepare_hardware_validation_payload` 生成 draft payload，然后再把审阅后的最终值提交给 `raman_record_hardware_validation`。
 
@@ -430,7 +426,7 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
 - 如果 thermal 参与，记录温控稳定判据
 - 如果做了异常重试，记录重试是否影响证据可信度
 
-当前 validation record 还会显式固化 `validatedCoverage` 元数据，用来声明这份 record 实际验证过哪些能力面（如 autofocus、XY correction、thermal wait、acquisition）。后续 `raman_check_hardware_validation` 和 runtime gate 都会复核该字段与最小 run spec 是否一致。
+当前 validation record 还会显式固化 `validatedCoverage` 元数据，用来声明这份 record 实际验证过哪些能力面（如 autofocus、XY correction、thermal wait、acquisition）。后续 `raman_check_hardware_validation` 会复核该字段与最小 run spec 是否一致；当前 MVP launch runtime 不把这类 validation metadata 当作放行 gate。
 
 当 operator 已完成人工确认后，最终提交给 `raman_record_hardware_validation` 的 payload 形状应接近下面这样：
 
@@ -478,9 +474,9 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
 }
 ```
 
-### Step 7. 用 `v2ValidationId` 绑定未来真实 V2 运行
+### Step 7. 可选地用 `v2ValidationId` 绑定未来真实 V2 运行
 
-只有当 validation record 满足以下条件时，才能作为真实 `v2_bridge` 运行的 gate evidence：
+只有当 validation record 满足以下条件时，它才适合作为真实 `v2_bridge` 运行的高质量 traceability evidence：
 
 - `productionReady === true`
 - `issues.length === 0`
@@ -503,7 +499,7 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
 }
 ```
 
-而在首份 production-ready validation record 生成之后，后续真实 V2 run 应切换为下面这种形状，不再使用 `bootstrapV2ValidationRun`：
+而在首份 production-ready validation record 生成之后，后续真实 V2 run 如果希望显式引用这份证据链，可以切换为下面这种形状，不再使用 `bootstrapV2ValidationRun`：
 
 ```json
 {
@@ -529,9 +525,7 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
         "dryRunReportId": "<dry-run-report-id>",
         "ramanSafety": {
           "laserPowerConfirmed": true,
-          "confirmedLaserPowerMw": 1,
-          "labSpecWorkerReady": true,
-          "windowsPowerPolicyReady": true
+          "confirmedLaserPowerMw": 1
         }
       }
     }
@@ -544,11 +538,11 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
 - 可以保留 thermal 作为 future full-surface parity 目标
 - 但当前 `G8.5` 的真实硬件 production-ready validation record，不应宣称已经完成 real thermal parity
 
-之后的真实 V2 run 必须在 `hardwareExecution.raman.v2ValidationId` 中显式引用这份 validation record。
+之后的真实 V2 run 可以在 `hardwareExecution.raman.v2ValidationId` 中显式引用这份 validation record，作为 readiness / traceability evidence。
 
 ## G8 最小证据包
 
-下面是当前 schema 下，一份可被 `v2ValidationId` 引用的最小证据包。它不是“所有可能文件”，而是 runtime gate 和人工审核都必须能追溯到的最小集合。
+下面是当前 schema 下，一份可被 `v2ValidationId` 引用的最小证据包。它不是“所有可能文件”，而是 traceability 与人工审核都建议能追溯到的最小集合。
 
 
 | 证据对象                     | 当前字段                                 | 最低要求                                                                                                       | 典型归档位置                                                                      |
@@ -557,7 +551,7 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
 | Active probe record      | `evidence.activeProbeRecordPath`     | operator-approved；包含真实 frame + spectrum smoke；不得是 fake/synthetic backend                                   | `.pi/experiment-runs/maintenance/active-probes/<probeId>/active-probe.json` |
 | Minimum Raman run        | `evidence.minimumRamanRunId`         | real MC.Newton + `workflowBackend: "v2_bridge"` + `labspec_file_bridge` spectrum metadata + completed unit | `.pi/experiment-runs/runs/<runId>/`                                         |
 | XY calibration           | `evidence.xyCalibrationId`           | 仅当 `xyCorrection` 启用时必需；不得伪造                                                                               | `.pi/experiment-runs/lab/calibrations/<id>.json`                            |
-| Workflow backend binding | `evidence.workflowBackend`           | 对真实 V2 gate 必须是 `"v2_bridge"`                                                                              | validation record 内字段                                                       |
+| Workflow backend binding | `evidence.workflowBackend`           | 对真实 V2 traceability evidence 必须是 `"v2_bridge"`                                                             | validation record 内字段                                                       |
 | Hardware observation     | `hardwareEvidence.*`                 | `evidenceMode: "hardware"`、`operatorAttestedRealHardware: true`、真实 instrument IDs、有效 observedAt            | validation record 内字段                                                       |
 | Safety checklist         | `checklist.*`                        | 全部 operator 确认，包括 laser power、LabSpec worker、camera、stage、Windows 电源策略、artifact review                     | validation record 内字段                                                       |
 
@@ -625,4 +619,4 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
 - Python Bridge 拒绝冲突命令，并能在 stop/cancel 时执行 best-effort 安全动作。
 - fake bridge 回归覆盖：autofocus 中途 crash、move 后 capture 前恢复、acquire 中途 abort、并发 motion/acquisition 被拒绝。
 - 真实硬件验收前，不删除 V1 `raman_bridge.py`；V2 与 V1 双轨记录必须能被同一 `analyze_run` 聚合。
-- G8 的 production-ready 证据必须显式包含 `workflowBackend: "v2_bridge"` 的 minimum Raman run validation record；真实硬件 `v2_bridge` 运行必须提供 `hardwareExecution.raman.v2ValidationId`，避免把 V1 smoke record 或未审核 run record 误判为 V2 parity。
+- G8 的 production-ready 证据应显式包含 `workflowBackend: "v2_bridge"` 的 minimum Raman run validation record；真实硬件 `v2_bridge` 运行可以提供 `hardwareExecution.raman.v2ValidationId` 作为 traceability evidence，避免把 V1 smoke record 或未审核 run record 误判为 V2 parity。

@@ -21,10 +21,10 @@
 
 - 研究人员用自然语言提出实验目标，agent 编译为可验证的 bounded `ExperimentSpec`；
   kernel 只执行该规格。
-- 所有实验工具调用经 schema、policy、preflight、operator approval 约束；任意一次 run
-  可从磁盘记录完整重建。
+- 所有实验工具调用经 schema、policy、preflight 和运行记录约束；任意一次 run 可从
+  磁盘记录完整重建。
 - simulation、dry_run、hardware 三种模式在同一 kernel 接口背后可替换，默认 simulation；
-  hardware 必须经同一 canonical `specHash` 的 dry-run gate 加 operator approval。
+  MVP Raman hardware launch 只阻断 backend executability 与最小 Z/power damage gate。
 - 长 run 与 LLM 解耦：启动即返回、事件驱动唤醒、planner 不轮询。
 - 实验管理抽象为 experiment/campaign、run、resource lease、artifact、approval、lineage，
   避免 schema 绑定某一种仪器流程。
@@ -157,7 +157,7 @@ machine：`idle | active(runId) | paused(runId) | recovering(runId)`），否则
 kernel 唯一接受的执行输入。必备字段保持最小：`schemaVersion`、`specId`、
 `experimentType`、`objective`、`subject`、`mode`(`simulation | dry_run | hardware`)、
 `resources`、`limits`（motion/power/acquisition/duration/cost/sample budget 统一限制块）、
-`plan`（`grid`/`points`/`steps` 互斥）、`stoppingRules`、`operatorApprovalRequired`。
+`plan`（`grid`/`points`/`steps` 互斥）、`stoppingRules`。
 仪器特定参数（focus 策略、标定策略、采集参数等）放 `domain` 扩展块，typed 而非
 free-form passthrough。
 
@@ -266,10 +266,12 @@ pause_run / abort_run / request_operator -> 写 intent，kernel 在安全 unit �
 - **Dry Run**：连接真实设备但零运动/采集/功率写入。验证 adapter 可达、calibration 存在、
   limits 满足、输出目录可写、abort/intents 路径存在、lease 可获得，并把 canonical
   `specHash` 与 capability snapshot 写入 preflight report。
-- **Hardware Run** 必须满足：`mode = hardware`；同一 canonical `specHash` 的 dry run 已
-  通过；`operatorApprovalRequired = true` 且 operator 明确确认（approval record 绑定
-  `specHash`、capability snapshot 和 hardware risk summary）；watchdog 已启动或明确降级
-  为 operator-only monitoring。
+- **Hardware Run** 必须满足：`mode = hardware`，且 launch backend 对当前 spec
+  可执行；同时最小 Raman 安全门只检查两条不可逆损伤不变式：
+  `limits.motion.zUm.maxUm`（撞物镜上限）与
+  `limits.powerEnergy.maxLaserPowerMw`（烧样功率上限）。
+  dry-run report、operator approval、coordinate audit、V2 validation record 可作为
+  readiness / traceability evidence 保留，但不作为当前 MVP Raman launch blocker。
 
 ## Watchdog
 

@@ -77,6 +77,7 @@ This template uses autofocus on every point and leaves XY correction disabled. E
   },
   "domain": {
     "raman": {
+      "operationIntent": "autofocus_then_acquire",
       "autofocus": {
         "enabled": true,
         "every": { "kind": "everyNPoints", "n": 1 },
@@ -103,8 +104,7 @@ This template uses autofocus on every point and leaves XY correction disabled. E
     "maxRuntimeMinutes": 4,
     "maxUnits": 3,
     "stopOnError": true
-  },
-  "operatorApprovalRequired": false
+  }
 }
 ```
 

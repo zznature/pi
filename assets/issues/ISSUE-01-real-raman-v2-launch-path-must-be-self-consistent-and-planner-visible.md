@@ -1,5 +1,9 @@
 # ISSUE-01: Real Raman V2 launch path must be self-consistent and planner-visible
 
+Status note: historical issue, superseded for the current MVP branch by
+`docs/experiment_extension/mvp_safety_contract.md` and
+`assets/issues/CHECKLIST-safety-alignment-and-bridge-asserts.md`.
+
 ## Suggested metadata
 
 - Type: Epic
@@ -32,14 +36,14 @@ operator most needs the system to be explicit.
 
 ## Scope
 
-This top-level issue merges the intent of:
+This top-level issue merged the intent of:
 
-- `ER-01`: mirror the real Raman V2 evidence gate in `run_preflight`
-- `ER-02`: inject first-run bootstrap vs. `v2ValidationId` knowledge into the
+- `ER-01`: mirror real Raman launch readiness in `run_preflight`
+- `ER-02`: expose first-run bootstrap vs. `v2ValidationId` evidence handling to
   planner prompt and tool guidance
 - `ER-03`: require the planner to branch before real V2 launch instead of
   issuing guaranteed-failure launch calls
-- `ER-05`: return a dedicated validation-evidence error code instead of a
+- `ER-05`: return a dedicated readiness/validation-evidence error code instead of a
   misleading simulated-hardware code
 
 ## Why this matters
@@ -52,26 +56,28 @@ This top-level issue merges the intent of:
 
 ## Proposed implementation checklist
 
-- Make `run_preflight` report launch-path readiness for real Raman V2 runs, not
-  only dry-run reachability.
-- Reuse one shared Raman V2 gate rule source between preflight and launch.
-- Inject an explicit first-run rule:
-  - first supervised real V2 run may use bootstrap approval
-  - later real V2 runs must provide `hardwareExecution.raman.v2ValidationId`
-- Prevent the planner from calling `run_experiment` for real V2 launch until
-  that branch is resolved.
-- Introduce a dedicated error code for Raman V2 validation-evidence failures.
+- Make `run_preflight` report launch-path backend executability for real Raman
+  V2 runs, not only dry-run reachability.
+- Reuse one shared Raman launch-readiness rule source between preflight and
+  launch.
+- Keep bootstrap / `v2ValidationId` / coordinate-audit evidence visible to the
+  operator and planner as readiness or traceability metadata, without reviving
+  them as MVP Raman launch blockers.
+- Prevent the planner from calling `run_experiment` with a hardwareExecution
+  preview that is already known to fail backend executability.
+- Introduce or preserve operator-meaningful runtime error surfaces for
+  readiness failures vs. damage-gate failures.
 
 ## Acceptance criteria
 
-- A real `v2_bridge` Raman spec with missing V2 validation evidence is visible
-  as not launch-ready before the final launch attempt.
+- A real `v2_bridge` Raman spec with backend-mismatched execution settings is
+  visible as not launch-ready before the final launch attempt.
 - The planner no longer emits the previously observed guaranteed-failure launch
   call shape.
-- The system prompt and `run_experiment` tool guidance explicitly teach the
-  bootstrap vs. `v2ValidationId` branch.
-- Validation-evidence failures are distinguishable from simulated-hardware
-  failures.
+- The system prompt and `run_experiment` tool guidance no longer teach
+  traceability metadata as MVP launch blockers.
+- Readiness failures are distinguishable from simulated-hardware failures and
+  from bounded damage-gate failures.
 - Regression coverage exists for the recorded session path.
 
 ## Relevant files
@@ -87,6 +93,7 @@ This top-level issue merges the intent of:
 ## Notes
 
 - Keep the agent simple by fixing contract visibility first.
-- Do not push more domain branching into prompt text than necessary once the
-  runtime and preflight contract are aligned.
-
+- Current MVP Raman contract is narrower than the earlier issue draft:
+  backend executability plus the two bounded damage invariants are the launch
+  gate; coordinate audit, bootstrap flags, and `v2ValidationId` remain
+  readiness / traceability evidence.

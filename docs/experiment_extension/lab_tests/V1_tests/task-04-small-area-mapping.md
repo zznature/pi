@@ -11,9 +11,9 @@ This task validates the core user goal: pi-agent can complete a bounded Raman ma
 1. Compile a small-grid `dry_run` spec.
 2. Call `validate_experiment_spec`.
 3. Call `run_preflight`.
-4. Review the dry-run report and approve hardware.
-5. Compile the matching hardware spec with only `mode` and `operatorApprovalRequired` changed.
-6. Call `run_experiment` with `hardwarePilot`.
+4. Review the dry-run report and any optional traceability evidence your lab keeps.
+5. Compile the matching hardware spec with only `mode` changed.
+6. Call `run_experiment` with `hardwareExecution`.
 7. Use `poll_run` while active.
 8. Call `analyze_run`.
 9. Only after analysis, use `plan_next_experiment` to decide whether to increase area, integration time, or point count.
@@ -79,6 +79,7 @@ This is the first mapping task. Keep the initial grid small.
   },
   "domain": {
     "raman": {
+      "operationIntent": "autofocus_then_acquire",
       "autofocus": {
         "enabled": true,
         "every": "once",
@@ -105,8 +106,7 @@ This is the first mapping task. Keep the initial grid small.
     "maxRuntimeMinutes": 5,
     "maxUnits": 9,
     "stopOnError": true
-  },
-  "operatorApprovalRequired": false
+  }
 }
 ```
 
@@ -130,4 +130,3 @@ For the first run, accept the map if:
 - Signal is scientifically interpretable by the operator.
 
 Do not automatically expand the map if the signal is weak, saturated, drifting, or inconsistent with the microscope image.
-
