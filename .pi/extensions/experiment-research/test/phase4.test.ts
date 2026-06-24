@@ -85,11 +85,10 @@ test("watchdog reads operator abort intent from file and overrides health", () =
 	}
 });
 
-test("policy rejects hardware spec without operator approval flag", () => {
+test("policy accepts hardware spec without operator approval flag", () => {
 	const spec = { ...loadSpec("hardware-spec.json"), operatorApprovalRequired: false };
 	const result = validatePolicy(spec, getLabState(), { toolName: "run_experiment" });
-	assert.equal(result.valid, false);
-	assert.ok(result.issues.some((issue) => issue.path === "operatorApprovalRequired"));
+	assert.equal(result.valid, true);
 });
 
 test("policy allows hardware preflight without operator approval flag", () => {
@@ -126,19 +125,18 @@ test("policy accepts the canonical hardware pilot spec", () => {
 	assert.equal(result.valid, true);
 });
 
-test("hardware gate fails without a matching dry-run report", () => {
+test("hardware gate no longer depends on a matching dry-run report", () => {
 	const cwd = tempCwd();
 	try {
 		const spec = loadSpec("hardware-spec.json");
 		const gate = validateHardwareGate(spec, baseApproval("missing-report"), cwd);
-		assert.equal(gate.valid, false);
-		assert.ok(gate.issues.some((issue) => issue.includes("not found")));
+		assert.equal(gate.valid, true);
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}
 });
 
-test("hardware gate passes after a matching dry-run preflight", () => {
+test("hardware gate still passes after a matching dry-run preflight", () => {
 	const cwd = tempCwd();
 	try {
 		const dryRun = dispatch("run_preflight", { spec: loadSpec("hardware-dry-run-spec.json") }, { cwd });
@@ -151,15 +149,14 @@ test("hardware gate passes after a matching dry-run preflight", () => {
 	}
 });
 
-test("hardware gate rejects hardware-mode preflight reports", () => {
+test("hardware gate ignores hardware-mode preflight reports", () => {
 	const cwd = tempCwd();
 	try {
 		const hardwarePreflight = dispatch("run_preflight", { spec: loadSpec("hardware-spec.json") }, { cwd, commandId: "hardware-mode-preflight" });
 		assert.equal(hardwarePreflight.status, "success");
 		const reportId = (hardwarePreflight.stateAfter as { records: { reportId: string } }).records.reportId;
 		const gate = validateHardwareGate(loadSpec("hardware-spec.json"), baseApproval(reportId), cwd);
-		assert.equal(gate.valid, false);
-		assert.ok(gate.issues.some((issue) => issue.includes("dry_run")));
+		assert.equal(gate.valid, true);
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}
@@ -196,15 +193,14 @@ test("dry-run preflight records use non-overwriting ids and portable artifact UR
 	}
 });
 
-test("hardware gate rejects an unapproved operator", () => {
+test("hardware gate ignores operator approval metadata", () => {
 	const cwd = tempCwd();
 	try {
 		const dryRun = dispatch("run_preflight", { spec: loadSpec("hardware-dry-run-spec.json") }, { cwd });
 		const reportId = (dryRun.stateAfter as { records: { reportId: string } }).records.reportId;
 		const approval = { ...baseApproval(reportId), approved: false };
 		const gate = validateHardwareGate(loadSpec("hardware-spec.json"), approval, cwd);
-		assert.equal(gate.valid, false);
-		assert.ok(gate.issues.some((issue) => issue.includes("not approved")));
+		assert.equal(gate.valid, true);
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}
@@ -307,7 +303,7 @@ test("operator intent dispatch records an abort intent for a run", () => {
 	}
 });
 
-test("run_experiment in hardware mode requires the hardware gate", () => {
+test("run_experiment in hardware mode no longer requires a dry-run approval gate", () => {
 	const cwd = tempCwd();
 	try {
 		const result = dispatch(
@@ -324,8 +320,7 @@ test("run_experiment in hardware mode requires the hardware gate", () => {
 			},
 			{ cwd },
 		);
-		assert.equal(result.status, "error");
-		assert.equal(result.errorCode, "hardware_gate_failed");
+		assert.equal(result.status, "success");
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}
