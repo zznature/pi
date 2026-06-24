@@ -1,21 +1,95 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { autoFitAndRecordRamanXyCalibration, fitAndRecordRamanXyCalibration, recordRamanXyCalibration } from "../kernel/raman-calibration.ts";
+import { runRamanActiveProbe } from "../kernel/raman-active-probe.ts";
 import { recordRamanHardwareValidation, validateRamanHardwareValidationReadiness } from "../kernel/raman-validation.ts";
 import { hashExperimentSpec } from "../run-store.ts";
 import {
+	RamanAutoXyCalibrationParamsSchema,
+	RamanFitXyCalibrationParamsSchema,
 	RamanHardwareValidationDraftParamsSchema,
-	RamanValidationSpecPairParamsSchema,
 	RamanHardwareValidationParamsSchema,
 	RamanHardwareValidationReadinessParamsSchema,
+	RamanRecordXyCalibrationParamsSchema,
+	RamanActiveProbeParamsSchema,
+	RamanValidationSpecPairParamsSchema,
 	type RamanHardwareValidationDraftParams,
 	type RamanHardwareValidationParams,
-	type RamanValidationSpecPairParams,
 	type RamanHardwareValidationReadinessParams,
+	type RamanValidationSpecPairParams,
 	type ToolResult,
 	type ValidationIssue,
-	validateSchema,
 	validateExperimentSpec,
+	validateSchema,
 } from "../schemas.ts";
 import { deriveDryRunSpecFromHardware } from "../spec-utils.ts";
+
+export const ramanRecordXyCalibrationTool = {
+	name: "raman_record_xy_calibration",
+	label: "Raman XY Calibration",
+	description: "Record an operator-approved Raman XY pixel-to-stage calibration artifact for later transformArtifactId use.",
+	promptSnippet: "Record a Raman XY calibration artifact for bounded Raman specs",
+	promptGuidelines: [
+		"Use raman_record_xy_calibration only as an operator maintenance action.",
+		"Reference the returned calibrationId from domain.raman.xyCorrection.transformArtifactId.",
+	],
+	parameters: RamanRecordXyCalibrationParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		const result = recordRamanXyCalibration(params, { cwd: ctx.cwd, commandId: toolCallId });
+		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
+	},
+} satisfies ToolDefinition<typeof RamanRecordXyCalibrationParamsSchema, ToolResult>;
+
+export const ramanFitXyCalibrationTool = {
+	name: "raman_fit_xy_calibration",
+	label: "Fit Raman XY Calibration",
+	description: "Fit and record an operator-approved Raman XY calibration artifact from stage shifts and frame pairs.",
+	promptSnippet: "Fit a Raman XY calibration matrix from approved frame pairs",
+	promptGuidelines: [
+		"Use raman_fit_xy_calibration only as an operator maintenance action.",
+		"Provide at least two non-collinear stage shifts with matching reference/current frame pairs.",
+	],
+	parameters: RamanFitXyCalibrationParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		const result = await fitAndRecordRamanXyCalibration(params, { cwd: ctx.cwd, commandId: toolCallId });
+		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
+	},
+} satisfies ToolDefinition<typeof RamanFitXyCalibrationParamsSchema, ToolResult>;
+
+export const ramanAutoXyCalibrationTool = {
+	name: "raman_auto_xy_calibration",
+	label: "Auto Raman XY Calibration",
+	description: "Run an operator-approved Raman XY calibration sequence that moves the stage, captures frames, fits, and records a calibration artifact.",
+	promptSnippet: "Run an approved Raman XY calibration movement/capture sequence",
+	promptGuidelines: [
+		"Use raman_auto_xy_calibration only as an operator maintenance action.",
+		"Use the memory/fake backend for no-hardware checks; use mc_newton_xyz and labspec_file_bridge only during supervised hardware maintenance.",
+	],
+	parameters: RamanAutoXyCalibrationParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		const result = await autoFitAndRecordRamanXyCalibration(params, { cwd: ctx.cwd, commandId: toolCallId });
+		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
+	},
+} satisfies ToolDefinition<typeof RamanAutoXyCalibrationParamsSchema, ToolResult>;
+
+export const ramanActiveProbeTool = {
+	name: "raman_active_probe",
+	label: "Raman Active Probe",
+	description: "Run an operator-approved Raman maintenance smoke probe that may capture a frame or acquire a short spectrum.",
+	promptSnippet: "Run an operator-approved Raman active smoke probe and record artifacts",
+	promptGuidelines: [
+		"Use raman_active_probe only as an operator maintenance action, not during planner-controlled dry runs.",
+		"Require explicit operator approval and laser safety confirmation before spectrum smoke acquisition.",
+	],
+	parameters: RamanActiveProbeParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		const result = await runRamanActiveProbe(params, { cwd: ctx.cwd, commandId: toolCallId });
+		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
+	},
+} satisfies ToolDefinition<typeof RamanActiveProbeParamsSchema, ToolResult>;
 
 export const ramanHardwareValidationTool = {
 	name: "raman_record_hardware_validation",
@@ -327,10 +401,10 @@ export const ramanValidationSpecPairTool = {
 					],
 					artifacts: [],
 					commandId: toolCallId,
-						correlationId: toolCallId,
-						stateAfter,
-						stopConditionMet: true,
-					}
+					correlationId: toolCallId,
+					stateAfter,
+					stopConditionMet: true,
+				}
 			: runtimeIssues.length > 0
 				? {
 						status: "warning",
@@ -348,30 +422,30 @@ export const ramanValidationSpecPairTool = {
 				: coverageIssues.length > 0
 					? {
 							status: "warning",
-						summary: `Derived Raman dry-run validation spec hash-matches, but the hardware spec is too narrow for full V2 validation coverage (${coverageIssues.length} issue(s)).`,
-						nextActions: [
-							"Enable autofocus, XY correction, thermal wait, and acquisition coverage before using this spec as the G8.5 minimum auditable run.",
-							"Use the returned dryRunSpec only after the hardware validation spec covers the intended V2 workflow surface.",
-						],
-						artifacts: [],
-						commandId: toolCallId,
-						correlationId: toolCallId,
-						stateAfter,
-						stopConditionMet: true,
-					}
-				: {
-						status: "success",
-						summary: "Derived Raman dry-run validation spec matches the hardware validation spec family and covers the full V2 validation surface.",
-						nextActions: [
-							"Use the returned dryRunSpec with run_preflight before the real hardware validation run.",
-							"Keep capabilityCoverage unchanged when adapting coordinates, IDs, or environment details on site.",
-						],
-						artifacts: [],
-						commandId: toolCallId,
-						correlationId: toolCallId,
-						stateAfter,
-						stopConditionMet: false,
-					};
+							summary: `Derived Raman dry-run validation spec hash-matches, but the hardware spec is too narrow for full V2 validation coverage (${coverageIssues.length} issue(s)).`,
+							nextActions: [
+								"Enable autofocus, XY correction, thermal wait, and acquisition coverage before using this spec as the G8.5 minimum auditable run.",
+								"Use the returned dryRunSpec only after the hardware validation spec covers the intended V2 workflow surface.",
+							],
+							artifacts: [],
+							commandId: toolCallId,
+							correlationId: toolCallId,
+							stateAfter,
+							stopConditionMet: true,
+						}
+					: {
+							status: "success",
+							summary: "Derived Raman dry-run validation spec matches the hardware validation spec family and covers the full V2 validation surface.",
+							nextActions: [
+								"Use the returned dryRunSpec with run_preflight before the real hardware validation run.",
+								"Keep capabilityCoverage unchanged when adapting coordinates, IDs, or environment details on site.",
+							],
+							artifacts: [],
+							commandId: toolCallId,
+							correlationId: toolCallId,
+							stateAfter,
+							stopConditionMet: false,
+						};
 		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
 	},
 } satisfies ToolDefinition<typeof RamanValidationSpecPairParamsSchema, ToolResult>;

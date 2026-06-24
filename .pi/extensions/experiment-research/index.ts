@@ -3,25 +3,36 @@ import { buildExperimentCompactionSummary } from "./compaction.ts";
 import { subscribeRamanHardwareRunTerminal, type RamanHardwareRunTerminalEvent } from "./kernel/raman-hardware.ts";
 import { EXPERIMENT_RESEARCH_PROMPT } from "./prompt.ts";
 import type { ToolResult } from "./schemas.ts";
-import { analyzeRunTool } from "./tools/analyze-run.ts";
-import { getExperimentStateTool } from "./tools/experiment-state.ts";
 import { hardwareBridgeV2ReadTool } from "./tools/hardware-bridge-v2-read.ts";
-import { recordHardwareCoordinateAuditTool } from "./tools/hardware-coordinate-audit.ts";
-import { getLabCapabilitiesTool, getLabStateTool } from "./tools/lab-state.ts";
-import { advanceRunTool, pollRunTool, startRunTool } from "./tools/lifecycle.ts";
-import { abortRunTool, pauseRunTool, requestOperatorTool } from "./tools/operator.ts";
-import { planNextExperimentTool } from "./tools/plan-next.ts";
-import { runPreflightTool } from "./tools/preflight.ts";
-import { ramanActiveProbeTool } from "./tools/raman-active-probe.ts";
-import { ramanAutoXyCalibrationTool, ramanFitXyCalibrationTool, ramanRecordXyCalibrationTool } from "./tools/raman-calibration.ts";
 import {
+	analyzeRunTool,
+	advanceRunTool,
+	getExperimentStateTool,
+	getLabCapabilitiesTool,
+	getLabStateTool,
+	planNextExperimentTool,
+	runExperimentTool,
+	runPreflightTool,
+	startRunTool,
+	validateExperimentSpecTool,
+} from "./tools/planner.ts";
+import {
+	abortRunTool,
+	pauseRunTool,
+	pollRunTool,
+	recordHardwareCoordinateAuditTool,
+	requestOperatorTool,
+} from "./tools/operator.ts";
+import {
+	ramanActiveProbeTool,
+	ramanAutoXyCalibrationTool,
+	ramanFitXyCalibrationTool,
 	ramanHardwareValidationDraftTool,
 	ramanHardwareValidationReadinessTool,
 	ramanHardwareValidationTool,
+	ramanRecordXyCalibrationTool,
 	ramanValidationSpecPairTool,
-} from "./tools/raman-validation.ts";
-import { runExperimentTool } from "./tools/run-experiment.ts";
-import { validateExperimentSpecTool } from "./tools/validate-spec.ts";
+} from "./tools/raman.ts";
 
 const PLANNER_TOOL_NAMES = [
 	"get_lab_capabilities",

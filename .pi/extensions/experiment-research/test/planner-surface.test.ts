@@ -6,9 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import experimentResearchExtension from "../index.ts";
 import { EXPERIMENT_RESEARCH_PROMPT } from "../prompt.ts";
-import { getLabCapabilitiesTool, getLabStateTool } from "../tools/lab-state.ts";
-import { runPreflightTool } from "../tools/preflight.ts";
-import { validateExperimentSpecTool } from "../tools/validate-spec.ts";
+import { getLabCapabilitiesTool, getLabStateTool, runPreflightTool, validateExperimentSpecTool } from "../tools/planner.ts";
 
 function tempCwd(): string {
 	return mkdtempSync(join(tmpdir(), "exp-planner-surface-"));

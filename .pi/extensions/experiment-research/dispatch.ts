@@ -4,7 +4,7 @@ import { getLabState } from "./lab-state.ts";
 import { runHardwarePilotKernel } from "./kernel/hardware-pilot.ts";
 import { validateHardwareCoordinateAuditReadiness } from "./kernel/hardware-coordinate-audit.ts";
 import { advanceRun, pollRun, startRun, type RunState } from "./kernel/kernel.ts";
-import { runLabAgentKernel } from "./kernel/lab-agent-kernel.ts";
+import { runLabAgentKernel } from "./kernel/simulation.ts";
 import { requestRamanHardwareStop, startRamanHardwareRun } from "./kernel/raman-hardware.ts";
 import { validateRamanHardwareValidationReadiness } from "./kernel/raman-validation.ts";
 import { createStageAdapter } from "./kernel/stage-adapter.ts";

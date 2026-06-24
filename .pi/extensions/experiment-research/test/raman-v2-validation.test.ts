@@ -24,7 +24,7 @@ import {
 	ramanHardwareValidationDraftTool,
 	ramanHardwareValidationReadinessTool,
 	ramanValidationSpecPairTool,
-} from "../tools/raman-validation.ts";
+} from "../tools/raman.ts";
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
 

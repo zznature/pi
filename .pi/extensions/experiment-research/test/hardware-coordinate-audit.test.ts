@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { dispatch } from "../dispatch.ts";
 import { validateHardwareCoordinateAuditReadiness } from "../kernel/hardware-coordinate-audit.ts";
 import type { ExperimentSpec } from "../schemas.ts";
-import { recordHardwareCoordinateAuditTool } from "../tools/hardware-coordinate-audit.ts";
+import { recordHardwareCoordinateAuditTool } from "../tools/operator.ts";
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
 

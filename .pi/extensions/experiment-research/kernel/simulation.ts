@@ -71,3 +71,7 @@ export function runSimulation(runId: string, spec: ExperimentSpec): SimulationRu
 	const summary = summarizeRun(runId, spec, points);
 	return { runId, spec, points, summary };
 }
+
+export function runLabAgentKernel(runId: string, spec: ExperimentSpec): SimulationRun {
+	return runSimulation(runId, spec);
+}
