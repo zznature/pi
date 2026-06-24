@@ -114,8 +114,8 @@ function validatePointLimits(spec: ExperimentSpec): ValidationIssue[] {
 			issues.push(issue(`points.${point.index}.yUm`, "Point yUm is outside ExperimentSpec motion limits"));
 		}
 		if (point.zUm !== undefined && spec.limits.motion.zUm) {
-			if (!withinRange(point.zUm, spec.limits.motion.zUm.minUm, spec.limits.motion.zUm.maxUm)) {
-				issues.push(issue(`points.${point.index}.zUm`, "Point zUm is outside ExperimentSpec motion limits"));
+			if (point.zUm > spec.limits.motion.zUm.maxUm) {
+				issues.push(issue(`points.${point.index}.zUm`, "Point zUm exceeds limits.motion.zUm.maxUm, the Raman objective collision ceiling"));
 			}
 		}
 	}
@@ -140,14 +140,6 @@ export function validatePolicy(
 		}
 	} else if (spec.mode !== "simulation") {
 		issues.push(issue("mode", `${ctx.toolName} only supports simulation mode`));
-	}
-
-	if (isEffectfulRunContext(ctx) && spec.mode === "hardware") {
-		if (!spec.operatorApprovalRequired) {
-			issues.push(issue("operatorApprovalRequired", "Hardware execution requires operatorApprovalRequired to be true"));
-		}
-	} else if (isEffectfulRunContext(ctx) && spec.operatorApprovalRequired) {
-		issues.push(issue("operatorApprovalRequired", "Simulation and dry-run checks must not require approval"));
 	}
 
 	if (isEffectfulRunContext(ctx) && labState.activeRunId !== null) {

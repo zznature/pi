@@ -130,7 +130,7 @@ export function runHardwarePilotKernel(spec: ExperimentSpec, options: HardwareKe
 		timestamp: new Date(options.nowMs?.() ?? Date.now()).toISOString(),
 		unitCount: points.length,
 		stageAdapter: options.pilot.stageAdapter,
-		operatorOnlyMonitoring: options.pilot.approval.operatorOnlyMonitoring === true,
+		operatorOnlyMonitoring: options.pilot.approval?.operatorOnlyMonitoring === true,
 	});
 	sequence += 1;
 
@@ -265,7 +265,7 @@ export function runHardwarePilotKernel(spec: ExperimentSpec, options: HardwareKe
 		records,
 		status,
 		stopReason,
-		options.pilot.approval.operatorOnlyMonitoring === true,
+		options.pilot.approval?.operatorOnlyMonitoring === true,
 	);
 	appendEvent(options.eventsPath, {
 		schemaVersion: "1",

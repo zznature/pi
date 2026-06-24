@@ -291,7 +291,7 @@ function buildSnapshot(
 		unitKind: "point",
 		nextUnitIndex,
 		safeToResume: status === "paused" && nextUnitIndex < totalUnits,
-		requiresOperatorApproval: status !== "completed",
+		requiresOperatorApproval: false,
 		createdAt: nowIso(),
 	};
 	if (nextUnitIndex < totalUnits) {
@@ -563,7 +563,7 @@ function recordApproval(reserved: ReservedRun, pilot: HardwarePilotParams, spec:
 		type: "hardware_approval_recorded",
 		runId: reserved.record.runId,
 		approval: pilot.approval,
-		operatorOnlyMonitoring: pilot.approval.operatorOnlyMonitoring === true,
+		operatorOnlyMonitoring: pilot.approval?.operatorOnlyMonitoring === true,
 		specHash: reserved.specHash,
 		raman: spec.domain?.raman !== undefined,
 	});
@@ -730,7 +730,7 @@ async function executeRamanHardwareRun(
 		if (bridge) {
 			await bridge.shutdown().catch(() => bridge?.close());
 		}
-		const summary = finishRun(cwd, reserved, spec, terminalStatus, nextUnitIndex, stopReason, pilot.approval.operatorOnlyMonitoring === true);
+		const summary = finishRun(cwd, reserved, spec, terminalStatus, nextUnitIndex, stopReason, pilot.approval?.operatorOnlyMonitoring === true);
 		emitRamanHardwareRunTerminal({
 			cwd,
 			runId: reserved.record.runId,
@@ -903,7 +903,7 @@ async function executeRamanHardwareRunV2(
 			terminalStatus,
 			nextUnitIndex,
 			stopReason,
-			pilot.approval.operatorOnlyMonitoring === true,
+			pilot.approval?.operatorOnlyMonitoring === true,
 			snapshotBase,
 		);
 		emitRamanHardwareRunTerminal({

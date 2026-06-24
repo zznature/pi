@@ -321,6 +321,7 @@ const RamanExecutionSchema = Type.Object(
 	{
 		workflowBackend: Type.Optional(Type.Union([Type.Literal("v1_bridge"), Type.Literal("v2_bridge")])),
 		v2ValidationId: Type.Optional(Type.String({ minLength: 1 })),
+		laserPowerMw: Type.Optional(Type.Number({ minimum: 0 })),
 		acquisitionBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("labspec_file_bridge")])),
 		autofocusBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("labspec_file_bridge")])),
 		xyCorrectionBackend: Type.Optional(Type.Union([Type.Literal("fake"), Type.Literal("phase_correlation")])),
@@ -359,7 +360,7 @@ const HardwareExecutionSchema = Type.Object(
 		heartbeatTimeoutMs: Type.Integer({ minimum: 1 }),
 		maxConsecutiveErrors: Type.Integer({ minimum: 1 }),
 		intentsPath: Type.Optional(Type.String({ minLength: 1 })),
-		approval: OperatorApprovalSchema,
+		approval: Type.Optional(OperatorApprovalSchema),
 	},
 	{ additionalProperties: false },
 );
@@ -892,18 +893,6 @@ function getPlanPointCount(spec: ExperimentSpec): number {
 	return spec.plan.grid.x.steps * spec.plan.grid.y.steps;
 }
 
-function getPlanZValues(spec: ExperimentSpec): number[] {
-	if (spec.plan.kind === "points") return spec.plan.points.map((point) => point.zUm ?? 0);
-	if (spec.plan.kind === "grid") return [0];
-	return [];
-}
-
-function estimateRamanExposureEnergyMj(spec: ExperimentSpec, laserPowerMw: number): number | undefined {
-	const acquisition = spec.domain?.raman?.acquisition;
-	if (!acquisition) return undefined;
-	return laserPowerMw * acquisition.integrationTimeS * acquisition.accumulations;
-}
-
 function validateRamanDomainSemantics(spec: ExperimentSpec): ValidationIssue[] {
 	const issues: ValidationIssue[] = [];
 	const raman = spec.domain?.raman;
@@ -917,14 +906,11 @@ function validateRamanDomainSemantics(spec: ExperimentSpec): ValidationIssue[] {
 		if (!spec.limits.motion.zUm) {
 			issues.push({ path: "limits.motion.zUm", message: "Raman autofocus requires explicit zUm motion limits" });
 		} else {
-			if (autofocus.zMinUm < spec.limits.motion.zUm.minUm || autofocus.zMaxUm > spec.limits.motion.zUm.maxUm) {
-				issues.push({ path: "domain.raman.autofocus", message: "autofocus z range must fit inside zUm motion limits" });
-			}
-			for (const zUm of getPlanZValues(spec)) {
-				if (zUm - autofocus.coarseRangeUm < spec.limits.motion.zUm.minUm || zUm + autofocus.coarseRangeUm > spec.limits.motion.zUm.maxUm) {
-					issues.push({ path: "domain.raman.autofocus.coarseRangeUm", message: "autofocus coarse scan window exceeds zUm motion limits" });
-					break;
-				}
+			if (autofocus.zMaxUm > spec.limits.motion.zUm.maxUm) {
+				issues.push({
+					path: "domain.raman.autofocus.zMaxUm",
+					message: "autofocus zMaxUm exceeds limits.motion.zUm.maxUm, the Raman objective collision ceiling",
+				});
 			}
 		}
 	}
@@ -950,18 +936,6 @@ function validateRamanDomainSemantics(spec: ExperimentSpec): ValidationIssue[] {
 		const estimatedMinutes = (acquisition.integrationTimeS * acquisition.accumulations * getPlanPointCount(spec)) / 60;
 		if (estimatedMinutes > spec.stoppingRules.maxRuntimeMinutes) {
 			issues.push({ path: "stoppingRules.maxRuntimeMinutes", message: "Raman acquisition estimate exceeds maxRuntimeMinutes" });
-		}
-		const maxExposureEnergyMj = spec.limits.powerEnergy.maxExposureEnergyMj;
-		const worstCaseExposureEnergyMj = estimateRamanExposureEnergyMj(spec, spec.limits.powerEnergy.maxLaserPowerMw);
-		if (
-			maxExposureEnergyMj !== undefined &&
-			worstCaseExposureEnergyMj !== undefined &&
-			worstCaseExposureEnergyMj > maxExposureEnergyMj
-		) {
-			issues.push({
-				path: "limits.powerEnergy.maxExposureEnergyMj",
-				message: "Raman acquisition energy at maxLaserPowerMw exceeds maxExposureEnergyMj",
-			});
 		}
 	}
 

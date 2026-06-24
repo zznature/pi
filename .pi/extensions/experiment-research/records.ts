@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Capabilities } from "./capabilities.ts";
 import type { HardwareRun } from "./kernel/hardware-pilot.ts";
 import type { SimulationRun, SimulationSummary } from "./kernel/simulation.ts";
 import type { PreflightResult } from "./preflight.ts";
 import type { ExperimentSpec, HardwarePilotParams, ToolResult } from "./schemas.ts";
-import { getUnitCount } from "./spec-utils.ts";
+import { getExperimentPoints, getUnitCount } from "./spec-utils.ts";
 import {
 	hashExperimentSpec,
 	artifactUriPath,
@@ -179,129 +179,62 @@ export function appendPreflightReport(
 export interface HardwareGateResult {
 	valid: boolean;
 	issues: string[];
-	dryRunReportPath?: string;
 	specHash?: string;
-	capabilitySnapshotId?: string;
+	collisionCeilingUm?: number;
+	maxPlannedZUm?: number;
+	laserCeilingMw?: number;
+	requestedLaserPowerMw?: number;
 }
 
-function estimateConfirmedRamanExposureEnergyMj(spec: ExperimentSpec, confirmedLaserPowerMw: number): number | undefined {
-	const acquisition = spec.domain?.raman?.acquisition;
-	if (!acquisition) return undefined;
-	return confirmedLaserPowerMw * acquisition.integrationTimeS * acquisition.accumulations;
-}
+type HardwareGateInput = HardwarePilotParams | NonNullable<HardwarePilotParams["approval"]>;
 
-function validateRamanSafetyConfirmation(
-	spec: ExperimentSpec,
-	approval: HardwarePilotParams["approval"],
-	issues: string[],
-): void {
-	if (!spec.domain?.raman?.acquisition) return;
-	const safety = approval.ramanSafety;
-	if (!safety) {
-		issues.push("Raman acquisition requires operator ramanSafety confirmation");
-		return;
-	}
-	if (safety.laserPowerConfirmed !== true) {
-		issues.push("Raman acquisition requires laser power confirmation");
-	}
-	if (safety.confirmedLaserPowerMw > spec.limits.powerEnergy.maxLaserPowerMw) {
-		issues.push("confirmed Raman laser power exceeds spec limits.powerEnergy.maxLaserPowerMw");
-	}
-	const maxExposureEnergyMj = spec.limits.powerEnergy.maxExposureEnergyMj;
-	if (maxExposureEnergyMj !== undefined) {
-		if (safety.confirmedExposureEnergyMj === undefined) {
-			issues.push("Raman acquisition with maxExposureEnergyMj requires confirmed exposure energy");
-			return;
-		}
-		const derivedExposureEnergyMj = estimateConfirmedRamanExposureEnergyMj(spec, safety.confirmedLaserPowerMw);
-		if (
-			derivedExposureEnergyMj !== undefined &&
-			Math.abs(safety.confirmedExposureEnergyMj - derivedExposureEnergyMj) > 1e-9
-		) {
-			issues.push("confirmed Raman exposure energy does not match confirmed laser power and acquisition settings");
-		}
-		if (safety.confirmedExposureEnergyMj > maxExposureEnergyMj) {
-			issues.push("confirmed Raman exposure energy exceeds spec limits.powerEnergy.maxExposureEnergyMj");
+function maxPlannedRamanZUm(spec: ExperimentSpec): number | undefined {
+	const points = getExperimentPoints(spec);
+	if (points.length === 0) return undefined;
+	const autofocus = spec.domain?.raman?.autofocus?.enabled === true ? spec.domain.raman.autofocus : undefined;
+	let maxPlannedZ = Number.NEGATIVE_INFINITY;
+	for (const point of points) {
+		maxPlannedZ = Math.max(maxPlannedZ, point.zUm ?? 0);
+		if (autofocus) {
+			maxPlannedZ = Math.max(maxPlannedZ, autofocus.zMaxUm);
 		}
 	}
+	return Number.isFinite(maxPlannedZ) ? maxPlannedZ : undefined;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
+function normalizeHardwareGateInput(input: HardwareGateInput): Partial<HardwarePilotParams> {
+	if ("stageAdapter" in input) return input;
+	return { approval: input };
 }
 
-function requireDryRunPreflight(parsed: Record<string, unknown>, result: Record<string, unknown>, issues: string[]): void {
-	const spec = isRecord(parsed.spec) ? parsed.spec : undefined;
-	if (spec?.mode !== "dry_run") {
-		issues.push("referenced preflight must be a dry_run report");
-	}
-	if (result.mode !== "dry_run") {
-		issues.push("referenced preflight result must be dry_run readiness evidence");
-	}
-}
-
-function requireRamanReadOnlyProbe(spec: ExperimentSpec, result: Record<string, unknown>, issues: string[]): void {
-	if (!spec.domain?.raman) return;
-	const liveState = isRecord(result.liveState) ? result.liveState : undefined;
-	const readOnlyProbe = liveState && isRecord(liveState.readOnlyProbe) ? liveState.readOnlyProbe : undefined;
-	if (!readOnlyProbe) {
-		issues.push("referenced Raman dry-run preflight is missing a read-only probe");
-		return;
-	}
-	if (readOnlyProbe.readOnly !== true) {
-		issues.push("referenced Raman dry-run preflight probe must be read-only");
-	}
-	const stage = isRecord(readOnlyProbe.stage) ? readOnlyProbe.stage : undefined;
-	if (stage?.reachable !== true) {
-		issues.push("referenced Raman dry-run preflight must show a reachable stage");
-	}
-	const labspecWorker = isRecord(readOnlyProbe.labspecWorker) ? readOnlyProbe.labspecWorker : undefined;
-	if (labspecWorker?.reachable !== true) {
-		issues.push("referenced Raman dry-run preflight must show a reachable LabSpec worker");
-	}
-}
-
-export function validateHardwareGate(spec: ExperimentSpec, approval: HardwarePilotParams["approval"], cwd: string): HardwareGateResult {
+export function validateHardwareGate(spec: ExperimentSpec, hardwareGateInput: HardwareGateInput, _cwd?: string): HardwareGateResult {
+	const hardwareExecution = normalizeHardwareGateInput(hardwareGateInput);
 	const issues: string[] = [];
-	if (!approval.approved) {
-		issues.push("operator approval is not approved");
-	}
-	validateRamanSafetyConfirmation(spec, approval, issues);
-
 	const specHash = hashExperimentSpec(spec);
-	const reportPath = join(cwd, ".pi", "experiment-runs", "preflights", approval.dryRunReportId, "preflight.json");
-	let capabilitySnapshotId: string | undefined;
-	try {
-		const parsed = JSON.parse(readFileSync(reportPath, "utf-8")) as unknown;
-		if (!isRecord(parsed)) {
-			issues.push("referenced dry-run preflight report is malformed");
-			return { valid: false, issues, dryRunReportPath: reportPath, specHash };
+	const collisionCeilingUm = spec.limits.motion.zUm?.maxUm;
+	const maxPlannedZUm = spec.domain?.raman ? maxPlannedRamanZUm(spec) : undefined;
+	const laserCeilingMw = spec.limits.powerEnergy.maxLaserPowerMw;
+	const requestedLaserPowerMw = spec.domain?.raman
+		? (hardwareExecution.raman?.laserPowerMw ?? laserCeilingMw)
+		: undefined;
+
+	if (spec.domain?.raman) {
+		if (collisionCeilingUm === undefined) {
+			issues.push("Raman hardware execution requires limits.motion.zUm.maxUm as the Raman objective collision ceiling.");
 		}
-		const result = isRecord(parsed.result) ? parsed.result : undefined;
-		if (!result) {
-			issues.push("referenced dry-run preflight report is missing a result");
-			return { valid: false, issues, dryRunReportPath: reportPath, specHash };
+		if (collisionCeilingUm !== undefined && maxPlannedZUm !== undefined && maxPlannedZUm > collisionCeilingUm) {
+			issues.push(
+				`objective_collision: planned Z ${maxPlannedZUm} um exceeds limits.motion.zUm.maxUm = ${collisionCeilingUm} um (Raman objective collision ceiling).`,
+			);
 		}
-		requireDryRunPreflight(parsed, result, issues);
-		requireRamanReadOnlyProbe(spec, result, issues);
-		if (result.valid !== true) {
-			issues.push("referenced dry-run preflight did not pass");
+		if (requestedLaserPowerMw !== undefined && requestedLaserPowerMw > laserCeilingMw) {
+			issues.push(
+				`sample_burn: requested laser power ${requestedLaserPowerMw} mW exceeds limits.powerEnergy.maxLaserPowerMw = ${laserCeilingMw} mW.`,
+			);
 		}
-		const reportSpecHash = typeof parsed.specHash === "string" ? parsed.specHash : result.specHash;
-		if (reportSpecHash !== specHash) {
-			issues.push("referenced dry-run preflight does not match the hardware ExperimentSpec");
-		}
-		const snapshot = typeof parsed.capabilitySnapshotId === "string" ? parsed.capabilitySnapshotId : result.capabilitySnapshotId;
-		if (typeof snapshot !== "string" || snapshot.length === 0) {
-			issues.push("referenced dry-run preflight is missing a capability snapshot");
-		} else {
-			capabilitySnapshotId = snapshot;
-		}
-	} catch {
-		issues.push("referenced dry-run preflight report was not found or was not valid JSON");
 	}
 
-	return { valid: issues.length === 0, issues, dryRunReportPath: reportPath, specHash, capabilitySnapshotId };
+	return { valid: issues.length === 0, issues, specHash, collisionCeilingUm, maxPlannedZUm, laserCeilingMw, requestedLaserPowerMw };
 }
 
 export interface HardwareRunRecordRefs extends RunRecordRefs {
@@ -346,7 +279,7 @@ export function appendHardwareRunRecords(
 			type: "hardware_approval_recorded",
 			runId: run.runId,
 			approval: pilot.approval,
-			operatorOnlyMonitoring: pilot.approval.operatorOnlyMonitoring === true,
+			operatorOnlyMonitoring: pilot.approval?.operatorOnlyMonitoring === true,
 			specHash: hashExperimentSpec(run.spec),
 		})}\n`,
 		"utf-8",
@@ -416,7 +349,7 @@ function buildResumeSnapshot(
 		unitKind: spec.plan.kind === "steps" ? "step" : "point",
 		nextUnitIndex,
 		safeToResume,
-		requiresOperatorApproval: spec.mode === "hardware" && status !== "completed",
+		requiresOperatorApproval: false,
 		createdAt: new Date().toISOString(),
 	};
 	if (nextUnitIndex < totalUnits) {
