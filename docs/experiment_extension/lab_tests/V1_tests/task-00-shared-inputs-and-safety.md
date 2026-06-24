@@ -26,8 +26,10 @@ Collect the minimum information required before pi-agent is allowed to compile o
 
 ## Safety Rules
 
-- Hardware run requires `operatorApprovalRequired: true`.
-- The operator must confirm `ramanSafety.confirmedLaserPowerMw <= spec.limits.powerEnergy.maxLaserPowerMw`.
+- MVP Raman safety blocks launch only on two deterministic limits:
+  - `limits.motion.zUm.maxUm = Raman objective collision ceiling`
+  - `limits.powerEnergy.maxLaserPowerMw = laser ceiling`
+- `run_preflight` remains a readiness check. It is not an approval gate.
 - Do not use film-specific Raman peaks as the only pass/fail signal until a human confirms expected bands.
 - If the film is metallic or opaque, the Si 520.7 cm-1 peak may be weak or absent; this is not automatically a mapping failure.
 - Use `stopOnError: true` for first hardware contact with the sample.
@@ -54,20 +56,8 @@ Use this structure with `run_experiment` for hardware tasks. Replace IDs and pat
   "settleTimeoutMs": 5000,
   "heartbeatTimeoutMs": 10000,
   "maxConsecutiveErrors": 2,
-  "approval": {
-    "approvalId": "approval-raman-film-001",
-    "operator": "operator-name",
-    "approved": true,
-    "dryRunReportId": "dry_run-preflight-0001",
-    "operatorOnlyMonitoring": true,
-    "ramanSafety": {
-      "laserPowerConfirmed": true,
-      "confirmedLaserPowerMw": 0.2,
-      "labSpecWorkerReady": true,
-      "windowsPowerPolicyReady": true,
-      "notes": "Laser power confirmed before run; shutter controlled by LabSpec workflow."
-    },
-    "notes": "Operator reviewed sample position, focus state, and emergency stop."
+  "raman": {
+    "laserPowerMw": 0.2
   }
 }
 ```
@@ -75,9 +65,9 @@ Use this structure with `run_experiment` for hardware tasks. Replace IDs and pat
 ## Required Operator Checklist
 
 - Sample is sacrificial or approved for first automated test.
-- Laser power has been verified at or below the spec limit.
+- Laser power has been verified at or below `limits.powerEnergy.maxLaserPowerMw`.
 - LabSpec worker is running and points to the correct bridge directories.
 - Stage coordinate origin is inside the approved local sample region.
 - The full planned XY area stays inside the operator-approved region.
-- Z limits cannot crash the objective into the sample.
+- No planned Raman Z motion exceeds `limits.motion.zUm.maxUm`.
 - Emergency stop and shutter behavior are verified before hardware run.

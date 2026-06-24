@@ -1,18 +1,19 @@
-# Raman 硬件动作与算法接入方案 (V2 架构：Workflow-Stateful TS + Device-Stateful HAL)
+# Raman 硬件动作与算法接入方案 (V2 架构：Workflow-Stateful TS + Device-Session-Stateful Raman Runtime)
 
 本文记录 `docs/Raman` 参考栈（stage 运动、autofocus、XY 校正、LabSpec 谱采集）以及未来更多实验设备接入 `.pi/extensions/experiment-research` 的 V2 架构设计与重构方案。
 
-上层契约（准入链、kernel 协议、事件驱动唤醒、ToolResult 双通道）沿用原有设计。本文重点解决 **"多设备高扩展性、长周期稳定性的控制权分配与通信架构"**，目标是让长周期实验满足安全、可观测、可恢复、可扩展四个性质。核心判断标准不是语言，而是状态性质：
+上层契约（准入链、kernel 协议、事件驱动唤醒、ToolResult 双通道）沿用原有设计。本文重点解决 **"多设备高扩展性、长周期稳定性的控制权分配与通信架构"**，目标是让长周期实验满足安全、可观测、可恢复、可扩展四个性质。当前 `docs/Raman` 的优化说明了一个边界修正：**TS 必须拥有实验级 workflow state，但不必把所有硬件邻近闭环都拆成 TS 微步。** 核心判断标准不是语言，而是状态性质：
 
 - **workflow state**：实验跑到哪里、下一步该做什么、哪些 artifact 已落盘、失败后从哪里恢复。这类状态必须由 TS Kernel 持久化管理。
 - **device session state**：串口连接、LabSpec 文件桥连接、camera stream、driver 缓存、设备级 stop/cleanup。这类状态贴近硬件，仍由 Python HAL 管理。
+- **action-local deterministic state**：backlash 补偿、settle 判据、粗细双扫描、单次采谱内部轮询、局部 timeout/retry 等。这类状态若被封装为**单个有界动作**且能回传 progress/checkpoint/error，可以留在 Python Raman runtime。
 - **agent strategy state**：暂停后的诊断、下一轮实验策略、operator-facing recovery plan。LLM 只能在非实时边界介入。
 
 ## 核心架构理念：控制倒置 (Inversion of Control)
 
-**V1 架构（现状）**：Python 端承担了过多的业务编排（如 `run_unit`、`autofocus` 循环），导致实验级状态被封装在 Python 调用栈中。TS 只能在 unit 结束后写 resume snapshot，崩溃恢复粒度偏粗。
+**V1 架构（问题根源）**：真正的问题不是“Python 里存在复合动作”，而是**实验级 workflow state** 曾被整个藏进 Python 调用栈里，导致 TS 只能在 unit 结束后写 resume snapshot，崩溃恢复粒度偏粗。
 
-**V2 架构（重构目标）**：TS Kernel 拥有 durable workflow state；Python Bridge 是 workflow-stateless 但 device-session-stateful 的 HAL。所有跨设备复合流程在 TS 层以 `async/await` 编排，Python 负责设备连接生命周期、设备原语、局部安全动作、标准化错误和 progress/cancel。
+**V2 架构（当前推荐）**：TS Kernel 拥有 durable workflow state；Python Bridge / Raman runtime 持有 device session，并允许承载**设备邻近、确定性、可界定恢复语义的复合动作**。TS 负责实验级 sequencing、lease、watchdog、records、resume policy；Python 负责设备连接生命周期、硬件原语、局部安全动作、标准化错误，以及必要时的 progress/checkpoint/cancel。
 
 ```text
 LLM Agent (Strategy & Recovery, non-realtime)
@@ -20,32 +21,46 @@ LLM Agent (Strategy & Recovery, non-realtime)
        │ - 输出诊断建议、operator 请求、下一轮实验策略
 TS Kernel (Orchestrator & State Machine)
        │ - 负责：resource lease、主 mutex、watchdog、resume.snapshot、artifact index
-       │ - 负责：Autofocus / XY correction / Run Unit 等 workflow 编排
+       │ - 负责：跨 unit / 跨设备 workflow 编排
+       │ - 负责：决定调用 primitive 还是 compound action，以及恢复策略
        │ - 负责：将硬件异常降级为 paused/recovering 并投递给 Agent 或 operator
        │ (JSON-RPC over stdio / bounded timeout / progress / cancel / checkpoint)
-Python Bridge (Device-Stateful HAL)
+Python Bridge / Raman Runtime
        │ - 统一 Device Registry 和 device session lifecycle
-       │ - A 类硬件原语：stage.move, camera.capture, spectrometer.begin/poll/cancel
-       │ - C 类无状态算法：algorithm.calc_focus, algorithm.phase_correlation
+       │ - A 类硬件原语：stage.move, camera.capture, stage.stop
+       │ - B 类设备侧确定性复合动作：autofocus.run_single, xy_correct.estimate_and_apply, spectrometer.acquire_point
+       │ - C 类无状态算法：algorithm.phase_correlation, calibration.fit_matrix
        │ - 防御式 single-flight、局部 timeout/retry、best-effort stop/cleanup
 ```
 
 ## 能力盘点与边界重新划分
 
-我们将所有能力拆解为可组合的原语，供 TS 层组装。这里的“原子”指 RPC 边界和恢复边界清晰，不等于内部不能有轮询、短重试或设备级 cleanup。
+我们按**恢复边界**而不是按“是否只有一步调用”来拆能力。当前 Raman 栈已经证明：有些动作虽然内部包含扫描、轮询或补偿，但它们仍然适合作为一个设备侧 deterministic action 暴露给 TS。
 
-### A 类：原子硬件动作（Python HAL 执行）
+### A 类：硬件原语（Python runtime 执行）
 
-设备驱动暴露标准化 primitive。每个 primitive 必须声明 `sideEffectLevel`、`resourcesTouched`、`safeToRetry`、`timeoutMs`、`cancelBehavior`。Python 可以执行 bounded retry、wait loop、driver cleanup，但不得持有实验 workflow 进度。
+设备驱动暴露标准化 primitive。每个 primitive 必须声明 `sideEffectLevel`、`resourcesTouched`、`safeToRetry`、`timeoutMs`、`cancelBehavior`。Python 可以执行 bounded retry、wait loop、driver cleanup，但不得持有**跨 unit 的实验 workflow 进度**。
 
 
 | 设备域                   | 原子动作                                                                                    | 传输/耗时预期                                      |
 | --------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `stage`               | `move_absolute(x,y,z)`, `wait_settled()`, `stop()`, `get_position()`                    | RPC 毫秒级，机械动作按 timeout 约束                     |
-| `camera`              | `capture_frame()`, `start_stream()`, `stop_stream()`                                    | 单帧通常 ≥400 ms                                 |
-| `spectrometer`        | `begin_acquisition()`, `poll_acquisition()`, `cancel_acquisition()`, `collect_result()` | 积分可达数分钟，必须可 progress/cancel                  |
-| `spectrometer` legacy | `acquire_point(time, accums)`                                                           | 仅作为兼容路径；必须持续 heartbeat 并声明不可中断区间             |
+| `stage`        | `move_absolute(x,y,z)`, `wait_settled()`, `stop()`, `get_position()` | RPC 毫秒级，机械动作按 timeout 约束 |
+| `camera`       | `capture_frame()`, `start_stream()`, `stop_stream()`                 | 单帧通常 ≥400 ms |
+| `spectrometer` | `begin/poll/cancel/collect` *或* `acquire_point()`                  | 取决于底层后端是否支持 resume-friendly lifecycle |
 | `thermal` (加热台，未来)    | `set_target_temp(t)`, `get_current_temp()`, `wait_stable()`                             | `wait_stable()` 是设备级 wait loop，不是实验 workflow |
+
+
+### B 类：设备侧确定性复合动作（Python runtime 执行）
+
+这类动作靠近硬件、依赖设备 session 语义，而且已经在 `docs/Raman` 中沉淀为稳定模块。它们不是 agent-facing tool，也不是自由生长的“黑盒脚本”；它们必须有明确输入输出、progress/checkpoint/error contract，以及可审计的 artifact。
+
+
+| 动作域 | 当前 Raman 参考实现 | 推荐边界 |
+| --- | --- | --- |
+| `autofocus` | `autofocus.controller.AutofocusController.run_single()` | 保持为单个确定性动作，返回 `FocusResult`、曲线、置信度、失败类型 |
+| `xy_correction` | `calibration.stage_adapter.estimate_and_apply_xy_correction()` | 允许在设备侧完成“估计 + 应用”，但必须受 spec 里的位移/置信度 guard 约束 |
+| `spectrometer` | `mapping.labspec.*RamanAcquirer.acquire_point()` | 允许内部 poll/cancel/timeout；若未来后端支持更细粒度 lifecycle，再升级为 begin/poll/cancel/collect |
+| `point_runner` | `mapping.runner.MappingRunner._run_point()` | 可作为 domain runtime 参考实现；TS 是否直接调用取决于 records/resume 颗粒度要求 |
 
 
 ### C 类：无状态纯算法（Python 侧算力服务）
@@ -60,17 +75,17 @@ Python Bridge (Device-Stateful HAL)
 | `calibration`      | `fit_matrix`        | `shifts_array` -> `2x2_matrix, residuals`          |
 
 
-### B 类：复合业务流程（**全部上移至 TS 层编排**）
+### 实验级复合流程（TS 层编排）
 
-以前在 Python 中的长逻辑，现在由 TS 的 `async/await` 控制。
+TS 仍然拥有实验级 sequencing，但这里的“编排”应发生在 **unit / phase / device coordination** 层，而不是机械地把每一个硬件邻近扫描步都改写成 TS 微步。
 
 
 | 流程                       | TS 侧伪代码逻辑                                                                                                                                  | 优势与稳定性增强                                                     |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| **Z Autofocus**          | `for (z in range) { await stage.move(z); await snapshot(); img = await camera.capture(); score = await alg.calc(img); await snapshot(); }` | autofocus 的每个扫描步都能 checkpoint。崩溃后可判断最后位置、已采图像、是否需要回零或重扫。     |
-| **XY 校正**                | `img = await camera.capture(); shift = await alg.phase_corr(ref, img); await stage.move(shift)`                                            | 灵活的介入点。如果置信度极低，TS 可以直接挂起任务并向 LLM 请求人工确认。                     |
-| **Spectrum Acquisition** | `id = await spec.begin(); while (!done) { await snapshot(); await sleep(); state = await spec.poll(id); } await spec.collect(id)`          | 长积分不再是黑盒 RPC；watchdog、operator abort、resume policy 可以看到真实进度。 |
-| **Run Unit**             | `await visit(); await focus(); await correct_xy(); await thermal.wait_stable(); await acquire();`                                          | 方便插入新设备等待逻辑，例如采谱前等待加热台稳定。                                    |
+| **Z Autofocus** | `focus = await raman.autofocus.run_single(...)` | TS 记录动作开始/完成、曲线 artifact、失败类型；无需重写 coarse/fine/backlash 细节 |
+| **XY 校正** | `corr = await raman.xy_correct.estimate_and_apply(...)` | TS 决定是否启用、是否因低置信度暂停；设备侧负责图像配准与位移执行 |
+| **Spectrum Acquisition** | `result = await raman.spectrometer.acquire_point(...)` *或* `begin/poll/cancel/collect` | 生命周期细粒度由后端能力决定；关键是 progress/cancel/recovery contract 清晰 |
+| **Run Unit** | `await visit(); await autofocus?; await xy_correct?; await thermal.wait?; await acquire();` | 方便插入新设备等待逻辑，同时保留 Raman 设备侧优化过的局部闭环 |
 
 
 ## 稳定性与长周期实验保障 (Reliability & Resume)
@@ -79,10 +94,10 @@ Python Bridge (Device-Stateful HAL)
 
 ### 1. 状态外置与断点续传 (Resume Snapshot)
 
-- Python 不持有 workflow 进度；所有实验进度状态由 TS 管理并持久化。
-- TS Kernel 每完成一个微步（例如 stage 到达目标点、获得一张有效参考帧、开始一次谱采集、谱采集完成）都会刷新 `resume.snapshot.json`。
-- snapshot 至少记录：`runId`、`unitIndex`、`microstep`、`commandId`、最近已确认物理位置、已生成 artifact、正在进行的 acquisition id、下一步计划、`safeToResume`。
-- **灾难恢复**：如果 Python 进程崩溃（`bridge_crashed`）甚至 Node 进程重启，TS 重启后读取 snapshot，重新 spawn Python Bridge，并先执行 hardware reconcile（例如读取 stage position、查询 pending acquisition、确认 LabSpec 输出文件），再决定 resume / pause / abort。
+- Python 不持有**跨 unit / 跨 run** 的 workflow 进度；所有实验进度状态仍由 TS 管理并持久化。
+- TS Kernel 至少要在 unit 边界、phase 边界和长动作边界刷新 `resume.snapshot.json`。如果某个设备侧 compound action 能发出更细粒度 checkpoint，TS 应该消费并落盘，但**不要求为了 checkpoint 而把动作强行拆回 TS 微步**。
+- snapshot 至少记录：`runId`、`unitIndex`、`phase`、`action`、`commandId`、最近已确认物理位置、已生成 artifact、下一步计划、`safeToResume`。仅当后端真的暴露 acquisition/session id 时，才额外记录该 id。
+- **灾难恢复**：如果 Python 进程崩溃（`bridge_crashed`）甚至 Node 进程重启，TS 重启后读取 snapshot，重新 spawn Python Bridge，并先执行 hardware reconcile（例如读取 stage position、确认最近一次 autofocus/采谱是否已产出 artifact、检查 LabSpec 输出文件），再决定 resume / pause / abort。
 - 自动恢复只允许发生在显式标记 `safeToResume=true` 的边界；否则进入 `paused/recovering`，要求 operator 审核。
 
 ### 2. 精细化的错误隔离与 Agent 介入
@@ -94,15 +109,15 @@ Python Bridge (Device-Stateful HAL)
 
 ## Bridge 进程与 JSON-RPC 协议设计 (V2)
 
-**长驻 `hardware_bridge.py`**：统一的 RPC 服务器，内部按 Device Domain 路由。Bridge 是 workflow-stateless，但持有 device session，并对所有 side-effecting 命令执行防御式 single-flight。
+**长驻 `hardware_bridge.py`**：统一的 RPC 服务器，内部按 Device Domain 路由。Bridge 不持有实验级 workflow，但可以承载设备侧 deterministic action，并对所有 side-effecting 命令执行防御式 single-flight。
 
 ### 协议格式升级：引入 Domain Routing
 
 ```jsonc
 // TS -> Python
 {"id":"c-001","domain":"stage","action":"move_absolute","payload":{"xUm":10,"yUm":20},"timeoutMs":3000}
-{"id":"c-002","domain":"algorithm","action":"calc_focus_score","payload":{"imagePath":"/tmp/a.png"},"timeoutMs":1000}
-{"id":"c-003","domain":"spectrometer","action":"begin_acquisition","payload":{"integrationTimeS":360,"accumulations":1}}
+{"id":"c-002","domain":"autofocus","action":"run_single","payload":{"roi":{...},"params":{...}},"timeoutMs":30000}
+{"id":"c-003","domain":"spectrometer","action":"acquire_point","payload":{"pointId":"p-001","integrationTimeS":360,"accumulations":1}}
 
 // Python -> TS (保持一致)
 {"id":"c-001","ok":true,"result":{"xUm":10,"yUm":20,"zUm":0}}
@@ -143,7 +158,7 @@ interface HardwareActionContract {
 1. **V2 Bridge 破冰**：新建 `hardware_bridge_v2.py`。建立极简的 Device Router。先将最边缘的纯算法（C类）如 `phase_correlation` 迁移到 V2，并在 TS 端重写调用逻辑。
 2. **硬件驱动抽离**：将 `MCNewtonXYZStageController` 从原有桥接代码中解耦，注册入 V2 Bridge。在 TS 层实现 V2 版本的 `move` 和 `wait_settled`。
 3. **长动作生命周期化**：将谱采集从单次 `acquire_point` 优先迁移为 `begin/poll/cancel/collect`。先保证 heartbeat、operator abort、timeout 和 artifact 落盘语义正确。
-4. **流程倒置**：在 TS 层用 V2 primitive 重写 `autofocus` 循环、XY correction 和 `run_unit`。双轨运行测试通过后，废弃旧的 `raman_bridge.py`。
+4. **按恢复收益决定是否上移**：只有当某个闭环必须与其他设备强协调，或必须暴露更细粒度 resume 语义时，才把它从设备侧 compound action 进一步拆回 TS；否则优先复用 `docs/Raman` 中已经优化过的 deterministic runtime。
 5. **扩展新设备**：新增加热台（Thermal）设备。Python 只实现 driver primitive 和 action contract；TS 通过已有 resource lease、snapshot 和 watchdog 机制接入。
 
 ## 开发进度与剩余 Goal
@@ -154,7 +169,7 @@ interface HardwareActionContract {
 | --- | --- | --- |
 | G1-G4 | 已完成 | `hardware_bridge_v2.py`、TS V2 client、算法/Stage primitive、spectrometer lifecycle 已落地。`test:hardware-bridge-v2` 已覆盖协议、算法、stage、camera、thermal fake primitive、spectrometer lifecycle。 |
 | G5 | 已完成 | microstep snapshot、resume/reconcile、artifact 对账已落地。`test:raman-v2-resume` 已覆盖 resume/pause/abort 分支。 |
-| G6 | 已完成 | autofocus、XY correction、spectrum lifecycle 的 TS orchestration 已落地。`test:raman-v2-orchestrator` 与 `test:raman-v2-hardware-run` 已覆盖编排、恢复点和 LabSpec file-bridge 路径。 |
+| G6 | 已完成 | TS 侧 unit orchestration、恢复点管理，以及 autofocus / XY correction / spectrum 的 bridge-backed action integration 已落地。`test:raman-v2-orchestrator` 与 `test:raman-v2-hardware-run` 已覆盖编排、恢复点和 LabSpec file-bridge 路径。 |
 | G7 | 已完成（仅 fake thermal） | thermal domain、resource lease 和 wait 语义已接入 V2；但当前 real runtime 仍拒绝 thermal waiting，因此这不等于 real thermal parity 已完成。 |
 | G8.1-G8.4 | 已完成 | `v2ValidationId` gate、parity checks、`validatedCoverage`、spec pair / payload draft / readiness tooling、runbook 和 `sample_registry` 已补齐。`test:raman-v2-validation` 当前为 18/18 通过。 |
 | G8.5 | 未完成 | 还没有首份 production-ready 的 **real-hardware** V2 validation record。当前缺口不在架构，而在现场证据链。 |

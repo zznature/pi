@@ -63,12 +63,6 @@ Raman readiness currently includes:
   `raman_record_xy_calibration`, persisted under
   `.pi/experiment-runs/lab/calibrations` and referenced by
   `domain.raman.xyCorrection.transformArtifactId`;
-- operator-approved hardware coordinate audit records through
-  `record_hardware_coordinate_audit`, persisted under
-  `.pi/experiment-runs/lab/coordinate-audits` and referenced by
-  `hardwareExecution.coordinateAuditId` for supervised real hardware runs.
-  The audit binds the reviewed `subject + plan` coordinates rather than the
-  whole ExperimentSpec so non-coordinate edits do not invalidate the audit;
 - operator-approved Raman XY calibration fitting through
   `raman_fit_xy_calibration`, which estimates `pixelPerUm` from non-collinear
   stage shifts and reference/current frame pairs before writing the same
@@ -125,9 +119,11 @@ Raman readiness currently includes:
   `raman_check_hardware_validation`, which can re-verify stored evidence and,
   when given a candidate ExperimentSpec, also verify that the validation record
   covers the requested Raman capability surface before real hardware execution;
-- Raman hardware gates require a `labspec-workstation` workspace lease and
-  explicit `ramanSafety` laser-power confirmation plus exposure-energy
-  confirmation when `limits.powerEnergy.maxExposureEnergyMj` is set;
+- MVP Raman hardware launch now uses a minimal deterministic safety gate only:
+  - `limits.motion.zUm.maxUm = Raman objective collision ceiling`
+  - `limits.powerEnergy.maxLaserPowerMw = laser ceiling`
+  Everything else is readiness, diagnostics, or optional audit metadata and no
+  longer blocks `run_experiment`;
 - bridge-backed Raman `run_experiment` execution for the minimal
   `visit_point + acquire` path, returning immediately with a `runId` and
   updating `poll_run` state through `resume.snapshot.json`;
@@ -152,9 +148,15 @@ The next hardware milestone is validating the `labspec_file_bridge`
 acquisition/autofocus path and `phase_correlation` XY correction path against
 the real LabSpec worker, camera stream, stage, and operator safety workflow.
 
-Hardware execution requires a matching dry-run `specHash`, a capability
-snapshot, explicit operator approval, and for supervised real hardware on the
-MC.Newton path, a matching `hardwareExecution.coordinateAuditId`.
+For MVP Raman work, hardware execution is intentionally simple:
+
+- `run_preflight` remains useful for readiness checks, but it does not create a
+  launch approval gate;
+- `run_experiment` blocks only on backend executability plus the two bounded
+  safety limits above;
+- coordinate audits, validation records, and operator approval payloads remain
+  available as optional maintenance or traceability tools and are no longer
+  required before launch.
 
 New `run_experiment` hardware calls should pass `hardwareExecution` parameters.
 The legacy `hardwarePilot` parameter remains accepted during migration, but a
@@ -165,12 +167,13 @@ single call must not provide both aliases.
 1. Compile a bounded `ExperimentSpec`.
 2. Run `validate_experiment_spec`.
 3. Run `run_preflight`.
-4. For supervised real hardware, record and review a hardware coordinate audit.
-5. For hardware, review the dry-run report and record operator approval.
-6. Run `run_experiment`.
-7. Run `analyze_run`.
-8. Run `plan_next_experiment`.
-9. Compile the returned strategy into the next bounded `ExperimentSpec`.
+4. For Raman hardware, confirm:
+   - all planned Z stays below `limits.motion.zUm.maxUm`
+   - requested laser power stays below `limits.powerEnergy.maxLaserPowerMw`
+5. Run `run_experiment`.
+6. Run `analyze_run`.
+7. Run `plan_next_experiment`.
+8. Compile the returned strategy into the next bounded `ExperimentSpec`.
 
 The agent must not change run parameters while a run is active.
 
