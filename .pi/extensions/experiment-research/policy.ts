@@ -1,6 +1,6 @@
 import type { Capabilities } from "./capabilities.ts";
 import type { LabState } from "./lab-state.ts";
-import { getExperimentPoints, getInstrumentResourceIds } from "./spec-utils.ts";
+import { getExperimentPoints, getInstrumentResourceIds, ramanRequestsAcquisition, ramanRequestsAutofocus } from "./spec-utils.ts";
 import type { ExperimentSpec, ValidationIssue } from "./schemas.ts";
 
 export interface PolicyContext {
@@ -62,10 +62,10 @@ function validateHardwarePilotScope(spec: ExperimentSpec): ValidationIssue[] {
 		if (!hasLabSpecWorkstation) {
 			issues.push(issue("resources", "Raman hardware runs require labspec-workstation workspace lease"));
 		}
-		if (raman.acquisition && !instrumentIds.includes("lab-acquirer")) {
+		if (ramanRequestsAcquisition(spec) && !instrumentIds.includes("lab-acquirer")) {
 			issues.push(issue("resources", "Raman acquisition requires lab-acquirer"));
 		}
-		const requiresFrames = raman.autofocus?.enabled === true || raman.xyCorrection?.enabled === true;
+		const requiresFrames = ramanRequestsAutofocus(spec) || raman.xyCorrection?.enabled === true;
 		if (requiresFrames && !instrumentIds.includes("lab-camera")) {
 			issues.push(issue("resources", "Raman autofocus or XY correction requires lab-camera"));
 		}

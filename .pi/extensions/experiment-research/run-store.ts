@@ -230,7 +230,6 @@ function normalizeSpecForGate(spec: ExperimentSpec): unknown {
 	return {
 		...spec,
 		mode: "hardware_gate",
-		operatorApprovalRequired: true,
 	};
 }
 

@@ -19,8 +19,7 @@
 			"zUm": { "minUm": -10, "maxUm": 10 }
 		},
 		"powerEnergy": {
-			"maxLaserPowerMw": 1,
-			"maxExposureEnergyMj": 5
+			"maxLaserPowerMw": 1
 		},
 		"acquisition": {
 			"maxExposureMs": 100,
@@ -38,6 +37,5 @@
 		"maxRuntimeMinutes": 5,
 		"maxUnits": 4,
 		"stopOnError": true
-	},
-	"operatorApprovalRequired": false
+	}
 }

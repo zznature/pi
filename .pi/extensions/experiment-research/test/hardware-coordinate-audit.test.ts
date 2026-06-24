@@ -75,36 +75,6 @@ function baseHardwareExecution(coordinateAuditId?: string) {
 	};
 }
 
-function zOnlyHardwareSpec(): ExperimentSpec {
-	const base = loadSpec("hw/spec.json");
-	return {
-		...base,
-		specId: "spec-z-only-adjustment",
-		objective: "Move only Z to a bounded absolute position.",
-		limits: {
-			...base.limits,
-			motion: {
-				xUm: { minUm: 900, maxUm: 1000 },
-				yUm: { minUm: 1500, maxUm: 1600 },
-				zUm: { minUm: 2000, maxUm: 2200 },
-			},
-			acquisition: {
-				maxExposureMs: 100,
-				maxUnits: 1,
-			},
-		},
-		plan: {
-			kind: "points",
-			points: [{ xUm: 947.997, yUm: 1581.384, zUm: 2105.665 }],
-		},
-		stoppingRules: {
-			maxRuntimeMinutes: 1,
-			maxUnits: 1,
-			stopOnError: true,
-		},
-	};
-}
-
 test("record_hardware_coordinate_audit writes an operator-approved coordinate audit record", async () => {
 	const cwd = tempCwd();
 	try {
@@ -141,7 +111,31 @@ test("record_hardware_coordinate_audit writes an operator-approved coordinate au
 	}
 });
 
-test("run_preflight warns when a planned real hardware launch preview lacks coordinateAuditId", () => {
+test("run_preflight real hardware preview stays ready without coordinateAuditId", () => {
+	const cwd = tempCwd();
+	return withSimulatedHardwareDisabled(() => {
+		try {
+			const spec = loadSpec("hw/spec.json");
+			const result = dispatch(
+				"run_preflight",
+				{ spec, hardwareExecution: { stageAdapter: "mc_newton_xyz", stagePort: "COM_TEST" } },
+				{ cwd, commandId: "missing-coordinate-audit-preview" },
+			);
+			assert.equal(result.status, "success");
+			const launchReadiness = asRecord(asRecord(result.stateAfter).launchReadiness);
+			assert.equal(launchReadiness.required, true);
+			assert.equal(launchReadiness.evaluated, true);
+			assert.equal(launchReadiness.ready, true);
+			const issues = launchReadiness.issues;
+			assert.ok(Array.isArray(issues));
+			assert.equal(issues.some((issue) => String(issue).includes("coordinateAuditId")), false);
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+});
+
+test("run_preflight backend warnings stay backend-only when coordinateAuditId is omitted", () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
@@ -149,102 +143,21 @@ test("run_preflight warns when a planned real hardware launch preview lacks coor
 			const result = dispatch(
 				"run_preflight",
 				{ spec, hardwareExecution: { stageAdapter: "mc_newton_xyz" } },
-				{ cwd, commandId: "missing-coordinate-audit-preview" },
+				{ cwd, commandId: "missing-coordinate-audit-preview-backend" },
 			);
 			assert.equal(result.status, "warning");
-			assert.match(result.summary, /planned real hardware launch is not ready/);
 			const launchReadiness = asRecord(asRecord(result.stateAfter).launchReadiness);
-			assert.equal(launchReadiness.required, true);
-			assert.equal(launchReadiness.evaluated, true);
-			assert.equal(launchReadiness.ready, false);
 			const issues = launchReadiness.issues;
 			assert.ok(Array.isArray(issues));
-			assert.ok(issues.some((issue) => String(issue).includes("coordinateAuditId")));
+			assert.ok(issues.some((issue) => String(issue).includes("stagePort")));
+			assert.equal(issues.some((issue) => String(issue).includes("coordinateAuditId")), false);
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}
 	});
 });
 
-test("run_experiment rejects supervised real hardware without coordinateAuditId", () => {
-	const cwd = tempCwd();
-	return withSimulatedHardwareDisabled(() => {
-		try {
-			const spec = loadSpec("hw/spec.json");
-			const result = dispatch(
-				"run_experiment",
-				{ spec, hardwareExecution: baseHardwareExecution() },
-				{ cwd, commandId: "missing-coordinate-audit-run" },
-			);
-			assert.equal(result.errorCode, "hardware_gate_failed");
-			assert.match(result.summary, /coordinate audit gate/);
-			const issues = asRecord(result.stateAfter).issues as string[];
-			assert.ok(issues.some((issue) => issue.includes("coordinateAuditId")));
-		} finally {
-			rmSync(cwd, { recursive: true, force: true });
-		}
-	});
-});
-
-test("run_experiment accepts bounded Z adjustment coordinate audit exemption before the dry-run gate", () => {
-	const cwd = tempCwd();
-	return withSimulatedHardwareDisabled(() => {
-		try {
-			const spec = zOnlyHardwareSpec();
-			const result = dispatch(
-				"run_experiment",
-				{
-					spec,
-					hardwareExecution: {
-						...baseHardwareExecution(),
-						coordinateAuditExemption: "bounded_z_adjustment",
-					},
-				},
-				{ cwd, commandId: "bounded-z-adjustment-exemption-run" },
-			);
-			assert.equal(result.errorCode, "hardware_gate_failed");
-			assert.match(result.summary, /Hardware gate failed/);
-			const issues = asRecord(result.stateAfter).issues as string[];
-			assert.ok(issues.some((issue) => issue.includes("dry-run preflight")));
-			assert.equal(issues.some((issue) => issue.includes("coordinateAuditId") || issue.includes("coordinate audit")), false);
-		} finally {
-			rmSync(cwd, { recursive: true, force: true });
-		}
-	});
-});
-
-test("run_experiment rejects bounded Z adjustment exemption outside z motion limits", () => {
-	const cwd = tempCwd();
-	return withSimulatedHardwareDisabled(() => {
-		try {
-			const spec = {
-				...zOnlyHardwareSpec(),
-				plan: {
-					kind: "points" as const,
-					points: [{ xUm: 947.997, yUm: 1581.384, zUm: 2300 }],
-				},
-			};
-			const result = dispatch(
-				"run_experiment",
-				{
-					spec,
-					hardwareExecution: {
-						...baseHardwareExecution(),
-						coordinateAuditExemption: "bounded_z_adjustment",
-					},
-				},
-				{ cwd, commandId: "bounded-z-adjustment-exemption-out-of-range-run" },
-			);
-			assert.equal(result.errorCode, "policy_rejected");
-			const issues = asRecord(result.stateAfter).issues as Array<{ message: string }>;
-			assert.ok(issues.some((issue) => issue.message.includes("outside ExperimentSpec motion limits")));
-		} finally {
-			rmSync(cwd, { recursive: true, force: true });
-		}
-	});
-});
-
-test("run_experiment rejects coordinateAuditId records that do not match the current subject and plan", async () => {
+test("run_experiment backend gate ignores coordinateAuditId metadata", async () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabledAsync(async () => {
 		try {
@@ -254,8 +167,6 @@ test("run_experiment rejects coordinateAuditId records that do not match the cur
 				points: [
 					{ xUm: 1, yUm: 0, zUm: 0 },
 					{ xUm: 10, yUm: 0, zUm: 0 },
-					{ xUm: 10, yUm: 10, zUm: 0 },
-					{ xUm: 0, yUm: 10, zUm: 0 },
 				],
 			};
 			const record = await recordHardwareCoordinateAuditTool.execute(
@@ -275,46 +186,35 @@ test("run_experiment rejects coordinateAuditId records that do not match the cur
 			const result = dispatch(
 				"run_experiment",
 				{ spec, hardwareExecution: baseHardwareExecution("coord-audit-mismatch") },
-				{ cwd, commandId: "mismatched-coordinate-audit-run" },
+				{ cwd, commandId: "coord-audit-metadata-run" },
 			);
 			assert.equal(result.errorCode, "hardware_gate_failed");
+			assert.match(result.summary, /backend executability gate/);
 			const issues = asRecord(result.stateAfter).issues as string[];
-			assert.ok(issues.some((issue) => issue.includes("does not match the current hardware subject/plan coordinates")));
+			assert.ok(issues.some((issue) => issue.includes("stagePort")));
+			assert.equal(issues.some((issue) => issue.includes("coordinateAuditId") || issue.includes("coordinate audit")), false);
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}
 	});
 });
 
-test("run_experiment gets past the coordinate audit gate when the coordinateAuditId matches the current plan", async () => {
+test("run_experiment rejects legacy coordinateAuditExemption params after schema cleanup", () => {
 	const cwd = tempCwd();
-	return withSimulatedHardwareDisabledAsync(async () => {
+	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("hw/spec.json");
-			const record = await recordHardwareCoordinateAuditTool.execute(
-				"record-ready-coordinate-audit",
-				{
-					coordinateAuditId: "coord-audit-match",
-					approval: { approvalId: "appr-coord-audit-match", operator: "tester", approved: true },
-					subject: spec.subject,
-					plan: spec.plan,
-				},
-				undefined,
-				undefined,
-				toolContext(cwd),
-			);
-			assert.equal(record.details.status, "success");
-
 			const result = dispatch(
 				"run_experiment",
-				{ spec, hardwareExecution: baseHardwareExecution("coord-audit-match") },
-				{ cwd, commandId: "matching-coordinate-audit-run" },
+				{
+					spec: loadSpec("hw/spec.json"),
+					hardwareExecution: {
+						...baseHardwareExecution(),
+						coordinateAuditExemption: "bounded_z_adjustment",
+					},
+				},
+				{ cwd, commandId: "legacy-coordinate-audit-exemption-run" },
 			);
-			assert.equal(result.errorCode, "hardware_gate_failed");
-			assert.match(result.summary, /Hardware gate failed/);
-			const issues = asRecord(result.stateAfter).issues as string[];
-			assert.ok(issues.some((issue) => issue.includes("dry-run preflight")));
-			assert.equal(issues.some((issue) => issue.includes("coordinateAuditId")), false);
+			assert.equal(result.errorCode, "invalid_tool_params");
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}

@@ -44,6 +44,7 @@ function ramanV2Spec(mode: "dry_run" | "hardware"): ExperimentSpec {
 			},
 			raman: {
 				...spec.domain?.raman,
+				operationIntent: "autofocus_then_acquire",
 				autofocus: {
 					enabled: true,
 					every: { kind: "everyNPoints", n: 1 },
@@ -79,8 +80,6 @@ function baseApproval(dryRunReportId: string): HardwareExecutionParams["approval
 		ramanSafety: {
 			laserPowerConfirmed: true,
 			confirmedLaserPowerMw: 1,
-			labSpecWorkerReady: true,
-			windowsPowerPolicyReady: true,
 		},
 	};
 }

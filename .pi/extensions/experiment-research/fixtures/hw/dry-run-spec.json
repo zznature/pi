@@ -39,6 +39,5 @@
 		"maxRuntimeMinutes": 5,
 		"maxUnits": 4,
 		"stopOnError": true
-	},
-	"operatorApprovalRequired": false
+	}
 }

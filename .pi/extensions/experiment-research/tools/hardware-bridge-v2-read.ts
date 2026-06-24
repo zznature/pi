@@ -48,7 +48,7 @@ export const hardwareBridgeV2ReadTool = {
 	promptGuidelines: [
 		"Use this tool only for hardware_bridge_v2 actions whose contract reports sideEffectLevel read.",
 		"Do not use this tool to move a stage, change temperature, start acquisition, collect artifacts, or change laser/power state.",
-		"Read-only calls do not require coordinateAuditId; coordinateAuditId remains required before supervised real motion or acquisition.",
+		"Use read-only calls to recover measured hardware state for planning; do not substitute guessed coordinates when compiling a real hardware spec.",
 	],
 	parameters: HardwareBridgeV2ReadParamsSchema,
 	executionMode: "sequential",
@@ -81,7 +81,7 @@ export const hardwareBridgeV2ReadTool = {
 					toolCallId,
 					`Hardware bridge V2 action ${params.domain}.${params.action} is not read-only.`,
 					"hardware_gate_failed",
-					["Use run_preflight/run_experiment and the hardware approval gates for non-read hardware actions."],
+					["Use run_preflight/run_experiment and the bounded hardware safety contract for non-read hardware actions."],
 					{ contract },
 					false,
 				);
@@ -97,7 +97,7 @@ export const hardwareBridgeV2ReadTool = {
 				toolCallId,
 				`Hardware bridge V2 read action ${params.domain}.${params.action} completed.`,
 				{ contract, response },
-				["Use readback values as planning input; do not execute real motion or acquisition without the required gates."],
+				["Use readback values as planning input; execute real motion or acquisition only through run_preflight/run_experiment."],
 			);
 			return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };
 		} catch (error) {

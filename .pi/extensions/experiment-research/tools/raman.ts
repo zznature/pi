@@ -115,7 +115,7 @@ function readinessSuccessResult(toolCallId: string, params: RamanHardwareValidat
 		summary: `Raman hardware validation ${params.validationId} is ready for workflowBackend ${params.workflowBackend}.`,
 		nextActions:
 			params.workflowBackend === "v2_bridge"
-				? ["Use this validationId in hardwareExecution.raman.v2ValidationId for supervised real V2 runs."]
+				? ["Optionally reference this validationId from hardwareExecution.raman.v2ValidationId when the lab wants explicit readiness or traceability linkage."]
 				: ["Record the reviewed validationId in operator runbooks before supervised hardware execution."],
 		artifacts: [
 			{
@@ -152,11 +152,11 @@ export const ramanHardwareValidationReadinessTool = {
 	name: "raman_check_hardware_validation",
 	label: "Check Raman Hardware Validation",
 	description: "Read and re-verify a stored Raman hardware validation record before real hardware execution.",
-	promptSnippet: "Check whether a Raman hardware validation record is still ready for real V2 hardware runs",
+	promptSnippet: "Check whether a Raman hardware validation record is still usable as real V2 readiness or traceability evidence",
 	promptGuidelines: [
 		"Use raman_check_hardware_validation before real V2 hardware runs or after evidence files change.",
 		"Do not assume a stored productionReady record is still valid without rechecking referenced evidence.",
-		"Provide spec when you need to verify that a validation record covers the candidate real hardware run.",
+		"Provide spec when you need to verify that a validation record still covers the candidate real hardware run.",
 	],
 	parameters: RamanHardwareValidationReadinessParamsSchema,
 	executionMode: "sequential",
@@ -397,7 +397,7 @@ export const ramanValidationSpecPairTool = {
 					summary: "Derived Raman dry-run validation spec does not match the hardware spec hash family.",
 					nextActions: [
 						"Do not use this pair for preflight evidence until the hardware and dry-run specs hash-match.",
-						"Inspect fields beyond mode/operatorApprovalRequired that changed the canonical spec hash.",
+						"Inspect fields beyond mode that changed the canonical spec hash.",
 					],
 					artifacts: [],
 					commandId: toolCallId,
@@ -434,16 +434,16 @@ export const ramanValidationSpecPairTool = {
 							stopConditionMet: true,
 						}
 					: {
-							status: "success",
-							summary: "Derived Raman dry-run validation spec matches the hardware validation spec family and covers the full V2 validation surface.",
-							nextActions: [
-								"Use the returned dryRunSpec with run_preflight before the real hardware validation run.",
-								"Keep capabilityCoverage unchanged when adapting coordinates, IDs, or environment details on site.",
-							],
-							artifacts: [],
-							commandId: toolCallId,
-							correlationId: toolCallId,
-							stateAfter,
+						status: "success",
+						summary: "Derived Raman dry-run validation spec matches the hardware validation spec family and covers the full V2 validation surface.",
+						nextActions: [
+							"Use the returned dryRunSpec with run_preflight before the real hardware validation run.",
+							"Keep capabilityCoverage unchanged when adapting coordinates, IDs, or environment details on site.",
+						],
+						artifacts: [],
+						commandId: toolCallId,
+						correlationId: toolCallId,
+						stateAfter,
 							stopConditionMet: false,
 						};
 		return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result };

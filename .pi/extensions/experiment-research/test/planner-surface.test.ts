@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import experimentResearchExtension from "../index.ts";
 import { EXPERIMENT_RESEARCH_PROMPT } from "../prompt.ts";
-import { getLabCapabilitiesTool, getLabStateTool, runPreflightTool, validateExperimentSpecTool } from "../tools/planner.ts";
+import { getLabCapabilitiesTool, getLabStateTool, runExperimentTool, runPreflightTool, validateExperimentSpecTool } from "../tools/planner.ts";
 
 function tempCwd(): string {
 	return mkdtempSync(join(tmpdir(), "exp-planner-surface-"));
@@ -62,9 +62,9 @@ test("planner lab tools separate static capabilities from dynamic activity state
 		assert.equal(Object.hasOwn(capabilitiesState, "capabilities"), true);
 		assert.equal(Object.hasOwn(capabilitiesState, "activeRunId"), false);
 		const planningConstraints = asRecord(capabilitiesState.planningConstraints);
-		assert.equal(planningConstraints.hardwareRequiresAuditedAbsoluteCoordinates, true);
+		assert.equal(planningConstraints.hardwareRequiresMeasuredAbsoluteCoordinates, true);
 		assert.equal(planningConstraints.plannerMustRequestMissingCoordinates, true);
-		assert.equal(planningConstraints.supervisedRealHardwareRequiresCoordinateAuditId, true);
+		assert.equal(planningConstraints.ramanMvpLaunchUsesDamageInvariantsOnly, true);
 
 		const activityResult = await getLabStateTool.execute("planner-lab-state", {}, undefined, undefined, toolContext(cwd));
 		assert.equal(activityResult.details.status, "success");
@@ -94,8 +94,11 @@ test("planner prompt and tool guidance forbid placeholder hardware specs and red
 	assert.match(EXPERIMENT_RESEARCH_PROMPT, /Reuse the latest get_lab_capabilities result/);
 	assert.match(EXPERIMENT_RESEARCH_PROMPT, /Use get_lab_state only when current active-run, pause, or recovery state may affect the next action/);
 	assert.match(EXPERIMENT_RESEARCH_PROMPT, /contract-gated read-only hardware_bridge_v2_read/);
-	assert.match(EXPERIMENT_RESEARCH_PROMPT, /operator-audited absolute coordinates/);
+	assert.match(EXPERIMENT_RESEARCH_PROMPT, /guessed coordinates/);
 	assert.match(EXPERIMENT_RESEARCH_PROMPT, /placeholder origin points/);
+	assert.match(EXPERIMENT_RESEARCH_PROMPT, /backend executability plus two bounded damage invariants/);
+	assert.doesNotMatch(EXPERIMENT_RESEARCH_PROMPT, /coordinateAuditId/);
+	assert.doesNotMatch(EXPERIMENT_RESEARCH_PROMPT, /v2ValidationId/);
 
 	assert.ok(
 		getLabCapabilitiesTool.promptGuidelines.some((guideline) => guideline.includes("Do not re-call get_lab_capabilities")),
@@ -104,11 +107,16 @@ test("planner prompt and tool guidance forbid placeholder hardware specs and red
 		getLabStateTool.promptGuidelines.some((guideline) => guideline.includes("Do not use get_lab_state as the default static capability lookup")),
 	);
 	assert.ok(
-		validateExperimentSpecTool.promptGuidelines.some((guideline) =>
-			guideline.includes("collect operator-audited absolute coordinates"),
-		),
+		validateExperimentSpecTool.promptGuidelines.some((guideline) => guideline.includes("collect measured absolute coordinates")),
 	);
 	assert.ok(
 		runPreflightTool.promptGuidelines.some((guideline) => guideline.includes("placeholder hardware specs")),
+	);
+	assert.ok(
+		runExperimentTool.promptGuidelines.some((guideline) => guideline.includes("bounded collision and laser ceilings")),
+	);
+	assert.equal(
+		runExperimentTool.promptGuidelines.some((guideline) => guideline.includes("coordinateAuditId") || guideline.includes("v2ValidationId")),
+		false,
 	);
 });

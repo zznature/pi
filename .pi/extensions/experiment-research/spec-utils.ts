@@ -1,4 +1,4 @@
-import type { ExperimentSpec } from "./schemas.ts";
+import type { ExperimentSpec, RamanOperationIntent } from "./schemas.ts";
 
 export interface ExperimentPoint {
 	index: number;
@@ -52,8 +52,21 @@ export function deriveDryRunSpecFromHardware(spec: ExperimentSpec): ExperimentSp
 	return {
 		...spec,
 		mode: "dry_run",
-		operatorApprovalRequired: false,
 	};
+}
+
+export function getRamanOperationIntent(spec: ExperimentSpec): RamanOperationIntent | undefined {
+	return spec.domain?.raman?.operationIntent;
+}
+
+export function ramanRequestsAutofocus(spec: ExperimentSpec): boolean {
+	const intent = getRamanOperationIntent(spec);
+	return intent === "autofocus_only" || intent === "autofocus_then_acquire";
+}
+
+export function ramanRequestsAcquisition(spec: ExperimentSpec): boolean {
+	const intent = getRamanOperationIntent(spec);
+	return intent === "acquire_only" || intent === "autofocus_then_acquire";
 }
 
 export interface RamanValidationCoverage {

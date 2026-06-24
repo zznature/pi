@@ -86,14 +86,12 @@ test("watchdog reads operator abort intent from file and overrides health", () =
 });
 
 test("policy accepts hardware spec without operator approval flag", () => {
-	const spec = { ...loadSpec("hw/spec.json"), operatorApprovalRequired: false };
-	const result = validatePolicy(spec, getLabState(), { toolName: "run_experiment" });
+	const result = validatePolicy(loadSpec("hw/spec.json"), getLabState(), { toolName: "run_experiment" });
 	assert.equal(result.valid, true);
 });
 
 test("policy allows hardware preflight without operator approval flag", () => {
-	const spec = { ...loadSpec("hw/spec.json"), operatorApprovalRequired: false };
-	const result = validatePolicy(spec, getLabState(), { toolName: "run_preflight" });
+	const result = validatePolicy(loadSpec("hw/spec.json"), getLabState(), { toolName: "run_preflight" });
 	assert.equal(result.valid, true);
 });
 
@@ -165,8 +163,7 @@ test("hardware gate ignores hardware-mode preflight reports", () => {
 test("run_preflight accepts hardware spec without operator approval flag", () => {
 	const cwd = tempCwd();
 	try {
-		const spec = { ...loadSpec("hw/spec.json"), operatorApprovalRequired: false };
-		const result = dispatch("run_preflight", { spec }, { cwd, commandId: "hardware-readonly-preflight" });
+		const result = dispatch("run_preflight", { spec: loadSpec("hw/spec.json") }, { cwd, commandId: "hardware-readonly-preflight" });
 		assert.equal(result.status, "success");
 		assert.equal((result.stateAfter as { mode: string }).mode, "hardware");
 	} finally {

@@ -70,7 +70,6 @@ function dryRunVariant(spec: ExperimentSpec): ExperimentSpec {
 	return {
 		...spec,
 		mode: "dry_run",
-		operatorApprovalRequired: false,
 	};
 }
 
@@ -301,6 +300,7 @@ function validationParams(
 function realV2LaunchPreview(options: { bootstrapV2ValidationRun?: boolean; coordinateAuditId?: string; v2ValidationId?: string } = {}) {
 	return {
 		stageAdapter: "mc_newton_xyz" as const,
+		stagePort: "COM_TEST",
 		...(options.coordinateAuditId ? { coordinateAuditId: options.coordinateAuditId } : {}),
 		raman: {
 			workflowBackend: "v2_bridge" as const,
@@ -427,8 +427,6 @@ test("Raman V2 validation spec fixtures stay schema-valid and semantically align
 
 	assert.equal(hardwareSpec.mode, "hardware");
 	assert.equal(dryRunSpec.mode, "dry_run");
-	assert.equal(hardwareSpec.operatorApprovalRequired, true);
-	assert.equal(dryRunSpec.operatorApprovalRequired, false);
 	assert.equal(hardwareSpec.domain?.raman?.autofocus?.enabled, true);
 	assert.equal(dryRunSpec.domain?.raman?.autofocus?.enabled, true);
 	assert.equal(hardwareSpec.domain?.raman?.xyCorrection?.enabled, true);
@@ -487,7 +485,6 @@ test("Raman validation spec pair tool derives a hash-matched dry-run partner for
 		assert.equal(String(stateAfter.hardwareSpecHash), String(stateAfter.dryRunSpecHash));
 		const dryRunSpec = asRecord(stateAfter.dryRunSpec);
 		assert.equal(dryRunSpec.mode, "dry_run");
-		assert.equal(dryRunSpec.operatorApprovalRequired, false);
 		const capabilityCoverage = asRecord(stateAfter.capabilityCoverage);
 		assert.equal(capabilityCoverage.autofocus, true);
 		assert.equal(capabilityCoverage.xyCorrection, true);
@@ -887,7 +884,7 @@ test("real Raman V2 preflight warns when launch readiness preview is missing", (
 	});
 });
 
-test("real Raman V2 preflight warns when a planned v2_bridge launch lacks bootstrap approval and v2ValidationId", () => {
+test("real Raman V2 preflight does not require bootstrap approval or v2ValidationId", () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
@@ -900,22 +897,21 @@ test("real Raman V2 preflight warns when a planned v2_bridge launch lacks bootst
 				{ spec, hardwareExecution: realV2LaunchPreview({ coordinateAuditId: "missing-v2-preflight-coordinate-audit" }) },
 				{ cwd, commandId: "missing-v2-preflight-evidence" },
 			);
-			assert.equal(result.status, "warning");
-			assert.match(result.summary, /launch is not ready/);
+			assert.equal(result.status, "success");
 			const launchReadiness = asRecord(asRecord(result.stateAfter).launchReadiness);
 			assert.equal(launchReadiness.required, true);
 			assert.equal(launchReadiness.evaluated, true);
-			assert.equal(launchReadiness.ready, false);
+			assert.equal(launchReadiness.ready, true);
 			const issues = launchReadiness.issues;
 			assert.ok(Array.isArray(issues));
-			assert.ok(issues.some((issue) => String(issue).includes("raman.v2ValidationId")));
+			assert.equal(issues.some((issue) => String(issue).includes("raman.v2ValidationId")), false);
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}
 	});
 });
 
-test("real Raman V2 preflight accepts an operator-approved bootstrap preview for the first supervised run", () => {
+test("real Raman V2 preflight keeps bootstrap metadata as non-gating traceability", () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
@@ -935,7 +931,6 @@ test("real Raman V2 preflight accepts an operator-approved bootstrap preview for
 				{ cwd, commandId: "bootstrap-v2-preflight-preview" },
 			);
 			assert.equal(result.status, "success");
-			assert.match(result.summary, /launch preview is ready/);
 			const launchReadiness = asRecord(asRecord(result.stateAfter).launchReadiness);
 			assert.equal(launchReadiness.required, true);
 			assert.equal(launchReadiness.evaluated, true);
@@ -1003,25 +998,13 @@ test("real Raman V2 preflight accepts production-ready v2ValidationId evidence i
 	});
 });
 
-test("real Raman V2 dispatch requires production-ready V2 validation evidence before hardware gate", () => {
+test("real Raman V2 dispatch backend gate ignores missing V2 validation metadata", () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			seedPreflight(cwd, "seeded-v2-preflight");
-			const activeProbeRecordPath = seedActiveProbe(cwd);
-			seedCalibration(cwd);
-			seedRamanRun(cwd, "seeded-v2-hardware-run", { workflowBackend: "v2_bridge" });
-			const validation = recordRamanHardwareValidation(
-				validationParams(activeProbeRecordPath, "seeded-v2-hardware-run", "v2_bridge", "ready-v2-validation"),
-				{ cwd, commandId: "record-ready-v2-validation" },
-			);
-			assert.equal(validation.status, "success");
-
 			const spec = loadSpec("raman/base/hardware-spec.json");
-			seedCoordinateAudit(cwd, spec, "ready-v2-coordinate-audit");
 			const hardwareExecution = {
 				stageAdapter: "mc_newton_xyz",
-				coordinateAuditId: "ready-v2-coordinate-audit",
 				raman: {
 					workflowBackend: "v2_bridge",
 					acquisitionBackend: "labspec_file_bridge",
@@ -1039,17 +1022,16 @@ test("real Raman V2 dispatch requires production-ready V2 validation evidence be
 					ramanSafety: {
 						laserPowerConfirmed: true,
 						confirmedLaserPowerMw: 1,
-						labSpecWorkerReady: true,
-						windowsPowerPolicyReady: true,
 					},
 				},
 			};
 
 			const missingValidation = dispatch("run_experiment", { spec, hardwareExecution }, { cwd, commandId: "missing-v2-evidence" });
 			assert.equal(missingValidation.errorCode, "raman_launch_gate_failed");
-			assert.match(missingValidation.summary, /V2 parity evidence gate/);
+			assert.match(missingValidation.summary, /backend executability gate/);
 			const missingIssues = asRecord(missingValidation.stateAfter).issues as string[];
-			assert.ok(missingIssues.some((issue) => issue.includes("v2ValidationId")));
+			assert.ok(missingIssues.some((issue) => issue.includes("stagePort")));
+			assert.equal(missingIssues.some((issue) => issue.includes("v2ValidationId")), false);
 
 			const withValidation = dispatch(
 				"run_experiment",
@@ -1062,9 +1044,9 @@ test("real Raman V2 dispatch requires production-ready V2 validation evidence be
 				},
 				{ cwd, commandId: "ready-v2-evidence" },
 			);
-			assert.equal(withValidation.errorCode, "hardware_gate_failed");
+			assert.equal(withValidation.errorCode, "raman_launch_gate_failed");
 			const gateIssues = asRecord(withValidation.stateAfter).issues as string[];
-			assert.ok(gateIssues.some((issue) => issue.includes("dry-run preflight")));
+			assert.ok(gateIssues.some((issue) => issue.includes("stagePort")));
 			assert.equal(gateIssues.some((issue) => issue.includes("v2ValidationId")), false);
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
@@ -1072,19 +1054,17 @@ test("real Raman V2 dispatch requires production-ready V2 validation evidence be
 	});
 });
 
-test("real Raman V2 dispatch allows an operator-approved bootstrap validation run before the first v2ValidationId exists", () => {
+test("real Raman V2 dispatch backend gate ignores bootstrap validation metadata", () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
 			const spec = loadSpec("raman/v2/real/hardware-spec.json");
-			seedCoordinateAudit(cwd, spec, "bootstrap-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
 				{
 					spec,
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
-						coordinateAuditId: "bootstrap-v2-coordinate-audit",
 						raman: {
 							workflowBackend: "v2_bridge",
 							acquisitionBackend: "labspec_file_bridge",
@@ -1103,17 +1083,15 @@ test("real Raman V2 dispatch allows an operator-approved bootstrap validation ru
 							ramanSafety: {
 								laserPowerConfirmed: true,
 								confirmedLaserPowerMw: 1,
-								labSpecWorkerReady: true,
-								windowsPowerPolicyReady: true,
 							},
 						},
 					},
 				},
 				{ cwd, commandId: "bootstrap-v2-validation-run" },
 			);
-			assert.equal(result.errorCode, "hardware_gate_failed");
+			assert.equal(result.errorCode, "raman_launch_gate_failed");
 			const gateIssues = asRecord(result.stateAfter).issues as string[];
-			assert.ok(gateIssues.some((issue) => issue.includes("dry-run preflight")));
+			assert.ok(gateIssues.some((issue) => issue.includes("stagePort")));
 			assert.equal(gateIssues.some((issue) => issue.includes("v2ValidationId")), false);
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
@@ -1121,35 +1099,17 @@ test("real Raman V2 dispatch allows an operator-approved bootstrap validation ru
 	});
 });
 
-test("real Raman V2 dispatch rejects tampered validation evidence before the hardware gate", () => {
+test("real Raman V2 dispatch backend gate ignores tampered validation metadata", () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			seedPreflight(cwd, "seeded-v2-preflight");
-			const activeProbeRecordPath = seedActiveProbe(cwd);
-			seedCalibration(cwd);
-			seedRamanRun(cwd, "seeded-v2-hardware-run", { workflowBackend: "v2_bridge" });
-			const validation = recordRamanHardwareValidation(
-				validationParams(activeProbeRecordPath, "seeded-v2-hardware-run", "v2_bridge", "tampered-v2-validation"),
-				{ cwd, commandId: "record-tampered-v2-validation" },
-			);
-			assert.equal(validation.status, "success");
-
-			writeFileSync(
-				join(cwd, ".pi", "experiment-runs", "runs", "seeded-v2-hardware-run", "artifacts", "spectra", "point_0.txt"),
-				"tampered spectrum artifact\n",
-				"utf-8",
-			);
-
 			const spec = loadSpec("raman/base/hardware-spec.json");
-			seedCoordinateAudit(cwd, spec, "tampered-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
 				{
 					spec,
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
-						coordinateAuditId: "tampered-v2-coordinate-audit",
 						raman: {
 							workflowBackend: "v2_bridge",
 							v2ValidationId: "tampered-v2-validation",
@@ -1168,8 +1128,6 @@ test("real Raman V2 dispatch rejects tampered validation evidence before the har
 							ramanSafety: {
 								laserPowerConfirmed: true,
 								confirmedLaserPowerMw: 1,
-								labSpecWorkerReady: true,
-								windowsPowerPolicyReady: true,
 							},
 						},
 					},
@@ -1178,7 +1136,8 @@ test("real Raman V2 dispatch rejects tampered validation evidence before the har
 			);
 			assert.equal(result.errorCode, "raman_launch_gate_failed");
 			const issues = asRecord(result.stateAfter).issues as string[];
-			assert.ok(issues.some((issue) => issue.includes("evidenceDigest")));
+			assert.ok(issues.some((issue) => issue.includes("stagePort")));
+			assert.equal(issues.some((issue) => issue.includes("evidenceDigest")), false);
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}
@@ -1197,6 +1156,7 @@ test("real Raman V2 dispatch rejects thermal waiting until a real thermal backen
 					spec,
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
+						stagePort: "COM_TEST",
 						coordinateAuditId: "thermal-v2-coordinate-audit",
 						raman: {
 							workflowBackend: "v2_bridge",
@@ -1215,8 +1175,6 @@ test("real Raman V2 dispatch rejects thermal waiting until a real thermal backen
 							ramanSafety: {
 								laserPowerConfirmed: true,
 								confirmedLaserPowerMw: 1,
-								labSpecWorkerReady: true,
-								windowsPowerPolicyReady: true,
 							},
 						},
 					},
@@ -1225,36 +1183,24 @@ test("real Raman V2 dispatch rejects thermal waiting until a real thermal backen
 			);
 			assert.equal(result.errorCode, "raman_launch_gate_failed");
 			const issues = asRecord(result.stateAfter).issues as string[];
-			assert.ok(issues.some((issue) => issue.includes("thermal waiting is not yet supported")));
+			assert.ok(issues.some((issue) => issue.includes("thermal backend is currently fake-only")));
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}
 	});
 });
 
-test("real Raman V2 dispatch rejects validation evidence that does not cover the requested real-capable spec", () => {
+test("real Raman V2 dispatch backend gate ignores validation coverage metadata", () => {
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			seedPreflight(cwd, "seeded-v2-preflight");
-			const activeProbeRecordPath = seedActiveProbe(cwd);
-			seedCalibration(cwd);
-			seedRamanRun(cwd, "seeded-v2-hardware-run", { workflowBackend: "v2_bridge" });
-			const validation = recordRamanHardwareValidation(
-				validationParams(activeProbeRecordPath, "seeded-v2-hardware-run", "v2_bridge", "thin-v2-validation"),
-				{ cwd, commandId: "record-thin-v2-validation" },
-			);
-			assert.equal(validation.status, "success");
-
 			const spec = loadSpec("raman/v2/real/hardware-spec.json");
-			seedCoordinateAudit(cwd, spec, "thin-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
 				{
 					spec,
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
-						coordinateAuditId: "thin-v2-coordinate-audit",
 						raman: {
 							workflowBackend: "v2_bridge",
 							v2ValidationId: "thin-v2-validation",
@@ -1273,8 +1219,6 @@ test("real Raman V2 dispatch rejects validation evidence that does not cover the
 							ramanSafety: {
 								laserPowerConfirmed: true,
 								confirmedLaserPowerMw: 1,
-								labSpecWorkerReady: true,
-								windowsPowerPolicyReady: true,
 							},
 						},
 					},
@@ -1283,8 +1227,9 @@ test("real Raman V2 dispatch rejects validation evidence that does not cover the
 			);
 			assert.equal(result.errorCode, "raman_launch_gate_failed");
 			const issues = asRecord(result.stateAfter).issues as string[];
-			assert.ok(issues.some((issue) => issue.includes("does not cover autofocus")));
-			assert.ok(issues.some((issue) => issue.includes("does not cover XY correction")));
+			assert.ok(issues.some((issue) => issue.includes("stagePort")));
+			assert.equal(issues.some((issue) => issue.includes("does not cover autofocus")), false);
+			assert.equal(issues.some((issue) => issue.includes("does not cover XY correction")), false);
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}

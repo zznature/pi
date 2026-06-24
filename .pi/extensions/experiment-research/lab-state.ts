@@ -16,9 +16,9 @@ export interface LabCapabilitiesState {
 	hardwareAvailable: true;
 	notes: string[];
 	planningConstraints: {
-		hardwareRequiresAuditedAbsoluteCoordinates: true;
+		hardwareRequiresMeasuredAbsoluteCoordinates: true;
 		plannerMustRequestMissingCoordinates: true;
-		supervisedRealHardwareRequiresCoordinateAuditId: true;
+		ramanMvpLaunchUsesDamageInvariantsOnly: true;
 	};
 }
 
@@ -39,7 +39,7 @@ export function getLabState(cwd = "."): LabState {
 		hardwareAvailable: true,
 		notes: [
 			"Available workflows include schema validation, simulation runs, dry-run preflight, structured run analysis, bounded replanning, and gated hardware execution.",
-			"Hardware execution supports a constrained non-Raman MC.Newton stage path plus typed Raman runs through the long-lived bridge; Raman acquisition still requires explicit operator safety approval.",
+			"Hardware execution supports a constrained non-Raman MC.Newton stage path plus typed Raman runs through the long-lived bridge; the current Raman MVP launch gate is backend executability plus bounded damage invariants.",
 		],
 	};
 }
@@ -51,12 +51,12 @@ export function getLabCapabilities(): LabCapabilitiesState {
 		hardwareAvailable: true,
 		notes: [
 			"Static lab capabilities include simulation instruments, dry-run reachability, coordinate conventions, software limits, and gated hardware surfaces.",
-			"Real hardware planning must stop at parameter collection until operator-audited absolute coordinates are available.",
+			"Real hardware planning still requires measured absolute coordinates; do not substitute guesses or placeholders.",
 		],
 		planningConstraints: {
-			hardwareRequiresAuditedAbsoluteCoordinates: true,
+			hardwareRequiresMeasuredAbsoluteCoordinates: true,
 			plannerMustRequestMissingCoordinates: true,
-			supervisedRealHardwareRequiresCoordinateAuditId: true,
+			ramanMvpLaunchUsesDamageInvariantsOnly: true,
 		},
 	};
 }

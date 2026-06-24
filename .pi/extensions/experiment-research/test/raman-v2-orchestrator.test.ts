@@ -183,6 +183,7 @@ function v2Spec(minXyConfidence = 0): ExperimentSpec {
 			},
 			raman: {
 				...spec.domain?.raman,
+				operationIntent: "autofocus_then_acquire",
 				autofocus: {
 					enabled: true,
 					every: { kind: "everyNPoints", n: 1 },

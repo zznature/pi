@@ -6,7 +6,7 @@ import type { HardwareRun } from "./kernel/hw/pilot.ts";
 import type { SimulationRun, SimulationSummary } from "./kernel/sim.ts";
 import type { PreflightResult } from "./preflight.ts";
 import type { ExperimentSpec, HardwarePilotParams, ToolResult } from "./schemas.ts";
-import { getExperimentPoints, getUnitCount } from "./spec-utils.ts";
+import { getExperimentPoints, getRamanOperationIntent, getUnitCount } from "./spec-utils.ts";
 import {
 	hashExperimentSpec,
 	artifactUriPath,
@@ -184,6 +184,14 @@ export interface HardwareGateResult {
 	maxPlannedZUm?: number;
 	laserCeilingMw?: number;
 	requestedLaserPowerMw?: number;
+	approvalAssessment?: RamanDamageApprovalAssessment;
+}
+
+export interface RamanDamageApprovalAssessment {
+	operationIntent?: string;
+	required: boolean;
+	damageRisks: Array<"objective_collision" | "sample_burn">;
+	reasons: string[];
 }
 
 type HardwareGateInput = HardwarePilotParams | NonNullable<HardwarePilotParams["approval"]>;
@@ -205,6 +213,47 @@ function maxPlannedRamanZUm(spec: ExperimentSpec): number | undefined {
 function normalizeHardwareGateInput(input: HardwareGateInput): Partial<HardwarePilotParams> {
 	if ("stageAdapter" in input) return input;
 	return { approval: input };
+}
+
+function approvalAssessment(
+	spec: ExperimentSpec,
+	issues: string[],
+	requestedLaserPowerMw: number | undefined,
+	laserCeilingMw: number | undefined,
+): RamanDamageApprovalAssessment | undefined {
+	const operationIntent = getRamanOperationIntent(spec);
+	if (!operationIntent) return undefined;
+	const damageRisks: Array<"objective_collision" | "sample_burn"> = [];
+	if (issues.some((issue) => issue.startsWith("objective_collision:"))) {
+		damageRisks.push("objective_collision");
+	}
+	if (issues.some((issue) => issue.startsWith("sample_burn:"))) {
+		damageRisks.push("sample_burn");
+	}
+	if (damageRisks.length > 0) {
+		return {
+			operationIntent,
+			required: true,
+			damageRisks,
+			reasons: issues.filter((issue) => issue.startsWith("objective_collision:") || issue.startsWith("sample_burn:")),
+		};
+	}
+	if (operationIntent === "autofocus_only") {
+		return {
+			operationIntent,
+			required: false,
+			damageRisks: [],
+			reasons: [
+				`autofocus_only stays inside the declared collision ceiling and keeps acquisition disabled; requested laser power ${requestedLaserPowerMw ?? laserCeilingMw ?? 0} mW remains within the bounded envelope.`,
+			],
+		};
+	}
+	return {
+		operationIntent,
+		required: false,
+		damageRisks: [],
+		reasons: ["No bounded Raman damage risk exceeds the declared collision or laser ceiling."],
+	};
 }
 
 export function validateHardwareGate(spec: ExperimentSpec, hardwareGateInput: HardwareGateInput, _cwd?: string): HardwareGateResult {
@@ -234,7 +283,16 @@ export function validateHardwareGate(spec: ExperimentSpec, hardwareGateInput: Ha
 		}
 	}
 
-	return { valid: issues.length === 0, issues, specHash, collisionCeilingUm, maxPlannedZUm, laserCeilingMw, requestedLaserPowerMw };
+	return {
+		valid: issues.length === 0,
+		issues,
+		specHash,
+		collisionCeilingUm,
+		maxPlannedZUm,
+		laserCeilingMw,
+		requestedLaserPowerMw,
+		approvalAssessment: approvalAssessment(spec, issues, requestedLaserPowerMw, laserCeilingMw),
+	};
 }
 
 export interface HardwareRunRecordRefs extends RunRecordRefs {

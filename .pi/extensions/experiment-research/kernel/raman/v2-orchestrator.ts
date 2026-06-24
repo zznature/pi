@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { relativeArtifact, type SnapshotStagePosition } from "../../run-store.ts";
 import type { ExperimentSpec, RamanErrorCode, ToolResult } from "../../schemas.ts";
-import type { ExperimentPoint } from "../../spec-utils.ts";
+import { ramanRequestsAcquisition, ramanRequestsAutofocus, type ExperimentPoint } from "../../spec-utils.ts";
 import { normalizeMatrix2x2, resolveRamanXyCalibration, type Matrix2x2 } from "./calibration.ts";
 import { writeRamanV2MicrostepSnapshot, type RamanV2Microstep } from "./v2-resume.ts";
 
@@ -196,6 +196,42 @@ function autofocusZPositions(point: ExperimentPoint, autofocus: Record<string, u
 	return [...new Set(values)].sort((a, b) => a - b);
 }
 
+function autofocusTargetTolerance(autofocus: Record<string, unknown>, phase: "scan" | "final"): number | undefined {
+	if (phase === "final") {
+		return (
+			optionalNumberField(autofocus, "finalStageToleranceUm") ??
+			optionalNumberField(autofocus, "fineStageToleranceUm") ??
+			optionalNumberField(autofocus, "coarseStageToleranceUm")
+		);
+	}
+	return optionalNumberField(autofocus, "coarseStageToleranceUm") ?? optionalNumberField(autofocus, "fineStageToleranceUm");
+}
+
+function autofocusMovePayload(
+	spec: ExperimentSpec,
+	point: ExperimentPoint,
+	autofocus: Record<string, unknown>,
+	zUm: number,
+	phase: "scan" | "final",
+	settleTimeoutMs: number,
+): Record<string, unknown> {
+	const autofocusMin = optionalNumberField(autofocus, "zMinUm") ?? pointZ(point);
+	const autofocusMax = optionalNumberField(autofocus, "zMaxUm") ?? pointZ(point);
+	const payload: Record<string, unknown> = {
+		zUm,
+		simulateDurationMs: settleTimeoutMs,
+	};
+	if (spec.limits.motion.zUm) {
+		payload.zGuardMinUm = Math.max(spec.limits.motion.zUm.minUm, autofocusMin);
+		payload.zGuardMaxUm = Math.min(spec.limits.motion.zUm.maxUm, autofocusMax);
+	}
+	const targetToleranceUm = autofocusTargetTolerance(autofocus, phase);
+	if (targetToleranceUm !== undefined) {
+		payload.targetToleranceUm = targetToleranceUm;
+	}
+	return payload;
+}
+
 function focusConfidence(samples: FocusSample[], best: FocusSample): number {
 	const sorted = [...samples].sort((a, b) => b.score - a.score);
 	const second = sorted.find((sample) => sample !== best);
@@ -291,6 +327,7 @@ async function runAutofocus(
 	options: RamanV2RunUnitOptions,
 	artifacts: ToolResult["artifacts"],
 ): Promise<RamanV2AutofocusRecord | undefined> {
+	if (!ramanRequestsAutofocus(options.spec)) return undefined;
 	const autofocus = options.spec.domain?.raman?.autofocus;
 	if (!autofocus?.enabled) return undefined;
 	const autofocusRecord = autofocus as Record<string, unknown>;
@@ -298,7 +335,11 @@ async function runAutofocus(
 	const metric = typeof autofocusRecord.metric === "string" ? autofocusRecord.metric : "tenengrad";
 	const samples: FocusSample[] = [];
 	for (const [index, zUm] of positions.entries()) {
-		await options.bridge.request("stage", "move_absolute", { zUm, simulateDurationMs: options.settleTimeoutMs ?? 0 });
+		await options.bridge.request(
+			"stage",
+			"move_absolute",
+			autofocusMovePayload(options.spec, options.point, autofocusRecord, zUm, "scan", options.settleTimeoutMs ?? 0),
+		);
 		const position = await stagePosition(options.bridge);
 		snapshot(options, "stage_position_confirmed", {
 			position,
@@ -343,13 +384,17 @@ async function runAutofocus(
 		});
 		throw new RamanV2WorkflowPauseError("autofocus_low_confidence", "autofocus confidence is below minConfidence");
 	}
-	await options.bridge.request("stage", "move_absolute", { zUm: best.zUm, simulateDurationMs: options.settleTimeoutMs ?? 0 });
+	await options.bridge.request(
+		"stage",
+		"move_absolute",
+		autofocusMovePayload(options.spec, options.point, autofocusRecord, best.zUm, "final", options.settleTimeoutMs ?? 0),
+	);
 	const position = await stagePosition(options.bridge);
 	snapshot(options, "stage_position_confirmed", {
 		position,
 		artifacts,
 		safeToResume: true,
-		nextPlan: ["run XY correction", "begin spectrum acquisition"],
+		nextPlan: ramanRequestsAcquisition(options.spec) ? ["run XY correction", "begin spectrum acquisition"] : ["run XY correction", "complete unit"],
 	});
 	return {
 		zBestUm: best.zUm,
@@ -432,6 +477,7 @@ async function runSpectrumAcquisition(
 	options: RamanV2RunUnitOptions,
 	artifacts: ToolResult["artifacts"],
 ): Promise<{ spectrum?: RamanV2SpectrumRecord; metadata?: Record<string, unknown> }> {
+	if (!ramanRequestsAcquisition(options.spec)) return {};
 	const acquisition = options.spec.domain?.raman?.acquisition;
 	if (!acquisition) return {};
 	const fileName = `artifacts/spectra/point_${options.point.index}.${acquisition.saveFormat}`;
@@ -504,6 +550,7 @@ async function runSpectrumAcquisition(
 }
 
 async function runThermalWait(options: RamanV2RunUnitOptions, artifacts: ToolResult["artifacts"]): Promise<RamanV2ThermalRecord | undefined> {
+	if (!ramanRequestsAcquisition(options.spec)) return undefined;
 	const thermal = options.spec.domain?.thermal;
 	if (!thermal?.enabled || thermal.waitBeforeAcquisition === false) return undefined;
 	const target = await options.bridge.request<Record<string, unknown>>("thermal", "set_target_temp", {
@@ -570,7 +617,9 @@ export async function executeRamanV2RunUnit(options: RamanV2RunUnitOptions): Pro
 		position: current,
 		artifacts,
 		safeToResume: true,
-		nextPlan: ["run autofocus", "run XY correction", "begin spectrum acquisition"],
+		nextPlan: ramanRequestsAcquisition(options.spec)
+			? ["run autofocus", "run XY correction", "begin spectrum acquisition"]
+			: ["run autofocus", "run XY correction", "complete unit"],
 	});
 	const autofocus = await runAutofocus(options, artifacts);
 	const xyCorrection = await runXyCorrection(options, artifacts);

@@ -63,7 +63,6 @@ const MotionLimitsSchema = Type.Object(
 const PowerEnergyLimitsSchema = Type.Object(
 	{
 		maxLaserPowerMw: Type.Number({ minimum: 0 }),
-		maxExposureEnergyMj: Type.Optional(Type.Number({ minimum: 0 })),
 	},
 	{ additionalProperties: false },
 );
@@ -72,9 +71,6 @@ const RamanSafetyConfirmationSchema = Type.Object(
 	{
 		laserPowerConfirmed: Type.Boolean(),
 		confirmedLaserPowerMw: Type.Number({ minimum: 0 }),
-		confirmedExposureEnergyMj: Type.Optional(Type.Number({ minimum: 0 })),
-		labSpecWorkerReady: Type.Optional(Type.Boolean()),
-		windowsPowerPolicyReady: Type.Optional(Type.Boolean()),
 		notes: Type.Optional(Type.String()),
 	},
 	{ additionalProperties: false },
@@ -185,6 +181,12 @@ const RamanFocusMetricSchema = Type.Union([
 	Type.Literal("labspec_spot_compactness"),
 ]);
 
+const RamanOperationIntentSchema = Type.Union([
+	Type.Literal("autofocus_only"),
+	Type.Literal("autofocus_then_acquire"),
+	Type.Literal("acquire_only"),
+]);
+
 const RamanFailurePolicySchema = Type.Union([Type.Literal("skip_point"), Type.Literal("pause"), Type.Literal("abort")]);
 
 const RamanAutofocusSchema = Type.Object(
@@ -231,6 +233,7 @@ const RamanAcquisitionSchema = Type.Object(
 
 const RamanDomainSchema = Type.Object(
 	{
+		operationIntent: RamanOperationIntentSchema,
 		autofocus: Type.Optional(RamanAutofocusSchema),
 		xyCorrection: Type.Optional(RamanXyCorrectionSchema),
 		acquisition: Type.Optional(RamanAcquisitionSchema),
@@ -349,7 +352,6 @@ const HardwareExecutionSchema = Type.Object(
 	{
 		stageAdapter: Type.Union([Type.Literal("memory"), Type.Literal("mc_newton_xyz")]),
 		coordinateAuditId: Type.Optional(Type.String({ minLength: 1 })),
-		coordinateAuditExemption: Type.Optional(Type.Literal("bounded_z_adjustment")),
 		stagePort: Type.Optional(Type.String({ minLength: 1 })),
 		stagePython: Type.Optional(
 			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to the project .venv interpreter" }),
@@ -370,7 +372,6 @@ const PreflightHardwareExecutionSchema = Type.Object(
 	{
 		stageAdapter: Type.Union([Type.Literal("memory"), Type.Literal("mc_newton_xyz")]),
 		coordinateAuditId: Type.Optional(Type.String({ minLength: 1 })),
-		coordinateAuditExemption: Type.Optional(Type.Literal("bounded_z_adjustment")),
 		stagePort: Type.Optional(Type.String({ minLength: 1 })),
 		stagePython: Type.Optional(
 			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to the project .venv interpreter" }),
@@ -400,7 +401,6 @@ export const ExperimentSpecSchema = Type.Object(
 		plan: PlanSchema,
 		domain: Type.Optional(DomainSchema),
 		stoppingRules: StoppingRulesSchema,
-		operatorApprovalRequired: Type.Boolean(),
 	},
 	{ additionalProperties: false },
 );
@@ -799,6 +799,7 @@ export type ExperimentSpec = Static<typeof ExperimentSpecSchema>;
 export type ToolResult = Static<typeof ToolResultSchema>;
 export type ErrorCode = Static<typeof ErrorCodeSchema>;
 export type RamanErrorCode = Static<typeof RamanErrorCodeSchema>;
+export type RamanOperationIntent = Static<typeof RamanOperationIntentSchema>;
 export type ValidateExperimentSpecParams = Static<typeof ValidateExperimentSpecParamsSchema>;
 export type RunPreflightParams = Static<typeof RunPreflightParamsSchema>;
 export type PreflightHardwareExecutionParams = Static<typeof PreflightHardwareExecutionSchema>;
@@ -897,6 +898,49 @@ function validateRamanDomainSemantics(spec: ExperimentSpec): ValidationIssue[] {
 	const issues: ValidationIssue[] = [];
 	const raman = spec.domain?.raman;
 	if (!raman) return issues;
+
+	if (raman.operationIntent === "autofocus_only") {
+		if (raman.autofocus?.enabled !== true) {
+			issues.push({
+				path: "domain.raman.operationIntent",
+				message: "autofocus_only requires domain.raman.autofocus.enabled = true",
+			});
+		}
+		if (raman.acquisition) {
+			issues.push({
+				path: "domain.raman.acquisition",
+				message: "autofocus_only does not allow Raman acquisition settings",
+			});
+		}
+	}
+	if (raman.operationIntent === "autofocus_then_acquire") {
+		if (raman.autofocus?.enabled !== true) {
+			issues.push({
+				path: "domain.raman.operationIntent",
+				message: "autofocus_then_acquire requires domain.raman.autofocus.enabled = true",
+			});
+		}
+		if (!raman.acquisition) {
+			issues.push({
+				path: "domain.raman.acquisition",
+				message: "autofocus_then_acquire requires Raman acquisition settings",
+			});
+		}
+	}
+	if (raman.operationIntent === "acquire_only") {
+		if (!raman.acquisition) {
+			issues.push({
+				path: "domain.raman.acquisition",
+				message: "acquire_only requires Raman acquisition settings",
+			});
+		}
+		if (raman.autofocus?.enabled === true) {
+			issues.push({
+				path: "domain.raman.autofocus",
+				message: "acquire_only does not allow autofocus.enabled = true",
+			});
+		}
+	}
 
 	const autofocus = raman.autofocus;
 	if (autofocus?.enabled) {

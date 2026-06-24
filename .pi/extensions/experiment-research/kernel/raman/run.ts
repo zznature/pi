@@ -13,7 +13,13 @@ import {
 } from "../../run-store.ts";
 import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../../labspec-bridge.ts";
 import type { ExperimentSpec, HardwarePilotParams, RamanErrorCode, ToolResult } from "../../schemas.ts";
-import { getExperimentPoints, getUnitCount, type ExperimentPoint } from "../../spec-utils.ts";
+import {
+	getExperimentPoints,
+	getRamanOperationIntent,
+	getUnitCount,
+	ramanRequestsAcquisition,
+	type ExperimentPoint,
+} from "../../spec-utils.ts";
 import { evaluateWatchdog } from "../../watchdog.ts";
 import {
 	HardwareBridgeV2Client,
@@ -68,6 +74,7 @@ export interface RamanHardwareSummary {
 	stopConditionMet: boolean;
 	stopReason?: string;
 	operatorOnlyMonitoring: boolean;
+	operationIntent?: string;
 }
 
 interface BridgeUnitRecord extends ExperimentPoint {
@@ -155,6 +162,7 @@ function artifact(runId: string, fileName: string, label: string, kind: string):
 }
 
 function buildSpectrumArtifactPlans(spec: ExperimentSpec, reserved: ReservedRun): SpectrumArtifactPlan[] {
+	if (!ramanRequestsAcquisition(spec)) return [];
 	const acquisition = spec.domain?.raman?.acquisition;
 	if (!acquisition) return [];
 	return getExperimentPoints(spec).map((point) => {
@@ -377,6 +385,10 @@ function buildSummary(
 		stopConditionMet: status !== "completed",
 		operatorOnlyMonitoring,
 	};
+	const operationIntent = getRamanOperationIntent(spec);
+	if (operationIntent) {
+		summary.operationIntent = operationIntent;
+	}
 	if (stopReason) {
 		summary.stopReason = stopReason;
 	}
@@ -458,7 +470,7 @@ function messageFrom(error: unknown): string {
 }
 
 function requestTimeoutMs(spec: ExperimentSpec, pilot: HardwarePilotParams): number {
-	const acquisition = spec.domain?.raman?.acquisition;
+	const acquisition = ramanRequestsAcquisition(spec) ? spec.domain?.raman?.acquisition : undefined;
 	const acquisitionMs = acquisition ? acquisition.integrationTimeS * acquisition.accumulations * 1000 : 0;
 	return Math.max(pilot.heartbeatTimeoutMs * 2, pilot.settleTimeoutMs + acquisitionMs + 30_000);
 }
@@ -479,6 +491,7 @@ function acquisitionPayload(
 	reserved: ReservedRun,
 	spectrum: SpectrumArtifactPlan | undefined,
 ): Record<string, unknown> | undefined {
+	if (!ramanRequestsAcquisition(spec)) return undefined;
 	const acquisition = spec.domain?.raman?.acquisition;
 	if (!acquisition || !spectrum) return undefined;
 	const backend =
@@ -640,6 +653,7 @@ async function executeRamanHardwareRun(
 			unitCount: points.length,
 			stageAdapter: pilot.stageAdapter,
 			raman: true,
+			operationIntent: getRamanOperationIntent(spec),
 		});
 		sequence += 1;
 
@@ -789,6 +803,7 @@ async function executeRamanHardwareRunV2(
 			stageAdapter: pilot.stageAdapter,
 			raman: true,
 			workflowBackend: "v2_bridge",
+			operationIntent: getRamanOperationIntent(spec),
 		});
 		sequence += 1;
 

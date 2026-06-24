@@ -81,7 +81,7 @@ export const recordHardwareCoordinateAuditTool = {
 	promptGuidelines: [
 		"Use record_hardware_coordinate_audit only as an operator maintenance action.",
 		"Record the audited subject and spatial plan exactly as reviewed on the real setup.",
-		"Reference the returned coordinateAuditId from hardwareExecution.coordinateAuditId for supervised real hardware runs.",
+		"Reference the returned coordinateAuditId from hardwareExecution.coordinateAuditId only when the lab wants extra readiness or traceability evidence.",
 	],
 	parameters: HardwareCoordinateAuditParamsSchema,
 	executionMode: "sequential",

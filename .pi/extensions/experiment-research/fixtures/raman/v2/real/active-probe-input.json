@@ -5,9 +5,7 @@
 		"approved": true,
 		"ramanSafety": {
 			"laserPowerConfirmed": true,
-			"confirmedLaserPowerMw": 1,
-			"labSpecWorkerReady": true,
-			"windowsPowerPolicyReady": true
+			"confirmedLaserPowerMw": 1
 		},
 		"notes": "Operator-approved active smoke probe for current real-capable Raman V2 validation."
 	},

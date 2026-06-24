@@ -1348,6 +1348,61 @@ def sleep_with_stop(runtime: BridgeRuntime, duration_ms: int) -> None:
         time.sleep(min(0.025, max(deadline - time.monotonic(), 0.0)))
 
 
+def assert_stage_move_postconditions(
+    *,
+    payload: JsonObject,
+    target: JsonObject,
+    settled: JsonObject,
+    context: BridgeContext,
+) -> None:
+    z_guard_min_um = optional_number(payload.get("zGuardMinUm"), "zGuardMinUm")
+    z_guard_max_um = optional_number(payload.get("zGuardMaxUm"), "zGuardMaxUm")
+    if z_guard_min_um is not None and z_guard_max_um is not None and z_guard_min_um > z_guard_max_um:
+        raise BridgeError(
+            "invalid_request",
+            "zGuardMinUm must be less than or equal to zGuardMaxUm",
+            {"zGuardMinUm": z_guard_min_um, "zGuardMaxUm": z_guard_max_um},
+        )
+    settled_z_um = float(settled.get("zUm", 0.0))
+    if z_guard_min_um is not None and settled_z_um < z_guard_min_um:
+        detail = {
+            "target": target,
+            "settledPosition": settled,
+            "zGuardMinUm": z_guard_min_um,
+            "zGuardMaxUm": z_guard_max_um,
+        }
+        context.emit({"domain": "stage", "action": "move_absolute", "phase": "guard_failed", "code": "autofocus_out_of_range", **detail})
+        raise BridgeError("autofocus_out_of_range", f"settled Z {settled_z_um} um is below zGuardMinUm {z_guard_min_um} um", detail)
+    if z_guard_max_um is not None and settled_z_um > z_guard_max_um:
+        detail = {
+            "target": target,
+            "settledPosition": settled,
+            "zGuardMinUm": z_guard_min_um,
+            "zGuardMaxUm": z_guard_max_um,
+        }
+        context.emit({"domain": "stage", "action": "move_absolute", "phase": "guard_failed", "code": "autofocus_out_of_range", **detail})
+        raise BridgeError("autofocus_out_of_range", f"settled Z {settled_z_um} um exceeds zGuardMaxUm {z_guard_max_um} um", detail)
+    target_tolerance_um = None
+    if "targetToleranceUm" in payload:
+        target_tolerance_um = parse_non_negative_number(payload.get("targetToleranceUm"), "targetToleranceUm", 0.0)
+    target_z_um = target.get("zUm")
+    if target_tolerance_um is not None and isinstance(target_z_um, (int, float)) and not isinstance(target_z_um, bool):
+        target_error_um = abs(settled_z_um - float(target_z_um))
+        if target_error_um > target_tolerance_um:
+            detail = {
+                "target": target,
+                "settledPosition": settled,
+                "targetToleranceUm": target_tolerance_um,
+                "targetErrorUm": target_error_um,
+            }
+            context.emit({"domain": "stage", "action": "move_absolute", "phase": "guard_failed", "code": "stage_command_error", **detail})
+            raise BridgeError(
+                "stage_command_error",
+                f"settled Z {settled_z_um} um missed target {float(target_z_um)} um by {target_error_um} um",
+                detail,
+            )
+
+
 def action_stage_connect(runtime: BridgeRuntime, payload: JsonObject, _context: BridgeContext) -> JsonObject:
     stage_payload = parse_payload(payload.get("stage", payload))
     return {"stage": runtime.connect_stage(stage_payload)}
@@ -1381,18 +1436,26 @@ def action_stage_move_absolute(runtime: BridgeRuntime, payload: JsonObject, cont
         stage.move_absolute_um(x_um=x_um, y_um=y_um, z_um=z_um)
         stage.wait_settled(timeout_ms)
     move_commands = stage_command_trace(stage)
+    sleep_with_stop(runtime, int(payload.get("simulateDurationMs", 0)))
+    settled = position_to_wire(stage.get_position_um())
     context.emit({
         "domain": "stage",
         "action": "move_absolute",
         "phase": "settled",
         "target": {"xUm": x_um, "yUm": y_um, "zUm": z_um},
+        "settledPosition": settled,
         "moveCommands": move_commands,
     })
-    sleep_with_stop(runtime, int(payload.get("simulateDurationMs", 0)))
+    assert_stage_move_postconditions(
+        payload=payload,
+        target={"xUm": x_um, "yUm": y_um, "zUm": z_um},
+        settled=settled,
+        context=context,
+    )
     return {
         "adapter": runtime.stage_adapter,
         "before": before,
-        "position": position_to_wire(stage.get_position_um()),
+        "position": settled,
         "moveCommands": move_commands,
     }
 

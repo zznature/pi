@@ -37,6 +37,7 @@
 	},
 	"domain": {
 		"raman": {
+			"operationIntent": "autofocus_then_acquire",
 			"autofocus": {
 				"enabled": true,
 				"every": "once",
@@ -70,6 +71,5 @@
 		"maxRuntimeMinutes": 5,
 		"maxUnits": 1,
 		"stopOnError": true
-	},
-	"operatorApprovalRequired": true
+	}
 }

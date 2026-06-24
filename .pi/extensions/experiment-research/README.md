@@ -3,6 +3,9 @@
 This project-local extension implements the bounded experiment loop described in
 `docs/pi_agent_experiment_research_adaptation.md`.
 
+The authoritative MVP Raman safety contract now lives in
+`docs/experiment_extension/mvp_safety_contract.md`.
+
 ## Configuration
 
 The extension is loaded from `.pi/extensions/experiment-research`. It registers
@@ -48,7 +51,7 @@ Capabilities are loaded from `capabilities.ts`.
 
 Raman readiness currently includes:
 
-- typed `domain.raman` schema and semantic validation for acquisition,
+- typed `domain.raman.operationIntent` plus semantic validation for acquisition,
   autofocus windows, and XY correction margins;
 - `raman_bridge.py`, a JSON-lines Python bridge with read-only probe,
   memory-stage `visit_point`, fake `run_unit` acquisition, and stderr-only
@@ -99,22 +102,17 @@ Raman readiness currently includes:
   requires `unit.autofocus`, XY correction requires `unit.xyCorrection`,
   thermal waiting requires `unit.thermal`, and autofocus/XY runs require real
   frame artifacts on disk.
-  The first supervised real V2 minimum run may use
-  `hardwareExecution.approval.bootstrapV2ValidationRun = true` as an
-  operator-only bootstrap path before the first production-ready
-  `v2ValidationId` exists; later real V2 runs must switch to explicit
-  `hardwareExecution.raman.v2ValidationId`.
   The referenced read-only preflight and minimum Raman run must share the same
   canonical `specHash`; the validation record stores an `evidenceDigest` with
   SHA-256 hashes for the referenced preflight, active probe, run records, and
   optional calibration artifact, plus the active probe frame/spectrum artifacts
-  and minimum-run spectrum artifacts. Real `v2_bridge` hardware runs must pass
-  `hardwareExecution.raman.v2ValidationId` pointing at a production-ready V2
-  validation record before the Raman hardware gate opens. Current real hardware
-  execution still rejects `thermal.waitBeforeAcquisition` because the thermal
-  backend is fake-only; use the current real-capable validation spec pair for
-  production-ready V2 evidence, and treat thermal parity as a future full-surface
-  target until a real backend exists;
+  and minimum-run spectrum artifacts. These validation records remain useful
+  for readiness review and traceability, but they are not the current MVP Raman
+  launch gate. Current real hardware execution still rejects
+  `thermal.waitBeforeAcquisition` because the thermal backend is fake-only; use
+  the current real-capable validation spec pair for production-ready V2
+  evidence, and treat thermal parity as a future full-surface target until a
+  real backend exists;
 - operator-only Raman validation readiness checks through
   `raman_check_hardware_validation`, which can re-verify stored evidence and,
   when given a candidate ExperimentSpec, also verify that the validation record
@@ -135,7 +133,11 @@ Raman readiness currently includes:
   XY correction backends, wired into Raman `run_unit` so focus confidence and
   correction metadata flow into run records and analysis. Hardware execution
   params can provide explicit phase-correlation frame paths, while the transform
-  is normally resolved from the referenced calibration artifact;
+  is normally resolved from the referenced calibration artifact. For V2
+  autofocus moves, the TS orchestrator passes an explicit trusted Z window and
+  optional target tolerance into the bridge, and the Python bridge rejects any
+  settled readback outside that declared envelope before frame capture or
+  acquisition continues;
 - deterministic Raman analysis metrics for spectrum SNR, saturation, focus
   confidence, and XY correction metadata.
 
@@ -154,6 +156,8 @@ For MVP Raman work, hardware execution is intentionally simple:
   launch approval gate;
 - `run_experiment` blocks only on backend executability plus the two bounded
   safety limits above;
+- for `workflowBackend: "v2_bridge"`, autofocus motion also faces a bridge-side
+  settled-position assertion inside the declared trusted Z window;
 - coordinate audits, validation records, and operator approval payloads remain
   available as optional maintenance or traceability tools and are no longer
   required before launch.

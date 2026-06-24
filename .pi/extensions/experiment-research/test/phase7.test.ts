@@ -70,8 +70,6 @@ function baseApproval(dryRunReportId: string) {
 		ramanSafety: {
 			laserPowerConfirmed: true,
 			confirmedLaserPowerMw: 1,
-			labSpecWorkerReady: true,
-			windowsPowerPolicyReady: true,
 		},
 	};
 }
@@ -118,6 +116,7 @@ function focusCorrectionSpec(mode: "dry_run" | "hardware"): ExperimentSpec {
 		domain: {
 			raman: {
 				...spec.domain?.raman,
+				operationIntent: "autofocus_then_acquire",
 				autofocus: {
 					enabled: true,
 					every: { kind: "everyNPoints", n: 1 },
@@ -672,8 +671,6 @@ test("operator Raman active probe tool writes an audited maintenance record", as
 					ramanSafety: {
 						laserPowerConfirmed: true,
 						confirmedLaserPowerMw: 1,
-						labSpecWorkerReady: true,
-						windowsPowerPolicyReady: true,
 					},
 				},
 				captureFrame: true,
@@ -992,8 +989,6 @@ test("operator Raman hardware validation records readiness evidence", async () =
 					ramanSafety: {
 						laserPowerConfirmed: true,
 						confirmedLaserPowerMw: 1,
-						labSpecWorkerReady: true,
-						windowsPowerPolicyReady: true,
 					},
 				},
 				captureFrame: true,

@@ -77,8 +77,7 @@ function createLabCapabilitiesResult(state: LabCapabilitiesState): ToolResult {
 			"Static lab capabilities loaded. Reuse this result until the capability picture changes.",
 		nextActions: [
 			"Draft an ExperimentSpec in simulation or dry_run mode within these capabilities.",
-			"Collect operator-audited absolute coordinates before compiling a real hardware ExperimentSpec.",
-			"Record the reviewed coordinates as a hardware coordinate audit before supervised real hardware execution.",
+			"Read current hardware coordinates before compiling a real hardware ExperimentSpec when they are missing.",
 			"Call validate_experiment_spec before any preflight or run.",
 		],
 		artifacts: [],
@@ -121,8 +120,7 @@ export const validateExperimentSpecTool = {
 	promptSnippet: "Validate a candidate ExperimentSpec without touching hardware",
 	promptGuidelines: [
 		"Use validate_experiment_spec before proposing any experiment run.",
-		"For real hardware planning, collect operator-audited absolute coordinates before compiling a hardware ExperimentSpec.",
-		"For supervised real hardware runs, plan to reference an operator-reviewed coordinateAuditId from hardwareExecution.coordinateAuditId.",
+		"For real hardware planning, collect measured absolute coordinates before compiling a hardware ExperimentSpec.",
 		"Do not call hardware or execution tools when validate_experiment_spec returns an error.",
 	],
 	parameters: ValidateExperimentSpecParamsSchema,
@@ -216,8 +214,7 @@ export const runPreflightTool = {
 	promptGuidelines: [
 		"Use run_preflight after validate_experiment_spec succeeds and before run_experiment.",
 		"Do not use run_preflight to probe real hardware readiness with guessed coordinates or placeholder hardware specs.",
-		"For supervised real hardware launch planning, include hardwareExecution.coordinateAuditId in the preview once the operator has recorded the coordinate audit.",
-		"For real Raman launch planning, include the planned hardwareExecution preview so preflight can report launch readiness before the final launch call.",
+		"For real Raman launch planning, include the planned hardwareExecution preview so preflight can report backend executability before the final launch call.",
 	],
 	parameters: RunPreflightParamsSchema,
 	executionMode: "sequential",
@@ -229,13 +226,14 @@ export const runPreflightTool = {
 export const runExperimentTool = {
 	name: "run_experiment",
 	label: "Run Experiment",
-	description: "Execute a validated simulation ExperimentSpec or an operator-approved hardware ExperimentSpec.",
-	promptSnippet: "Execute a simulation or approved hardware ExperimentSpec and return run records and summary",
+	description: "Execute a validated simulation ExperimentSpec or a bounded hardware ExperimentSpec.",
+	promptSnippet: "Execute a simulation or bounded hardware ExperimentSpec and return run records and summary",
 	promptGuidelines: [
 		"Use run_experiment for simulation specs that passed preflight.",
 		"Use hardwareExecution for new hardware calls; legacy hardwarePilot is accepted only during migration.",
-		"For hardware specs, require a matching dry-run preflight report, explicit operator approval, hardwareExecution.coordinateAuditId for supervised real hardware, and any Raman-specific safety gates.",
-		"For Raman workflowBackend v2_bridge, branch before launch: use approval.bootstrapV2ValidationRun only for the first supervised real V2 minimum run; otherwise provide hardwareExecution.raman.v2ValidationId.",
+		"For the Raman MVP, run_experiment blocks on backend executability plus the bounded collision and laser ceilings declared in the ExperimentSpec.",
+		"Set domain.raman.operationIntent explicitly for Raman specs; do not imply autofocus-only by omitting acquisition fields.",
+		"For Raman workflowBackend v2_bridge, autofocus motion is guarded again at runtime by bridge-side settled-position assertions.",
 	],
 	parameters: RunExperimentParamsSchema,
 	executionMode: "sequential",

@@ -37,6 +37,7 @@
 	},
 	"domain": {
 		"raman": {
+			"operationIntent": "acquire_only",
 			"acquisition": {
 				"integrationTimeS": 1,
 				"accumulations": 1,
@@ -50,6 +51,5 @@
 		"maxRuntimeMinutes": 5,
 		"maxUnits": 2,
 		"stopOnError": true
-	},
-	"operatorApprovalRequired": false
+	}
 }
