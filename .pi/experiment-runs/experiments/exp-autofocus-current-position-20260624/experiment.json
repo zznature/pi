@@ -1,0 +1,16 @@
+{
+  "experimentId": "exp-autofocus-current-position-20260624",
+  "experimentType": "spatial_mapping",
+  "objective": "Run a hardware camera-based autofocus-only pass at the current readback XY position with a bounded ±50 µm Z scan, no Raman spectrum acquisition, and no intentional laser power change.",
+  "subject": {
+    "id": "operator-loaded-sample-current-position",
+    "kind": "operator_loaded_raman_sample",
+    "label": "Current operator-loaded sample position read from MC.Newton stage"
+  },
+  "status": "active",
+  "rootRunIds": [
+    "hw-run-eec00b70"
+  ],
+  "createdAt": "2026-06-24T03:41:50.202Z",
+  "updatedAt": "2026-06-24T03:41:50.205Z"
+}

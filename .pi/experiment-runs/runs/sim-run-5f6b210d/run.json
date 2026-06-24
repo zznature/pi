@@ -1,0 +1,28 @@
+{
+  "runId": "sim-run-5f6b210d",
+  "experimentId": "exp-autofocus-sim-001",
+  "mode": "simulation",
+  "specId": "spec-autofocus-sim-001",
+  "specHash": "42221296fd804af1a22b10c9c506d93a18b7c867aa5781d3ac6c42401ac44f29",
+  "status": "completed",
+  "resourceLeaseId": "lease-5853dfbb",
+  "recordPaths": {
+    "runDir": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d",
+    "runJson": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\run.json",
+    "spec": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\spec.json",
+    "preflight": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\preflight.json",
+    "capabilitiesSnapshot": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\capabilities.snapshot.json",
+    "events": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\events.jsonl",
+    "intents": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\intents.jsonl",
+    "summary": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\summary.json",
+    "analysis": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\analysis.json",
+    "resumeSnapshot": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\resume.snapshot.json",
+    "artifacts": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\artifacts.json",
+    "approvals": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\approvals.jsonl",
+    "leases": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\sim-run-5f6b210d\\leases.jsonl"
+  },
+  "createdAt": "2026-06-22T07:03:10.877Z",
+  "updatedAt": "2026-06-22T07:03:10.885Z",
+  "startedAt": "2026-06-22T07:03:10.881Z",
+  "finishedAt": "2026-06-22T07:03:10.885Z"
+}

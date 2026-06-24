@@ -1,0 +1,182 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MFMCNewtonLT06 Python API &mdash; MCNewtonLT06 v1.0.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=12f31cd9"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=beaddf03"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="next" title="NewtonLT06 API" href="NewtonLT06.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            MCNewtonLT06
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <p class="caption" role="heading"><span class="caption-text">目录:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="NewtonLT06.html">NewtonLT06 API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">MCNewtonLT06</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">MFMCNewtonLT06 Python API</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> 查看页面源码</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="mfmcnewtonlt06-python-api">
+<h1>MFMCNewtonLT06 Python API<a class="headerlink" href="#mfmcnewtonlt06-python-api" title="Link to this heading"></a></h1>
+<p>这是一个用于控制和与 MC.NewtonLT-06 进行串口通信的 Python 包。该包提供了一套简化的接口，允许用户轻松地与仪器进行交互、收集数据以及执行各种操作。</p>
+<p>官网：<a class="reference external" href="https://www.multi-field.com/">MultiFields</a></p>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">目录:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="NewtonLT06.html">NewtonLT06 API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.NoError"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.NoError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.NotConnected"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.NotConnected</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.WSAStartup_Failed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.WSAStartup_Failed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.SocketCreationFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.SocketCreationFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.InvalidServerIP"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.InvalidServerIP</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.ConnectionServerFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.ConnectionServerFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.SendDataFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.SendDataFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.GetByteToReadFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.GetByteToReadFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.RecvDataFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.RecvDataFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.RecvDataZero"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.RecvDataZero</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.RecvDataNotAvailable"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.RecvDataNotAvailable</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.InvalidParameter"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.InvalidParameter</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.ErrorReturn"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.ErrorReturn</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.ErrorParse"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.ErrorParse</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.IPInvalid"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.IPInvalid</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.ConnectPortFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.ConnectPortFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus.TargetSetError"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.TargetSetError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.ChannelSwitch"><code class="docutils literal notranslate"><span class="pre">ChannelSwitch</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.ChannelSwitch.OFF"><code class="docutils literal notranslate"><span class="pre">ChannelSwitch.OFF</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.ChannelSwitch.ON"><code class="docutils literal notranslate"><span class="pre">ChannelSwitch.ON</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.__init__"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.connect"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.connect()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.disconnect"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.disconnect()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.commandConsole"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.commandConsole()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.hard_idn"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.hard_idn()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.set_cap"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.set_cap()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.set_volt"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.set_volt()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.set_freq"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.set_freq()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_slid"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_slid()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_step"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_step()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel_set"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel_set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel1_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel1_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel1_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel1_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel2_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel2_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel2_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel2_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel3_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel3_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel3_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel3_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel4_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel4_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel4_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel4_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel5_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel5_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel5_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel5_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel6_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel6_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel6_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel6_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_open_pulse_positive"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_open_pulse_positive()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_open_pulse_negative"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_open_pulse_negative()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_open_positive_until_stop"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_open_positive_until_stop()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_open_negative_until_stop"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_open_negative_until_stop()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_close_target"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_close_target()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_stop"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_stop()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.read_pulse"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.read_pulse()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.check_voltage"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.check_voltage()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.check_position"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.check_position()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.change_units_angle"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.change_units_angle()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.change_units_mm"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.change_units_mm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.change_tcp"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.change_tcp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.change_usart"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.change_usart()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="页脚">
+        <a href="NewtonLT06.html" class="btn btn-neutral float-right" title="NewtonLT06 API" accesskey="n" rel="next">下一页 <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2025, MultiFields。</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

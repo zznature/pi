@@ -1,0 +1,7 @@
+NewtonLT06 API
+---------------
+
+.. automodule:: MCNewtonLT06
+   :members:
+   :show-inheritance:
+   :undoc-members:

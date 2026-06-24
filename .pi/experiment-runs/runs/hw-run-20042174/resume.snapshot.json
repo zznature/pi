@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-20042174",
+  "experimentId": "exp-bounded-z-adjustment-002",
+  "mode": "hardware",
+  "status": "completed",
+  "completedUnits": 1,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 1,
+  "safeToResume": false,
+  "requiresOperatorApproval": false,
+  "createdAt": "2026-06-24T03:07:53.595Z"
+}

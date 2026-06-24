@@ -1,0 +1,51 @@
+[
+  {
+    "id": "sim-run-5f6b210d-run",
+    "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/run.json",
+    "label": "Run record",
+    "kind": "run",
+    "producerRunId": "sim-run-5f6b210d"
+  },
+  {
+    "id": "sim-run-5f6b210d-spec",
+    "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/spec.json",
+    "label": "ExperimentSpec",
+    "kind": "spec",
+    "producerRunId": "sim-run-5f6b210d"
+  },
+  {
+    "id": "sim-run-5f6b210d-events",
+    "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/events.jsonl",
+    "label": "Unit events",
+    "kind": "events",
+    "producerRunId": "sim-run-5f6b210d"
+  },
+  {
+    "id": "sim-run-5f6b210d-summary",
+    "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/summary.json",
+    "label": "Simulation summary",
+    "kind": "summary",
+    "producerRunId": "sim-run-5f6b210d"
+  },
+  {
+    "id": "sim-run-5f6b210d-resume-snapshot",
+    "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/resume.snapshot.json",
+    "label": "Resume snapshot",
+    "kind": "resume-snapshot",
+    "producerRunId": "sim-run-5f6b210d"
+  },
+  {
+    "id": "sim-run-5f6b210d-artifacts",
+    "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/artifacts.json",
+    "label": "Artifact index",
+    "kind": "artifacts",
+    "producerRunId": "sim-run-5f6b210d"
+  },
+  {
+    "id": "sim-run-5f6b210d-analysis",
+    "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/analysis.json",
+    "label": "Run analysis",
+    "kind": "analysis",
+    "producerRunId": "sim-run-5f6b210d"
+  }
+]

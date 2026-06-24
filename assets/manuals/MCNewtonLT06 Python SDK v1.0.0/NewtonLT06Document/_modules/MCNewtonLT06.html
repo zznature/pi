@@ -1,0 +1,897 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN" data-content_root="../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCNewtonLT06 &mdash; MCNewtonLT06 v1.0.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=12f31cd9"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/translations.js?v=beaddf03"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="../genindex.html" />
+    <link rel="search" title="搜索" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            MCNewtonLT06
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <p class="caption" role="heading"><span class="caption-text">目录:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../NewtonLT06.html">NewtonLT06 API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">MCNewtonLT06</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">模块代码</a></li>
+      <li class="breadcrumb-item active">MCNewtonLT06</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>MCNewtonLT06 源代码</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">serial</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">include_in_docs</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;标记函数或类应包含在文档中。&quot;&quot;&quot;</span>
+    <span class="n">func</span><span class="o">.</span><span class="n">__doc_include__</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="n">func</span>
+
+
+<span class="c1"># region Enum &amp; Structures</span>
+<div class="viewcode-block" id="MFMCNewtonStatus">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MFMCNewtonStatus">[文档]</a>
+<span class="nd">@include_in_docs</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MFMCNewtonStatus</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    状态码：MFMC Newton 状态枚举类型。</span>
+<span class="sd">    该枚举类定义了与 MFMC Newton 通讯相关的各种状态及错误码。</span>
+
+<span class="sd">        - NoError: 没有错误</span>
+<span class="sd">        - NotConnected: 设备未连接</span>
+<span class="sd">        - WSAStartup_Failed: WSAStartup 初始化失败</span>
+<span class="sd">        - SocketCreationFailed: 创建 Socket 失败</span>
+<span class="sd">        - InvalidServerIP: 连接服务器的 IP 非法</span>
+<span class="sd">        - ConnectionServerFailed: 连接服务器失败</span>
+<span class="sd">        - SendDataFailed: 发送数据失败</span>
+<span class="sd">        - GetByteToReadFailed: 获取缓冲区数据大小失败</span>
+<span class="sd">        - RecvDataFailed: 读取数据失败</span>
+<span class="sd">        - RecvDataZero: 读取数据长度为 0，服务器关闭连接</span>
+<span class="sd">        - RecvDataNotAvailable: 读取数据失败，应该返回数据但无数据返回</span>
+<span class="sd">        - InvalidParameter: 非法参数</span>
+<span class="sd">        - ErrorReturn: 查询返回匹配失败</span>
+<span class="sd">        - ErrorParse: 解析返回值失败</span>
+<span class="sd">        - IPInvalid: IP 非法</span>
+<span class="sd">        - ConnectPortFailed: 连接串口失败</span>
+<span class="sd">        - TargetSetError: move_close_target: 目标位置参数设置失败</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">NoError</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 没有错误</span>
+    <span class="n">NotConnected</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># 设备未连接</span>
+    <span class="n">WSAStartup_Failed</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># WSAStartup初始化失败</span>
+    <span class="n">SocketCreationFailed</span> <span class="o">=</span> <span class="mi">3</span>  <span class="c1"># 创建Socket失败</span>
+    <span class="n">InvalidServerIP</span> <span class="o">=</span> <span class="mi">4</span>  <span class="c1"># 连接服务器的IP非法</span>
+    <span class="n">ConnectionServerFailed</span> <span class="o">=</span> <span class="mi">5</span>  <span class="c1"># 连接服务器失败</span>
+    <span class="n">SendDataFailed</span> <span class="o">=</span> <span class="mi">6</span>  <span class="c1"># 发送数据失败</span>
+    <span class="n">GetByteToReadFailed</span> <span class="o">=</span> <span class="mi">7</span>  <span class="c1"># 获取缓冲区数据大小失败</span>
+    <span class="n">RecvDataFailed</span> <span class="o">=</span> <span class="mi">8</span>  <span class="c1"># 读取数据失败</span>
+    <span class="n">RecvDataZero</span> <span class="o">=</span> <span class="mi">9</span>  <span class="c1"># 读取数据长度为0，服务器关闭连接</span>
+    <span class="n">RecvDataNotAvailable</span> <span class="o">=</span> <span class="mi">10</span>  <span class="c1"># 读取数据失败，应该返回数据但无数据返回</span>
+    <span class="n">InvalidParameter</span> <span class="o">=</span> <span class="mi">11</span>  <span class="c1"># 非法参数</span>
+    <span class="n">ErrorReturn</span> <span class="o">=</span> <span class="mi">12</span>  <span class="c1"># 查询返回匹配失败</span>
+    <span class="n">ErrorParse</span> <span class="o">=</span> <span class="mi">13</span>  <span class="c1"># 解析返回值失败</span>
+    <span class="n">IPInvalid</span> <span class="o">=</span> <span class="mi">14</span>  <span class="c1"># IP非法</span>
+    <span class="n">ConnectPortFailed</span> <span class="o">=</span> <span class="mi">15</span>  <span class="c1"># 连接串口失败</span>
+    <span class="n">TargetSetError</span> <span class="o">=</span> <span class="mi">16</span>  <span class="c1"># move_close_target目标位置参数设置失败</span></div>
+
+
+<div class="viewcode-block" id="ChannelSwitch">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.ChannelSwitch">[文档]</a>
+<span class="nd">@include_in_docs</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ChannelSwitch</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    控制通道开关</span>
+<span class="sd">        - OFF ： 关闭</span>
+<span class="sd">        - ON ： 开启</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">OFF</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 关闭</span>
+    <span class="n">ON</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># 开启</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06">[文档]</a>
+<span class="nd">@include_in_docs</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MCNewtonLT06</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    MCNewtonLT06 参数</span>
+<span class="sd">        - port ： 串口端口</span>
+<span class="sd">        - baudrate: 波特率</span>
+<span class="sd">        - timeout: 超时时间</span>
+<span class="sd">        - device: 此设备</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># region 初始化</span>
+<div class="viewcode-block" id="MCNewtonLT06.__init__">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.__init__">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">baudrate</span><span class="o">=</span><span class="mi">115200</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        初始化设备</span>
+
+<span class="sd">        :param port: 串口端口</span>
+<span class="sd">        :param baudrate: 波特率</span>
+<span class="sd">        :param timeout: 超时时间</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># 初始化锁和连接状态</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">commandLock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">port</span> <span class="o">=</span> <span class="n">port</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">baudrate</span> <span class="o">=</span> <span class="n">baudrate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="n">timeout</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span></div>
+
+
+    <span class="c1"># endregion 初始化</span>
+
+    <span class="c1"># region 串口通讯</span>
+<div class="viewcode-block" id="MCNewtonLT06.connect">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.connect">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        打开串口，连接设备</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># 打开串口</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">serial</span><span class="o">.</span><span class="n">Serial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">baudrate</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">timeout</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">is_open</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;串口 </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="si">}</span><span class="s2"> 已打开&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">serial</span><span class="o">.</span><span class="n">SerialException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;无法打开串口</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.disconnect">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.disconnect">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        断开连接设备</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">is_open</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;串口 </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="si">}</span><span class="s2"> 已关闭&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span>
+        <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NotConnected</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">commandQueryLong</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandLock</span><span class="p">:</span>
+            <span class="c1"># print(&quot;commandQueryLong&quot;)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">is_open</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NotConnected</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">bytes_sent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+                <span class="k">if</span> <span class="n">bytes_sent</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># print(&quot;Failed to send data.&quot;)</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">SendDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.050</span><span class="p">)</span>  <span class="c1"># 50ms</span>
+
+                <span class="c1"># 查询串口缓冲区中的数据大小</span>
+                <span class="n">bytes_available</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">in_waiting</span>  <span class="c1"># 获取缓冲区中待接收字节数</span>
+
+                <span class="k">if</span> <span class="n">bytes_available</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># 接收串口的响应</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">bytes_available</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>  <span class="c1"># 读取数据到缓冲区</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">response</span><span class="p">:</span>
+                        <span class="c1"># print(&quot;No data received, or device closed the connection.&quot;)</span>
+                        <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">RecvDataZero</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">,</span> <span class="n">response</span>  <span class="c1"># 返回错误状态和响应数据</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># print(&quot;No data available to read&quot;)</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">RecvDataZero</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">except</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">SerialException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Serial error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">SendDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">RecvDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">commandQueryShort</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandLock</span><span class="p">:</span>
+            <span class="c1"># print(&quot;commandQueryShort&quot;)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">is_open</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NotConnected</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">bytes_sent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+                <span class="k">if</span> <span class="n">bytes_sent</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># print(&quot;Failed to send data.&quot;)</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">SendDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.030</span><span class="p">)</span>  <span class="c1"># 50ms</span>
+
+                <span class="c1"># 查询串口缓冲区中的数据大小</span>
+                <span class="n">bytes_available</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">in_waiting</span>  <span class="c1"># 获取缓冲区中待接收字节数</span>
+
+                <span class="k">if</span> <span class="n">bytes_available</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># 接收串口的响应</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">bytes_available</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>  <span class="c1"># 读取数据到缓冲区</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">TargetSetError</span><span class="p">,</span> <span class="n">response</span>  <span class="c1"># 返回错误状态和响应数据</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">except</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">SerialException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Serial error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">SendDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">RecvDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">commandQueryReadLine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandLock</span><span class="p">:</span>
+            <span class="c1"># print(&quot;commandQueryReadLine&quot;)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">is_open</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NotConnected</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+                <span class="n">bytes_sent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+                <span class="k">if</span> <span class="n">bytes_sent</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># print(&quot;Failed to send data.&quot;)</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">SendDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.030</span><span class="p">)</span>  <span class="c1"># 50ms</span>
+
+                <span class="c1"># 查询串口缓冲区中的数据大小</span>
+                <span class="n">bytes_available</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">in_waiting</span>  <span class="c1"># 获取缓冲区中待接收字节数</span>
+
+                <span class="k">if</span> <span class="n">bytes_available</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># 接收串口的响应</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">readLine</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>  <span class="c1"># 读取数据到缓冲区</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">response</span><span class="p">:</span>
+                        <span class="c1"># print(&quot;No data received, or device closed the connection.&quot;)</span>
+                        <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">RecvDataZero</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span> <span class="c1"># 离开之前清理串口缓冲区</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">,</span> <span class="n">response</span>  <span class="c1"># 返回错误状态和响应数据</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># print(&quot;No data available to read&quot;)</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">RecvDataZero</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">except</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">SerialException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Serial error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">SendDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">RecvDataFailed</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">readLine</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">received_data</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;&#39;</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">byte</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">byte</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="n">received_data</span> <span class="o">+=</span> <span class="n">byte</span>
+            <span class="k">if</span> <span class="sa">b</span><span class="s1">&#39;]&#39;</span> <span class="ow">in</span> <span class="n">received_data</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">received_data</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">commandSet</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandLock</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="c1"># print(&quot;commandSet&quot;)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">is_open</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NotConnected</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+                <span class="n">bytes_sent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+                <span class="k">if</span> <span class="n">bytes_sent</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># print(&quot;Failed to send data.&quot;)</span>
+                    <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">SendDataFailed</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.030</span><span class="p">)</span>  <span class="c1"># 30ms</span>
+
+                <span class="c1"># 查询串口缓冲区中的数据大小</span>
+                <span class="n">bytes_available</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">in_waiting</span>  <span class="c1"># 获取缓冲区中待接收字节数</span>
+                <span class="k">if</span> <span class="n">bytes_available</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># 接收串口的响应</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>  <span class="c1"># 读取数据到缓冲区</span>
+                    <span class="c1"># print(f&quot;error response:{response}&quot;)</span>
+            <span class="k">except</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">SerialException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Serial error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">SendDataFailed</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">RecvDataFailed</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span>
+
+    <span class="c1"># endregion 串口通讯</span>
+
+    <span class="c1"># region 指令控制台</span>
+<div class="viewcode-block" id="MCNewtonLT06.commandConsole">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.commandConsole">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">commandConsole</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        指令控制台</span>
+
+<span class="sd">        :param command: 需要发送的指令</span>
+<span class="sd">        :return: 状态码,返回的指令</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandQueryLong</span><span class="p">(</span><span class="n">command</span><span class="p">)</span></div>
+
+
+    <span class="c1"># endregion 指令控制台</span>
+
+    <span class="c1"># region 硬件查询</span>
+<div class="viewcode-block" id="MCNewtonLT06.hard_idn">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.hard_idn">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">hard_idn</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">-&gt;</span><span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        返回控制器版本号</span>
+
+<span class="sd">        :return: 状态码,版本号</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">status</span><span class="p">,</span> <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandQueryReadLine</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[*IDN?]&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="o">!=</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">status</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;[&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;]&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">,</span> <span class="n">response</span></div>
+
+    <span class="c1"># endregion 硬件查询</span>
+
+    <span class="c1"># region 参数设置</span>
+<div class="viewcode-block" id="MCNewtonLT06.set_cap">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.set_cap">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_cap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cap</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        修改控制设备电容值 cap，构建[cap:xxxnF]命令</span>
+
+<span class="sd">        :param cap: 设置的电容值，单位为nF</span>
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># 构建基础命令字符串</span>
+        <span class="n">command_string</span> <span class="o">=</span> <span class="s2">&quot;[cap:</span><span class="si">{:0&gt;3d}</span><span class="s2">nF]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cap</span><span class="p">)</span>
+        <span class="c1"># 调用 commandSet 发送命令</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.set_volt">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.set_volt">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_volt</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">volt</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        修改控制设备电压值 volt，构建[volt:+xxxV]命令</span>
+
+<span class="sd">        :param volt: 设置的电压值，单位为V</span>
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># 构建基础命令字符串</span>
+        <span class="n">command_string</span> <span class="o">=</span> <span class="s2">&quot;[volt:+</span><span class="si">{:0&gt;3d}</span><span class="s2">V]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">volt</span><span class="p">)</span>
+        <span class="c1"># 调用 commandSet 发送命令</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.set_freq">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.set_freq">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_freq</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">freq</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        修改控制设备频率值 freq，构建[freq:xxxxHz]命令</span>
+
+<span class="sd">        :param freq: 设置的频率，单位为Hz</span>
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># 构建基础命令字符串</span>
+        <span class="n">command_string</span> <span class="o">=</span> <span class="s2">&quot;[freq:</span><span class="si">{:0&gt;5d}</span><span class="s2">Hz]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">freq</span><span class="p">)</span>
+        <span class="c1"># 调用 commandSet 发送命令</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+    <span class="c1"># endregion 参数设置</span>
+
+    <span class="c1"># region 步进模式</span>
+<div class="viewcode-block" id="MCNewtonLT06.move_slid">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_slid">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_slid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置步进方式为slide模式，构建[-slid-]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># 构建基础命令字符串</span>
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[-slid-]&quot;</span>
+        <span class="c1"># 调用 commandSet 发送命令</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.move_step">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_step">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_step</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置步进方式为step模式，构建[-step-]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># 构建基础命令字符串</span>
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[-step-]&quot;</span>
+        <span class="c1"># 调用 commandSet 发送命令</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+    <span class="c1"># endregion 步进模式</span>
+
+    <span class="c1"># region 通道开关</span>
+<div class="viewcode-block" id="MCNewtonLT06.channel_set">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel_set">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel_set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">channel</span><span class="p">:</span><span class="nb">int</span><span class="p">,</span> <span class="n">channelswitch</span><span class="p">:</span><span class="n">ChannelSwitch</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道打开和关闭，构建[chx:x]命令</span>
+
+<span class="sd">        :channel:通道号</span>
+<span class="sd">        :channelswitch:开关模式</span>
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">channel</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">channel</span> <span class="o">&gt;</span> <span class="mi">6</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;channel参数错误&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">InvalidParameter</span>
+        <span class="c1"># 构建基础命令字符串</span>
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[ch</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">channelswitch</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">]&quot;</span>
+        <span class="c1"># 调用 commandSet 发送命令</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel1_on">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel1_on">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel1_on</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道1打开，构建[ch1:1]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">ON</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel1_off">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel1_off">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel1_off</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道1关闭，构建[ch1:0]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">OFF</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel2_on">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel2_on">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel2_on</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道2打开，构建[ch2:1]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">ON</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel2_off">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel2_off">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel2_off</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道2关闭，构建[ch2:0]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">OFF</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel3_on">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel3_on">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel3_on</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道3打开，构建[ch3:1]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">ON</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel3_off">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel3_off">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel3_off</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道3关闭，构建[ch3:0]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">OFF</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel4_on">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel4_on">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel4_on</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道4打开，构建[ch4:1]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">ON</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel4_off">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel4_off">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel4_off</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道4关闭，构建[ch4:0]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">OFF</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel5_on">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel5_on">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel5_on</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道5打开，构建[ch5:1]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">ON</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel5_off">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel5_off">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel5_off</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道5关闭，构建[ch5:0]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">OFF</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel6_on">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel6_on">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel6_on</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道6打开，构建[ch6:1]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">ON</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.channel6_off">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.channel6_off">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">channel6_off</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置通道6关闭，构建[ch6:0]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">channel_set</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="n">ChannelSwitch</span><span class="o">.</span><span class="n">OFF</span><span class="p">)</span></div>
+
+    <span class="c1"># endregion 通道开关</span>
+
+    <span class="c1"># region 运动控制</span>
+<div class="viewcode-block" id="MCNewtonLT06.move_open_pulse_positive">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_open_pulse_positive">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_open_pulse_positive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pulse</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置脉冲数pulse并开始正向运动，构建[+:pulse]命令</span>
+
+<span class="sd">        :param pulse: 正向运动的脉冲数</span>
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="s2">&quot;[+:</span><span class="si">{:0&gt;6d}</span><span class="s2">]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pulse</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.move_open_pulse_negative">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_open_pulse_negative">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_open_pulse_negative</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pulse</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        设置脉冲数pulse并开始负向运动，构建[-:pulse]命令</span>
+
+<span class="sd">        :param pulse: 负向运动的脉冲数</span>
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="s2">&quot;[-:</span><span class="si">{:0&gt;6d}</span><span class="s2">]&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pulse</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.move_open_positive_until_stop">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_open_positive_until_stop">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_open_positive_until_stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        正方向持续运动直至收到停止命令，构建[+:000000]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[+:000000]&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.move_open_negative_until_stop">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_open_negative_until_stop">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_open_negative_until_stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        反方向持续运动直至收到停止命令，构建[-:000000]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[-:000000]&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.move_close_target">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_close_target">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_close_target</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        运动至target mm位置处，构建[movetarget:target]命令</span>
+
+<span class="sd">        :param target: 运动的目标位置</span>
+<span class="sd">        :return: 状态码, 闭环运动位置参数设置失败返回值</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[movetarget:</span><span class="si">{</span><span class="n">target</span><span class="si">}</span><span class="s2">]&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandQueryShort</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.move_stop">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.move_stop">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        停止运动，构建[stop]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[stop]&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+    <span class="c1"># endregion 运动控制</span>
+
+    <span class="c1"># region 参数查询</span>
+<div class="viewcode-block" id="MCNewtonLT06.read_pulse">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.read_pulse">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_pulse</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        查询剩余脉冲数，构建[read:pulse?]命令</span>
+
+<span class="sd">        :return: 状态码和当前剩余脉冲数</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pulse</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">status</span><span class="p">,</span> <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandQueryReadLine</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[read:pulse?]&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="o">!=</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">status</span><span class="p">,</span> <span class="n">pulse</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;[&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;]&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">pulse</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">,</span> <span class="n">pulse</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">ErrorParse</span><span class="p">,</span> <span class="n">pulse</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.check_voltage">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.check_voltage">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_voltage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        查询位置传感器电压值，构建[v?]命令</span>
+
+<span class="sd">        :return: 状态码和当前位置传感器电压值</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">voltage</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">status</span><span class="p">,</span> <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandQueryReadLine</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[v?]&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="o">!=</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">status</span><span class="p">,</span> <span class="n">voltage</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;[+&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;v]&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">voltage</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">,</span> <span class="n">voltage</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">ErrorParse</span><span class="p">,</span> <span class="n">voltage</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.check_position">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.check_position">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_position</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        查询当前位置，单位为mm(°)，构建[check:pos?]命令</span>
+
+<span class="sd">        :return: 状态码和当前位置</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">position</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">status</span><span class="p">,</span> <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandQueryReadLine</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[check:pos?]&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="o">!=</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">status</span><span class="p">,</span> <span class="n">position</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;[pos:&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;]&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">position</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">NoError</span><span class="p">,</span> <span class="n">position</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">MFMCNewtonStatus</span><span class="o">.</span><span class="n">ErrorParse</span><span class="p">,</span> <span class="n">position</span></div>
+
+    <span class="c1"># endregion 参数查询</span>
+
+    <span class="c1"># region 显示单位</span>
+<div class="viewcode-block" id="MCNewtonLT06.change_units_angle">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.change_units_angle">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">change_units_angle</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        切换屏幕显示位置单位为 °，构建[changeunits:angle]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[changeunits:angle]&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.change_units_mm">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.change_units_mm">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">change_units_mm</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        切换屏幕显示位置单位为 mm，构建[changeunits:mm]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[changeunits:mm]&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+    <span class="c1"># endregion 显示单位</span>
+
+    <span class="c1"># region 通讯模式</span>
+<div class="viewcode-block" id="MCNewtonLT06.change_tcp">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.change_tcp">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">change_tcp</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        切换通讯为网口模式，构建[change:tcp]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[change:tcp]&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MCNewtonLT06.change_usart">
+<a class="viewcode-back" href="../NewtonLT06.html#MCNewtonLT06.MCNewtonLT06.change_usart">[文档]</a>
+    <span class="nd">@include_in_docs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">change_usart</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MFMCNewtonStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        切换通讯为串口模式，构建[change:usart]命令</span>
+
+<span class="sd">        :return: 状态码</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">command_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;[change:usart]&quot;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">commandSet</span><span class="p">(</span><span class="n">command_string</span><span class="p">)</span></div>
+</div>
+
+    <span class="c1"># endregion 通讯模式</span>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2025, MultiFields。</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

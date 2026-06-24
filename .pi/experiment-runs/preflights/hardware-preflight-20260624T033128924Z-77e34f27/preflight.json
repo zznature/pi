@@ -1,0 +1,118 @@
+{
+  "reportId": "hardware-preflight-20260624T033128924Z-77e34f27",
+  "spec": {
+    "schemaVersion": "1",
+    "experimentId": "exp-autofocus-current-position-20260624",
+    "specId": "spec-autofocus-current-position-20260624-001",
+    "experimentType": "spatial_mapping",
+    "objective": "Run a hardware camera-based autofocus-only pass at the current readback XY position with a bounded ±50 µm Z scan, no Raman spectrum acquisition, and no intentional laser power change.",
+    "subject": {
+      "id": "operator-loaded-sample-current-position",
+      "kind": "operator_loaded_raman_sample",
+      "label": "Current operator-loaded sample position read from MC.Newton stage"
+    },
+    "mode": "hardware",
+    "resources": [
+      {
+        "id": "mc-newton-xyz-stage",
+        "kind": "instrument",
+        "role": "stage"
+      },
+      {
+        "id": "lab-camera",
+        "kind": "instrument",
+        "role": "camera"
+      },
+      {
+        "id": "lab-acquirer",
+        "kind": "instrument",
+        "role": "acquirer"
+      },
+      {
+        "id": "labspec-workstation",
+        "kind": "workspace",
+        "role": "exclusive_lab_station"
+      }
+    ],
+    "limits": {
+      "motion": {
+        "xUm": {
+          "minUm": 942.723,
+          "maxUm": 942.723
+        },
+        "yUm": {
+          "minUm": 1580.978,
+          "maxUm": 1580.978
+        },
+        "zUm": {
+          "minUm": 2056.81,
+          "maxUm": 2156.81
+        }
+      },
+      "powerEnergy": {
+        "maxLaserPowerMw": 2
+      },
+      "acquisition": {
+        "maxExposureMs": 500,
+        "maxUnits": 1
+      }
+    },
+    "plan": {
+      "kind": "points",
+      "points": [
+        {
+          "xUm": 942.723,
+          "yUm": 1580.978,
+          "zUm": 2106.81
+        }
+      ]
+    },
+    "domain": {
+      "raman": {
+        "autofocus": {
+          "enabled": true,
+          "every": {
+            "kind": "everyNPoints",
+            "n": 1
+          },
+          "zMinUm": 2056.81,
+          "zMaxUm": 2156.81,
+          "coarseRangeUm": 50,
+          "coarseStepUm": 10,
+          "fineRangeUm": 10,
+          "fineStepUm": 2,
+          "metric": "labspec_spot_compactness",
+          "minConfidence": 0.2,
+          "onFailure": "pause"
+        }
+      }
+    },
+    "stoppingRules": {
+      "maxRuntimeMinutes": 3,
+      "maxUnits": 1,
+      "stopOnError": true
+    },
+    "operatorApprovalRequired": true
+  },
+  "result": {
+    "valid": true,
+    "issues": [],
+    "unitCount": 1,
+    "estimatedRuntimeMinutes": 0.008,
+    "mode": "hardware",
+    "plannedRun": {
+      "wouldVisitUnits": 1,
+      "wouldUseResources": [
+        "mc-newton-xyz-stage",
+        "lab-camera",
+        "lab-acquirer",
+        "labspec-workstation"
+      ]
+    },
+    "willNotExecute": [],
+    "specHash": "960cb3ced7fb364f0e2233f0ed1914afe0b8db9163245b17d8b1545074df4349",
+    "capabilitySnapshotId": "hardware-preflight-20260624T033128924Z-77e34f27-capabilities"
+  },
+  "specHash": "960cb3ced7fb364f0e2233f0ed1914afe0b8db9163245b17d8b1545074df4349",
+  "capabilitySnapshotId": "hardware-preflight-20260624T033128924Z-77e34f27-capabilities"
+}

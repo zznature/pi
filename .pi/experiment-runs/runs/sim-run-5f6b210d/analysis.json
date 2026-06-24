@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "1",
+  "runId": "sim-run-5f6b210d",
+  "experimentId": "exp-autofocus-sim-001",
+  "status": "completed",
+  "qualityMetrics": {
+    "unitCount": 2,
+    "completedUnits": 2,
+    "failedUnits": 0,
+    "skippedUnits": 0,
+    "completionRate": 1,
+    "errorRate": 0,
+    "meanSignal": 105,
+    "maxSignal": 107,
+    "minSignal": 103,
+    "signalRange": 4,
+    "meanFocusScore": 0.899,
+    "minFocusScore": 0.899,
+    "saturatedSpectra": 0,
+    "artifactCount": 6
+  },
+  "anomalies": [],
+  "artifactRefs": [
+    {
+      "id": "sim-run-5f6b210d-run",
+      "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/run.json",
+      "label": "Run record",
+      "kind": "run",
+      "producerRunId": "sim-run-5f6b210d"
+    },
+    {
+      "id": "sim-run-5f6b210d-spec",
+      "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/spec.json",
+      "label": "ExperimentSpec",
+      "kind": "spec",
+      "producerRunId": "sim-run-5f6b210d"
+    },
+    {
+      "id": "sim-run-5f6b210d-events",
+      "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/events.jsonl",
+      "label": "Unit events",
+      "kind": "events",
+      "producerRunId": "sim-run-5f6b210d"
+    },
+    {
+      "id": "sim-run-5f6b210d-summary",
+      "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/summary.json",
+      "label": "Simulation summary",
+      "kind": "summary",
+      "producerRunId": "sim-run-5f6b210d"
+    },
+    {
+      "id": "sim-run-5f6b210d-resume-snapshot",
+      "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/resume.snapshot.json",
+      "label": "Resume snapshot",
+      "kind": "resume-snapshot",
+      "producerRunId": "sim-run-5f6b210d"
+    },
+    {
+      "id": "sim-run-5f6b210d-artifacts",
+      "uri": ".pi/experiment-runs/runs/sim-run-5f6b210d/artifacts.json",
+      "label": "Artifact index",
+      "kind": "artifacts",
+      "producerRunId": "sim-run-5f6b210d"
+    }
+  ],
+  "stoppingRules": [
+    {
+      "rule": "maxUnits",
+      "status": "passed",
+      "triggered": false,
+      "observed": 2,
+      "limit": 2,
+      "reason": "Run stayed within the bounded unit limit."
+    },
+    {
+      "rule": "maxRuntimeMinutes",
+      "status": "not_evaluable",
+      "triggered": false,
+      "limit": 2,
+      "reason": "Run summary does not include runtimeMinutes."
+    },
+    {
+      "rule": "stopOnError",
+      "status": "passed",
+      "triggered": false,
+      "observed": 0,
+      "limit": true,
+      "reason": "No stop-on-error condition was met."
+    },
+    {
+      "rule": "summaryStopCondition",
+      "status": "passed",
+      "triggered": false,
+      "observed": false,
+      "limit": false,
+      "reason": "Kernel summary did not report a stop condition."
+    }
+  ],
+  "stopConditionMet": false,
+  "recommendationBasis": {
+    "usableForReplan": true,
+    "reason": "Run records are complete enough for bounded replanning."
+  }
+}

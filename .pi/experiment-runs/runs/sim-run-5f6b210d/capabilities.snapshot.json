@@ -1,0 +1,89 @@
+{
+  "instruments": [
+    {
+      "id": "sim-stage",
+      "resourceKind": "instrument",
+      "kind": "stage",
+      "units": [
+        "um"
+      ],
+      "coordinateConvention": "right-handed sample coordinates, origin at configured simulation home",
+      "softwareLimits": {
+        "xUm": {
+          "minUm": 0,
+          "maxUm": 1000
+        },
+        "yUm": {
+          "minUm": 0,
+          "maxUm": 1000
+        },
+        "zUm": {
+          "minUm": -100,
+          "maxUm": 100
+        }
+      },
+      "hazards": [
+        "simulated motion only"
+      ],
+      "simulationAvailable": true,
+      "dryRunAvailable": false,
+      "leasePolicy": "exclusive"
+    },
+    {
+      "id": "sim-camera",
+      "resourceKind": "instrument",
+      "kind": "camera",
+      "units": [
+        "px",
+        "ms"
+      ],
+      "coordinateConvention": "image origin at top-left",
+      "softwareLimits": {
+        "maxExposureMs": 1000
+      },
+      "hazards": [
+        "simulated camera only"
+      ],
+      "simulationAvailable": true,
+      "dryRunAvailable": false,
+      "leasePolicy": "exclusive"
+    },
+    {
+      "id": "sim-acquirer",
+      "resourceKind": "instrument",
+      "kind": "acquirer",
+      "units": [
+        "mw",
+        "ms"
+      ],
+      "coordinateConvention": "no spatial coordinates",
+      "softwareLimits": {
+        "maxLaserPowerMw": 1,
+        "maxExposureMs": 1000
+      },
+      "hazards": [
+        "simulated acquisition only"
+      ],
+      "simulationAvailable": true,
+      "dryRunAvailable": false,
+      "leasePolicy": "exclusive"
+    },
+    {
+      "id": "sim-thermal-heating-stage",
+      "resourceKind": "instrument",
+      "kind": "thermal",
+      "units": [
+        "degC",
+        "s"
+      ],
+      "coordinateConvention": "sample heating stage temperature control",
+      "softwareLimits": {},
+      "hazards": [
+        "simulated thermal control only"
+      ],
+      "simulationAvailable": true,
+      "dryRunAvailable": false,
+      "leasePolicy": "exclusive"
+    }
+  ]
+}

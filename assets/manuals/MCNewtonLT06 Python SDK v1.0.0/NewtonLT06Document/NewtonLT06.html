@@ -1,0 +1,745 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NewtonLT06 API &mdash; MCNewtonLT06 v1.0.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=12f31cd9"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=beaddf03"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="prev" title="MFMCNewtonLT06 Python API" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MCNewtonLT06
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <p class="caption" role="heading"><span class="caption-text">目录:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">NewtonLT06 API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.NoError"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.NoError</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.NotConnected"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.NotConnected</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.WSAStartup_Failed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.WSAStartup_Failed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.SocketCreationFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.SocketCreationFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.InvalidServerIP"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.InvalidServerIP</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.ConnectionServerFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.ConnectionServerFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.SendDataFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.SendDataFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.GetByteToReadFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.GetByteToReadFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.RecvDataFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.RecvDataFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.RecvDataZero"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.RecvDataZero</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.RecvDataNotAvailable"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.RecvDataNotAvailable</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.InvalidParameter"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.InvalidParameter</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.ErrorReturn"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.ErrorReturn</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.ErrorParse"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.ErrorParse</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.IPInvalid"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.IPInvalid</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.ConnectPortFailed"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.ConnectPortFailed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus.TargetSetError"><code class="docutils literal notranslate"><span class="pre">MFMCNewtonStatus.TargetSetError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#MCNewtonLT06.ChannelSwitch"><code class="docutils literal notranslate"><span class="pre">ChannelSwitch</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.ChannelSwitch.OFF"><code class="docutils literal notranslate"><span class="pre">ChannelSwitch.OFF</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.ChannelSwitch.ON"><code class="docutils literal notranslate"><span class="pre">ChannelSwitch.ON</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.__init__"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.connect"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.connect()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.disconnect"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.disconnect()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.commandConsole"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.commandConsole()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.hard_idn"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.hard_idn()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.set_cap"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.set_cap()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.set_volt"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.set_volt()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.set_freq"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.set_freq()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.move_slid"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_slid()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.move_step"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_step()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel_set"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel_set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel1_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel1_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel1_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel1_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel2_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel2_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel2_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel2_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel3_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel3_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel3_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel3_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel4_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel4_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel4_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel4_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel5_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel5_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel5_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel5_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel6_on"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel6_on()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.channel6_off"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.channel6_off()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.move_open_pulse_positive"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_open_pulse_positive()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.move_open_pulse_negative"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_open_pulse_negative()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.move_open_positive_until_stop"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_open_positive_until_stop()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.move_open_negative_until_stop"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_open_negative_until_stop()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.move_close_target"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_close_target()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.move_stop"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.move_stop()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.read_pulse"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.read_pulse()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.check_voltage"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.check_voltage()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.check_position"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.check_position()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.change_units_angle"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.change_units_angle()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.change_units_mm"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.change_units_mm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.change_tcp"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.change_tcp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#MCNewtonLT06.MCNewtonLT06.change_usart"><code class="docutils literal notranslate"><span class="pre">MCNewtonLT06.change_usart()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MCNewtonLT06</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">NewtonLT06 API</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/NewtonLT06.rst.txt" rel="nofollow"> 查看页面源码</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-MCNewtonLT06">
+<span id="newtonlt06-api"></span><h1>NewtonLT06 API<a class="headerlink" href="#module-MCNewtonLT06" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">MCNewtonLT06.</span></span><span class="sig-name descname"><span class="pre">MFMCNewtonStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/MCNewtonLT06.html#MFMCNewtonStatus"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>状态码：MFMC Newton 状态枚举类型。
+该枚举类定义了与 MFMC Newton 通讯相关的各种状态及错误码。</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>NoError: 没有错误</p></li>
+<li><p>NotConnected: 设备未连接</p></li>
+<li><p>WSAStartup_Failed: WSAStartup 初始化失败</p></li>
+<li><p>SocketCreationFailed: 创建 Socket 失败</p></li>
+<li><p>InvalidServerIP: 连接服务器的 IP 非法</p></li>
+<li><p>ConnectionServerFailed: 连接服务器失败</p></li>
+<li><p>SendDataFailed: 发送数据失败</p></li>
+<li><p>GetByteToReadFailed: 获取缓冲区数据大小失败</p></li>
+<li><p>RecvDataFailed: 读取数据失败</p></li>
+<li><p>RecvDataZero: 读取数据长度为 0，服务器关闭连接</p></li>
+<li><p>RecvDataNotAvailable: 读取数据失败，应该返回数据但无数据返回</p></li>
+<li><p>InvalidParameter: 非法参数</p></li>
+<li><p>ErrorReturn: 查询返回匹配失败</p></li>
+<li><p>ErrorParse: 解析返回值失败</p></li>
+<li><p>IPInvalid: IP 非法</p></li>
+<li><p>ConnectPortFailed: 连接串口失败</p></li>
+<li><p>TargetSetError: move_close_target: 目标位置参数设置失败</p></li>
+</ul>
+</div></blockquote>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.NoError">
+<span class="sig-name descname"><span class="pre">NoError</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.NoError" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.NotConnected">
+<span class="sig-name descname"><span class="pre">NotConnected</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.NotConnected" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.WSAStartup_Failed">
+<span class="sig-name descname"><span class="pre">WSAStartup_Failed</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.WSAStartup_Failed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.SocketCreationFailed">
+<span class="sig-name descname"><span class="pre">SocketCreationFailed</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.SocketCreationFailed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.InvalidServerIP">
+<span class="sig-name descname"><span class="pre">InvalidServerIP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.InvalidServerIP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.ConnectionServerFailed">
+<span class="sig-name descname"><span class="pre">ConnectionServerFailed</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.ConnectionServerFailed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.SendDataFailed">
+<span class="sig-name descname"><span class="pre">SendDataFailed</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">6</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.SendDataFailed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.GetByteToReadFailed">
+<span class="sig-name descname"><span class="pre">GetByteToReadFailed</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">7</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.GetByteToReadFailed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.RecvDataFailed">
+<span class="sig-name descname"><span class="pre">RecvDataFailed</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.RecvDataFailed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.RecvDataZero">
+<span class="sig-name descname"><span class="pre">RecvDataZero</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">9</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.RecvDataZero" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.RecvDataNotAvailable">
+<span class="sig-name descname"><span class="pre">RecvDataNotAvailable</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.RecvDataNotAvailable" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.InvalidParameter">
+<span class="sig-name descname"><span class="pre">InvalidParameter</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">11</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.InvalidParameter" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.ErrorReturn">
+<span class="sig-name descname"><span class="pre">ErrorReturn</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">12</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.ErrorReturn" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.ErrorParse">
+<span class="sig-name descname"><span class="pre">ErrorParse</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">13</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.ErrorParse" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.IPInvalid">
+<span class="sig-name descname"><span class="pre">IPInvalid</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">14</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.IPInvalid" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.ConnectPortFailed">
+<span class="sig-name descname"><span class="pre">ConnectPortFailed</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">15</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.ConnectPortFailed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.MFMCNewtonStatus.TargetSetError">
+<span class="sig-name descname"><span class="pre">TargetSetError</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">16</span></em><a class="headerlink" href="#MCNewtonLT06.MFMCNewtonStatus.TargetSetError" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="MCNewtonLT06.ChannelSwitch">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">MCNewtonLT06.</span></span><span class="sig-name descname"><span class="pre">ChannelSwitch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/MCNewtonLT06.html#ChannelSwitch"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.ChannelSwitch" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<dl class="simple">
+<dt>控制通道开关</dt><dd><ul class="simple">
+<li><p>OFF ： 关闭</p></li>
+<li><p>ON ： 开启</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.ChannelSwitch.OFF">
+<span class="sig-name descname"><span class="pre">OFF</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#MCNewtonLT06.ChannelSwitch.OFF" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="MCNewtonLT06.ChannelSwitch.ON">
+<span class="sig-name descname"><span class="pre">ON</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#MCNewtonLT06.ChannelSwitch.ON" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">MCNewtonLT06.</span></span><span class="sig-name descname"><span class="pre">MCNewtonLT06</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">port</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">baudrate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">115200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="simple">
+<dt>MCNewtonLT06 参数</dt><dd><ul class="simple">
+<li><p>port ： 串口端口</p></li>
+<li><p>baudrate: 波特率</p></li>
+<li><p>timeout: 超时时间</p></li>
+<li><p>device: 此设备</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">port</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">baudrate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">115200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.__init__"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.__init__" title="Link to this definition"></a></dt>
+<dd><p>初始化设备</p>
+<dl class="field-list simple">
+<dt class="field-odd">参数<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>port</strong> -- 串口端口</p></li>
+<li><p><strong>baudrate</strong> -- 波特率</p></li>
+<li><p><strong>timeout</strong> -- 超时时间</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.connect">
+<span class="sig-name descname"><span class="pre">connect</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.connect"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.connect" title="Link to this definition"></a></dt>
+<dd><p>打开串口，连接设备</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.disconnect">
+<span class="sig-name descname"><span class="pre">disconnect</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.disconnect"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.disconnect" title="Link to this definition"></a></dt>
+<dd><p>断开连接设备</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.commandConsole">
+<span class="sig-name descname"><span class="pre">commandConsole</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.commandConsole"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.commandConsole" title="Link to this definition"></a></dt>
+<dd><p>指令控制台</p>
+<dl class="field-list simple">
+<dt class="field-odd">参数<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>command</strong> -- 需要发送的指令</p>
+</dd>
+<dt class="field-even">返回<span class="colon">:</span></dt>
+<dd class="field-even"><p>状态码,返回的指令</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.hard_idn">
+<span class="sig-name descname"><span class="pre">hard_idn</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.hard_idn"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.hard_idn" title="Link to this definition"></a></dt>
+<dd><p>返回控制器版本号</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码,版本号</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.set_cap">
+<span class="sig-name descname"><span class="pre">set_cap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.set_cap"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.set_cap" title="Link to this definition"></a></dt>
+<dd><p>修改控制设备电容值 cap，构建[cap:xxxnF]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">参数<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>cap</strong> -- 设置的电容值，单位为nF</p>
+</dd>
+<dt class="field-even">返回<span class="colon">:</span></dt>
+<dd class="field-even"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.set_volt">
+<span class="sig-name descname"><span class="pre">set_volt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">volt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.set_volt"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.set_volt" title="Link to this definition"></a></dt>
+<dd><p>修改控制设备电压值 volt，构建[volt:+xxxV]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">参数<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>volt</strong> -- 设置的电压值，单位为V</p>
+</dd>
+<dt class="field-even">返回<span class="colon">:</span></dt>
+<dd class="field-even"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.set_freq">
+<span class="sig-name descname"><span class="pre">set_freq</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.set_freq"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.set_freq" title="Link to this definition"></a></dt>
+<dd><p>修改控制设备频率值 freq，构建[freq:xxxxHz]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">参数<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>freq</strong> -- 设置的频率，单位为Hz</p>
+</dd>
+<dt class="field-even">返回<span class="colon">:</span></dt>
+<dd class="field-even"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.move_slid">
+<span class="sig-name descname"><span class="pre">move_slid</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.move_slid"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.move_slid" title="Link to this definition"></a></dt>
+<dd><p>设置步进方式为slide模式，构建[-slid-]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.move_step">
+<span class="sig-name descname"><span class="pre">move_step</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.move_step"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.move_step" title="Link to this definition"></a></dt>
+<dd><p>设置步进方式为step模式，构建[-step-]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel_set">
+<span class="sig-name descname"><span class="pre">channel_set</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channelswitch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#MCNewtonLT06.ChannelSwitch" title="MCNewtonLT06.ChannelSwitch"><span class="pre">ChannelSwitch</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel_set"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel_set" title="Link to this definition"></a></dt>
+<dd><p>设置通道打开和关闭，构建[chx:x]命令</p>
+<p>:channel:通道号
+:channelswitch:开关模式
+:return: 状态码</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel1_on">
+<span class="sig-name descname"><span class="pre">channel1_on</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel1_on"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel1_on" title="Link to this definition"></a></dt>
+<dd><p>设置通道1打开，构建[ch1:1]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel1_off">
+<span class="sig-name descname"><span class="pre">channel1_off</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel1_off"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel1_off" title="Link to this definition"></a></dt>
+<dd><p>设置通道1关闭，构建[ch1:0]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel2_on">
+<span class="sig-name descname"><span class="pre">channel2_on</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel2_on"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel2_on" title="Link to this definition"></a></dt>
+<dd><p>设置通道2打开，构建[ch2:1]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel2_off">
+<span class="sig-name descname"><span class="pre">channel2_off</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel2_off"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel2_off" title="Link to this definition"></a></dt>
+<dd><p>设置通道2关闭，构建[ch2:0]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel3_on">
+<span class="sig-name descname"><span class="pre">channel3_on</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel3_on"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel3_on" title="Link to this definition"></a></dt>
+<dd><p>设置通道3打开，构建[ch3:1]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel3_off">
+<span class="sig-name descname"><span class="pre">channel3_off</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel3_off"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel3_off" title="Link to this definition"></a></dt>
+<dd><p>设置通道3关闭，构建[ch3:0]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel4_on">
+<span class="sig-name descname"><span class="pre">channel4_on</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel4_on"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel4_on" title="Link to this definition"></a></dt>
+<dd><p>设置通道4打开，构建[ch4:1]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel4_off">
+<span class="sig-name descname"><span class="pre">channel4_off</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel4_off"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel4_off" title="Link to this definition"></a></dt>
+<dd><p>设置通道4关闭，构建[ch4:0]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel5_on">
+<span class="sig-name descname"><span class="pre">channel5_on</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel5_on"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel5_on" title="Link to this definition"></a></dt>
+<dd><p>设置通道5打开，构建[ch5:1]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel5_off">
+<span class="sig-name descname"><span class="pre">channel5_off</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel5_off"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel5_off" title="Link to this definition"></a></dt>
+<dd><p>设置通道5关闭，构建[ch5:0]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel6_on">
+<span class="sig-name descname"><span class="pre">channel6_on</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel6_on"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel6_on" title="Link to this definition"></a></dt>
+<dd><p>设置通道6打开，构建[ch6:1]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.channel6_off">
+<span class="sig-name descname"><span class="pre">channel6_off</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.channel6_off"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.channel6_off" title="Link to this definition"></a></dt>
+<dd><p>设置通道6关闭，构建[ch6:0]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.move_open_pulse_positive">
+<span class="sig-name descname"><span class="pre">move_open_pulse_positive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pulse</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.move_open_pulse_positive"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.move_open_pulse_positive" title="Link to this definition"></a></dt>
+<dd><p>设置脉冲数pulse并开始正向运动，构建[+:pulse]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">参数<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>pulse</strong> -- 正向运动的脉冲数</p>
+</dd>
+<dt class="field-even">返回<span class="colon">:</span></dt>
+<dd class="field-even"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.move_open_pulse_negative">
+<span class="sig-name descname"><span class="pre">move_open_pulse_negative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pulse</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.move_open_pulse_negative"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.move_open_pulse_negative" title="Link to this definition"></a></dt>
+<dd><p>设置脉冲数pulse并开始负向运动，构建[-:pulse]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">参数<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>pulse</strong> -- 负向运动的脉冲数</p>
+</dd>
+<dt class="field-even">返回<span class="colon">:</span></dt>
+<dd class="field-even"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.move_open_positive_until_stop">
+<span class="sig-name descname"><span class="pre">move_open_positive_until_stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.move_open_positive_until_stop"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.move_open_positive_until_stop" title="Link to this definition"></a></dt>
+<dd><p>正方向持续运动直至收到停止命令，构建[+:000000]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.move_open_negative_until_stop">
+<span class="sig-name descname"><span class="pre">move_open_negative_until_stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.move_open_negative_until_stop"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.move_open_negative_until_stop" title="Link to this definition"></a></dt>
+<dd><p>反方向持续运动直至收到停止命令，构建[-:000000]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.move_close_target">
+<span class="sig-name descname"><span class="pre">move_close_target</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.move_close_target"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.move_close_target" title="Link to this definition"></a></dt>
+<dd><p>运动至target mm位置处，构建[movetarget:target]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">参数<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>target</strong> -- 运动的目标位置</p>
+</dd>
+<dt class="field-even">返回<span class="colon">:</span></dt>
+<dd class="field-even"><p>状态码, 闭环运动位置参数设置失败返回值</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.move_stop">
+<span class="sig-name descname"><span class="pre">move_stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.move_stop"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.move_stop" title="Link to this definition"></a></dt>
+<dd><p>停止运动，构建[stop]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.read_pulse">
+<span class="sig-name descname"><span class="pre">read_pulse</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.read_pulse"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.read_pulse" title="Link to this definition"></a></dt>
+<dd><p>查询剩余脉冲数，构建[read:pulse?]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码和当前剩余脉冲数</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.check_voltage">
+<span class="sig-name descname"><span class="pre">check_voltage</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.check_voltage"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.check_voltage" title="Link to this definition"></a></dt>
+<dd><p>查询位置传感器电压值，构建[v?]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码和当前位置传感器电压值</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.check_position">
+<span class="sig-name descname"><span class="pre">check_position</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.check_position"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.check_position" title="Link to this definition"></a></dt>
+<dd><p>查询当前位置，单位为mm(°)，构建[check:pos?]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码和当前位置</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.change_units_angle">
+<span class="sig-name descname"><span class="pre">change_units_angle</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.change_units_angle"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.change_units_angle" title="Link to this definition"></a></dt>
+<dd><p>切换屏幕显示位置单位为 °，构建[changeunits:angle]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.change_units_mm">
+<span class="sig-name descname"><span class="pre">change_units_mm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.change_units_mm"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.change_units_mm" title="Link to this definition"></a></dt>
+<dd><p>切换屏幕显示位置单位为 mm，构建[changeunits:mm]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.change_tcp">
+<span class="sig-name descname"><span class="pre">change_tcp</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.change_tcp"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.change_tcp" title="Link to this definition"></a></dt>
+<dd><p>切换通讯为网口模式，构建[change:tcp]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="MCNewtonLT06.MCNewtonLT06.change_usart">
+<span class="sig-name descname"><span class="pre">change_usart</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#MCNewtonLT06.MFMCNewtonStatus" title="MCNewtonLT06.MFMCNewtonStatus"><span class="pre">MFMCNewtonStatus</span></a></span></span><a class="reference internal" href="_modules/MCNewtonLT06.html#MCNewtonLT06.change_usart"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#MCNewtonLT06.MCNewtonLT06.change_usart" title="Link to this definition"></a></dt>
+<dd><p>切换通讯为串口模式，构建[change:usart]命令</p>
+<dl class="field-list simple">
+<dt class="field-odd">返回<span class="colon">:</span></dt>
+<dd class="field-odd"><p>状态码</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="页脚">
+        <a href="index.html" class="btn btn-neutral float-left" title="MFMCNewtonLT06 Python API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> 上一页</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2025, MultiFields。</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

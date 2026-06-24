@@ -1,0 +1,16 @@
+{
+  "experimentId": "exp-bounded-z-adjustment-002",
+  "experimentType": "spatial_mapping",
+  "objective": "Move the MC.Newton hardware stage in Z only by +50 um from read-only hardware zUm=2055.305 to absolute zUm=2105.305, holding X/Y at the read-only hardware readback.",
+  "subject": {
+    "id": "operator-loaded-sample",
+    "kind": "hardware_stage_position",
+    "label": "operator-reviewed bounded Z-only adjustment from real hardware readback"
+  },
+  "status": "active",
+  "rootRunIds": [
+    "hw-run-20042174"
+  ],
+  "createdAt": "2026-06-24T03:07:46.412Z",
+  "updatedAt": "2026-06-24T03:07:46.415Z"
+}

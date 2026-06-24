@@ -1,0 +1,80 @@
+{
+  "reportId": "hardware-preflight-20260624T030525750Z-d4f91bde",
+  "spec": {
+    "schemaVersion": "1",
+    "experimentId": "exp-bounded-z-adjustment-002",
+    "specId": "spec-bounded-z-plus-50um-real-readback-001",
+    "experimentType": "spatial_mapping",
+    "objective": "Move the MC.Newton hardware stage in Z only by +50 um from read-only hardware zUm=2055.305 to absolute zUm=2105.305, holding X/Y at the read-only hardware readback.",
+    "subject": {
+      "id": "operator-loaded-sample",
+      "kind": "hardware_stage_position",
+      "label": "operator-reviewed bounded Z-only adjustment from real hardware readback"
+    },
+    "mode": "hardware",
+    "resources": [
+      {
+        "id": "mc-newton-xyz-stage",
+        "kind": "instrument",
+        "role": "stage"
+      }
+    ],
+    "limits": {
+      "motion": {
+        "xUm": {
+          "minUm": 947.989,
+          "maxUm": 947.989
+        },
+        "yUm": {
+          "minUm": 1581.507,
+          "maxUm": 1581.507
+        },
+        "zUm": {
+          "minUm": 2055.305,
+          "maxUm": 2105.305
+        }
+      },
+      "powerEnergy": {
+        "maxLaserPowerMw": 0
+      },
+      "acquisition": {
+        "maxExposureMs": 1,
+        "maxUnits": 1
+      }
+    },
+    "plan": {
+      "kind": "points",
+      "points": [
+        {
+          "xUm": 947.989,
+          "yUm": 1581.507,
+          "zUm": 2105.305
+        }
+      ]
+    },
+    "stoppingRules": {
+      "maxRuntimeMinutes": 1,
+      "maxUnits": 1,
+      "stopOnError": true
+    },
+    "operatorApprovalRequired": true
+  },
+  "result": {
+    "valid": true,
+    "issues": [],
+    "unitCount": 1,
+    "estimatedRuntimeMinutes": 0,
+    "mode": "hardware",
+    "plannedRun": {
+      "wouldVisitUnits": 1,
+      "wouldUseResources": [
+        "mc-newton-xyz-stage"
+      ]
+    },
+    "willNotExecute": [],
+    "specHash": "1ab537702efea4674687dcd99a79b87c74207d3d654a5fb4e392920fd9bfb890",
+    "capabilitySnapshotId": "hardware-preflight-20260624T030525750Z-d4f91bde-capabilities"
+  },
+  "specHash": "1ab537702efea4674687dcd99a79b87c74207d3d654a5fb4e392920fd9bfb890",
+  "capabilitySnapshotId": "hardware-preflight-20260624T030525750Z-d4f91bde-capabilities"
+}

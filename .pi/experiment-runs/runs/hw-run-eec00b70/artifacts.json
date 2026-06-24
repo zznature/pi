@@ -1,0 +1,58 @@
+[
+  {
+    "id": "hw-run-eec00b70-run",
+    "uri": ".pi/experiment-runs/runs/hw-run-eec00b70/run.json",
+    "label": "Run record",
+    "kind": "run",
+    "producerRunId": "hw-run-eec00b70"
+  },
+  {
+    "id": "hw-run-eec00b70-spec",
+    "uri": ".pi/experiment-runs/runs/hw-run-eec00b70/spec.json",
+    "label": "ExperimentSpec",
+    "kind": "spec",
+    "producerRunId": "hw-run-eec00b70"
+  },
+  {
+    "id": "hw-run-eec00b70-events",
+    "uri": ".pi/experiment-runs/runs/hw-run-eec00b70/events.jsonl",
+    "label": "Hardware unit events",
+    "kind": "events",
+    "producerRunId": "hw-run-eec00b70"
+  },
+  {
+    "id": "hw-run-eec00b70-intents",
+    "uri": ".pi/experiment-runs/runs/hw-run-eec00b70/intents.jsonl",
+    "label": "Operator intents",
+    "kind": "intents",
+    "producerRunId": "hw-run-eec00b70"
+  },
+  {
+    "id": "hw-run-eec00b70-summary",
+    "uri": ".pi/experiment-runs/runs/hw-run-eec00b70/summary.json",
+    "label": "Hardware summary",
+    "kind": "summary",
+    "producerRunId": "hw-run-eec00b70"
+  },
+  {
+    "id": "hw-run-eec00b70-resume-snapshot",
+    "uri": ".pi/experiment-runs/runs/hw-run-eec00b70/resume.snapshot.json",
+    "label": "Resume snapshot",
+    "kind": "resume-snapshot",
+    "producerRunId": "hw-run-eec00b70"
+  },
+  {
+    "id": "hw-run-eec00b70-approvals",
+    "uri": ".pi/experiment-runs/runs/hw-run-eec00b70/approvals.jsonl",
+    "label": "Hardware approval",
+    "kind": "approvals",
+    "producerRunId": "hw-run-eec00b70"
+  },
+  {
+    "id": "hw-run-eec00b70-artifacts",
+    "uri": ".pi/experiment-runs/runs/hw-run-eec00b70/artifacts.json",
+    "label": "Artifact index",
+    "kind": "artifacts",
+    "producerRunId": "hw-run-eec00b70"
+  }
+]

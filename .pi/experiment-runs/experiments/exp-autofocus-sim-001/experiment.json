@@ -1,0 +1,16 @@
+{
+  "experimentId": "exp-autofocus-sim-001",
+  "experimentType": "spatial_mapping",
+  "objective": "Test simulated Raman autofocus workflow on two bounded points before any hardware use.",
+  "subject": {
+    "id": "SIM-AF-001",
+    "kind": "simulated_focus_target",
+    "label": "simulated autofocus target"
+  },
+  "status": "active",
+  "rootRunIds": [
+    "sim-run-5f6b210d"
+  ],
+  "createdAt": "2026-06-22T07:03:10.876Z",
+  "updatedAt": "2026-06-22T07:03:10.881Z"
+}

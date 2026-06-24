@@ -1,0 +1,80 @@
+{
+  "reportId": "hardware-preflight-20260624T030236558Z-b4bf7a7e",
+  "spec": {
+    "schemaVersion": "1",
+    "experimentId": "exp-bounded-z-adjustment-001",
+    "specId": "spec-bounded-z-plus-50um-001",
+    "experimentType": "spatial_mapping",
+    "objective": "Move the MC.Newton hardware stage in Z only by +50 um from audited zUm=0 to absolute zUm=50, with X/Y held at the audited current readback.",
+    "subject": {
+      "id": "operator-loaded-sample",
+      "kind": "hardware_stage_position",
+      "label": "operator-reviewed bounded Z-only adjustment"
+    },
+    "mode": "hardware",
+    "resources": [
+      {
+        "id": "mc-newton-xyz-stage",
+        "kind": "instrument",
+        "role": "stage"
+      }
+    ],
+    "limits": {
+      "motion": {
+        "xUm": {
+          "minUm": 0,
+          "maxUm": 0
+        },
+        "yUm": {
+          "minUm": 0,
+          "maxUm": 0
+        },
+        "zUm": {
+          "minUm": 0,
+          "maxUm": 50
+        }
+      },
+      "powerEnergy": {
+        "maxLaserPowerMw": 0
+      },
+      "acquisition": {
+        "maxExposureMs": 1,
+        "maxUnits": 1
+      }
+    },
+    "plan": {
+      "kind": "points",
+      "points": [
+        {
+          "xUm": 0,
+          "yUm": 0,
+          "zUm": 50
+        }
+      ]
+    },
+    "stoppingRules": {
+      "maxRuntimeMinutes": 1,
+      "maxUnits": 1,
+      "stopOnError": true
+    },
+    "operatorApprovalRequired": true
+  },
+  "result": {
+    "valid": true,
+    "issues": [],
+    "unitCount": 1,
+    "estimatedRuntimeMinutes": 0,
+    "mode": "hardware",
+    "plannedRun": {
+      "wouldVisitUnits": 1,
+      "wouldUseResources": [
+        "mc-newton-xyz-stage"
+      ]
+    },
+    "willNotExecute": [],
+    "specHash": "63a4081d0194f76c0eeb2c7c74a323947d2aca5ffc5c23d7e258390e468f0b70",
+    "capabilitySnapshotId": "hardware-preflight-20260624T030236558Z-b4bf7a7e-capabilities"
+  },
+  "specHash": "63a4081d0194f76c0eeb2c7c74a323947d2aca5ffc5c23d7e258390e468f0b70",
+  "capabilitySnapshotId": "hardware-preflight-20260624T030236558Z-b4bf7a7e-capabilities"
+}

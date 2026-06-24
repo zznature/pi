@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "1",
+  "reportId": "hardware-preflight-manual-readonly-20260624T034400Z",
+  "createdAt": "2026-06-24T03:41:33.072Z",
+  "spec": {
+    "schemaVersion": "1",
+    "experimentId": "exp-autofocus-current-position-20260624",
+    "specId": "spec-autofocus-current-position-20260624-001",
+    "experimentType": "spatial_mapping",
+    "objective": "Run a hardware camera-based autofocus-only pass at the current readback XY position with a bounded ±50 µm Z scan, no Raman spectrum acquisition, and no intentional laser power change.",
+    "subject": {
+      "id": "operator-loaded-sample-current-position",
+      "kind": "operator_loaded_raman_sample",
+      "label": "Current operator-loaded sample position read from MC.Newton stage"
+    },
+    "mode": "dry_run",
+    "resources": [
+      {
+        "id": "mc-newton-xyz-stage",
+        "kind": "instrument",
+        "role": "stage"
+      },
+      {
+        "id": "lab-camera",
+        "kind": "instrument",
+        "role": "camera"
+      },
+      {
+        "id": "lab-acquirer",
+        "kind": "instrument",
+        "role": "acquirer"
+      },
+      {
+        "id": "labspec-workstation",
+        "kind": "workspace",
+        "role": "exclusive_lab_station"
+      }
+    ],
+    "limits": {
+      "motion": {
+        "xUm": {
+          "minUm": 942.723,
+          "maxUm": 942.723
+        },
+        "yUm": {
+          "minUm": 1580.978,
+          "maxUm": 1580.978
+        },
+        "zUm": {
+          "minUm": 2056.81,
+          "maxUm": 2156.81
+        }
+      },
+      "powerEnergy": {
+        "maxLaserPowerMw": 2
+      },
+      "acquisition": {
+        "maxExposureMs": 500,
+        "maxUnits": 1
+      }
+    },
+    "plan": {
+      "kind": "points",
+      "points": [
+        {
+          "xUm": 942.723,
+          "yUm": 1580.978,
+          "zUm": 2106.81
+        }
+      ]
+    },
+    "domain": {
+      "raman": {
+        "autofocus": {
+          "enabled": true,
+          "every": {
+            "kind": "everyNPoints",
+            "n": 1
+          },
+          "zMinUm": 2056.81,
+          "zMaxUm": 2156.81,
+          "coarseRangeUm": 50,
+          "coarseStepUm": 10,
+          "fineRangeUm": 10,
+          "fineStepUm": 2,
+          "metric": "labspec_spot_compactness",
+          "minConfidence": 0.2,
+          "onFailure": "pause"
+        }
+      }
+    },
+    "stoppingRules": {
+      "maxRuntimeMinutes": 3,
+      "maxUnits": 1,
+      "stopOnError": true
+    },
+    "operatorApprovalRequired": true
+  },
+  "specHash": "960cb3ced7fb364f0e2233f0ed1914afe0b8db9163245b17d8b1545074df4349",
+  "capabilitySnapshotId": "hardware-preflight-manual-readonly-20260624T034400Z-capabilities",
+  "result": {
+    "valid": true,
+    "issues": [],
+    "unitCount": 1,
+    "estimatedRuntimeMinutes": 0.008,
+    "mode": "dry_run",
+    "specHash": "960cb3ced7fb364f0e2233f0ed1914afe0b8db9163245b17d8b1545074df4349",
+    "capabilitySnapshotId": "hardware-preflight-manual-readonly-20260624T034400Z-capabilities",
+    "liveState": {
+      "mode": "dry_run",
+      "adapters": [
+        {
+          "instrumentId": "mc-newton-xyz-stage",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        },
+        {
+          "instrumentId": "lab-camera",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        },
+        {
+          "instrumentId": "lab-acquirer",
+          "reachable": true,
+          "readOnly": true,
+          "calibrationAvailable": true
+        }
+      ],
+      "readOnlyProbe": {
+        "stage": {
+          "reachable": true,
+          "idn": "memory-stage",
+          "adapter": "memory"
+        },
+        "labspecWorker": {
+          "reachable": true,
+          "latencyMs": 0
+        },
+        "outputDirWritable": true,
+        "dependencies": {
+          "python": "3.13.13",
+          "pyserial": "3.5",
+          "numpy": "2.4.6",
+          "PIL": "12.2.0"
+        },
+        "readOnly": true
+      },
+      "outputDirectory": {
+        "path": ".pi/experiment-runs/dry-run",
+        "writable": true
+      },
+      "abortPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "available": true
+      },
+      "intentsPath": {
+        "path": ".pi/experiment-runs/intents.jsonl",
+        "writable": true
+      },
+      "approvalsPath": {
+        "path": ".pi/experiment-runs/approvals.jsonl",
+        "writable": true
+      }
+    }
+  }
+}

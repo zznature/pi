@@ -1,0 +1,28 @@
+{
+  "runId": "hw-run-eec00b70",
+  "experimentId": "exp-autofocus-current-position-20260624",
+  "mode": "hardware",
+  "specId": "spec-autofocus-current-position-20260624-001",
+  "specHash": "960cb3ced7fb364f0e2233f0ed1914afe0b8db9163245b17d8b1545074df4349",
+  "status": "aborted",
+  "resourceLeaseId": "lease-a558a32c",
+  "recordPaths": {
+    "runDir": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70",
+    "runJson": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\run.json",
+    "spec": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\spec.json",
+    "preflight": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\preflight.json",
+    "capabilitiesSnapshot": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\capabilities.snapshot.json",
+    "events": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\events.jsonl",
+    "intents": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\intents.jsonl",
+    "summary": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\summary.json",
+    "analysis": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\analysis.json",
+    "resumeSnapshot": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\resume.snapshot.json",
+    "artifacts": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\artifacts.json",
+    "approvals": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\approvals.jsonl",
+    "leases": "D:\\RamanLab\\LabAgents\\pi\\.pi\\experiment-runs\\runs\\hw-run-eec00b70\\leases.jsonl"
+  },
+  "createdAt": "2026-06-24T03:41:50.203Z",
+  "updatedAt": "2026-06-24T03:41:54.188Z",
+  "startedAt": "2026-06-24T03:41:50.207Z",
+  "finishedAt": "2026-06-24T03:41:54.188Z"
+}

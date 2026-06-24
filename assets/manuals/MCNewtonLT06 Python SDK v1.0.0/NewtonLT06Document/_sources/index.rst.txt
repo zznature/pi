@@ -1,0 +1,13 @@
+MFMCNewtonLT06 Python API
+==========================
+
+这是一个用于控制和与 MC.NewtonLT-06 进行串口通信的 Python 包。该包提供了一套简化的接口，允许用户轻松地与仪器进行交互、收集数据以及执行各种操作。
+
+
+官网：`MultiFields <https://www.multi-field.com/>`_
+
+.. toctree::
+   :maxdepth: 3
+   :caption: 目录:
+
+   NewtonLT06

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1",
+  "runId": "hw-run-eec00b70",
+  "experimentId": "exp-autofocus-current-position-20260624",
+  "mode": "hardware",
+  "status": "aborted",
+  "completedUnits": 0,
+  "totalUnits": 1,
+  "unitKind": "point",
+  "nextUnitIndex": 0,
+  "safeToResume": false,
+  "requiresOperatorApproval": true,
+  "createdAt": "2026-06-24T03:41:54.187Z",
+  "resumeFrom": "0",
+  "reason": "Stage did not settle within 1000 ms (current x=941.602; target x=942.723; delta x=-1.121; remaining pulses x=0; tolerance x=1.000)",
+  "unitIndex": 0,
+  "microstep": "stage_move_commanded",
+  "commandId": "call_9OIm5DSxlqWCHCfJytch0evE|fc_0aeed89e1aaf0691016a3b51f13f64819ab97f7d95fcb04d14",
+  "lastKnownStagePosition": {
+    "xUm": 943.151,
+    "yUm": 1580.879,
+    "zUm": 2106.134
+  },
+  "nextPlan": [
+    "wait for stage position confirmation"
+  ]
+}

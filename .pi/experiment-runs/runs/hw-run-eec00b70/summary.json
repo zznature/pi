@@ -1,0 +1,18 @@
+{
+  "runId": "hw-run-eec00b70",
+  "experimentId": "exp-autofocus-current-position-20260624",
+  "mode": "hardware",
+  "subjectId": "operator-loaded-sample-current-position",
+  "objective": "Run a hardware camera-based autofocus-only pass at the current readback XY position with a bounded ±50 µm Z scan, no Raman spectrum acquisition, and no intentional laser power change.",
+  "unitCount": 1,
+  "completedUnits": 0,
+  "progress": {
+    "completedUnits": 0,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "aborted",
+  "stopConditionMet": true,
+  "operatorOnlyMonitoring": true,
+  "stopReason": "Stage did not settle within 1000 ms (current x=941.602; target x=942.723; delta x=-1.121; remaining pulses x=0; tolerance x=1.000)"
+}

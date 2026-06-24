@@ -1,0 +1,17 @@
+{
+  "runId": "hw-run-20042174",
+  "experimentId": "exp-bounded-z-adjustment-002",
+  "mode": "hardware",
+  "subjectId": "operator-loaded-sample",
+  "objective": "Move the MC.Newton hardware stage in Z only by +50 um from read-only hardware zUm=2055.305 to absolute zUm=2105.305, holding X/Y at the read-only hardware readback.",
+  "unitCount": 1,
+  "completedUnits": 1,
+  "progress": {
+    "completedUnits": 1,
+    "totalUnits": 1,
+    "unitKind": "point"
+  },
+  "status": "completed",
+  "stopConditionMet": false,
+  "operatorOnlyMonitoring": true
+}

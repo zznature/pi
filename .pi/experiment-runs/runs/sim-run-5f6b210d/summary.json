@@ -1,0 +1,17 @@
+{
+  "runId": "sim-run-5f6b210d",
+  "experimentId": "exp-autofocus-sim-001",
+  "mode": "simulation",
+  "subjectId": "SIM-AF-001",
+  "objective": "Test simulated Raman autofocus workflow on two bounded points before any hardware use.",
+  "unitCount": 2,
+  "progress": {
+    "completedUnits": 2,
+    "totalUnits": 2,
+    "unitKind": "point"
+  },
+  "meanSignal": 105,
+  "maxSignal": 107,
+  "minSignal": 103,
+  "stopConditionMet": false
+}

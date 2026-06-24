@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "runId": "sim-run-5f6b210d",
+  "experimentId": "exp-autofocus-sim-001",
+  "mode": "simulation",
+  "status": "completed",
+  "completedUnits": 2,
+  "totalUnits": 2,
+  "unitKind": "point",
+  "nextUnitIndex": 2,
+  "safeToResume": false,
+  "requiresOperatorApproval": false,
+  "createdAt": "2026-06-22T07:03:10.884Z"
+}

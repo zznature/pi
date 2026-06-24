@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1",
+  "coordinateAuditId": "coord-audit-autofocus-current-position-20260624-001",
+  "createdAt": "2026-06-24T03:40:00.000Z",
+  "observedAt": "2026-06-24T03:31:00.000Z",
+  "subject": {
+    "id": "operator-loaded-sample-current-position",
+    "kind": "operator_loaded_raman_sample",
+    "label": "Current operator-loaded sample position read from MC.Newton stage"
+  },
+  "plan": {
+    "kind": "points",
+    "points": [
+      {
+        "xUm": 942.723,
+        "yUm": 1580.978,
+        "zUm": 2106.81
+      }
+    ]
+  },
+  "coordinatePlanHash": "dbcdaa7c0e9626dcc6bd472e3d6b046d8d6bcc1162ea947bd738ea197edfe7de",
+  "approval": {
+    "approvalId": "AF-20260624-001-coordinate-audit",
+    "operator": "zz",
+    "approved": true,
+    "notes": "Operator confirmed current absolute coordinates and bounded ±50 µm Z autofocus range. Camera-based autofocus only; no Raman spectrum acquisition."
+  },
+  "notes": "Autofocus-only coordinate audit for fixed XY with Z limits 2056.81–2156.81 µm."
+}
