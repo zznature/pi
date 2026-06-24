@@ -7,15 +7,15 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { analyzeRecordedRun } from "../analysis.ts";
 import { dispatch } from "../dispatch.ts";
-import { runRamanActiveProbe } from "../kernel/raman-active-probe.ts";
+import { runRamanActiveProbe } from "../kernel/raman/probe.ts";
 import {
 	autoFitAndRecordRamanXyCalibration,
 	fitAndRecordRamanXyCalibration,
 	recordRamanXyCalibration,
 	resolveRamanXyCalibration,
-} from "../kernel/raman-calibration.ts";
-import { recordRamanHardwareValidation } from "../kernel/raman-validation.ts";
-import { RamanBridgeClient, type RamanBridgeEvent } from "../kernel/raman-bridge.ts";
+} from "../kernel/raman/calibration.ts";
+import { recordRamanHardwareValidation } from "../kernel/raman/validation.ts";
+import { RamanBridgeClient, type RamanBridgeEvent } from "../kernel/raman/bridge.ts";
 import { getLabState } from "../lab-state.ts";
 import { validatePolicy } from "../policy.ts";
 import { hashExperimentSpec, validateHardwareGate } from "../records.ts";
@@ -110,7 +110,7 @@ function recordFakeCalibration(cwd: string, calibrationId = "fake-calibration"):
 }
 
 function focusCorrectionSpec(mode: "dry_run" | "hardware"): ExperimentSpec {
-	const spec = loadSpec(mode === "dry_run" ? "raman-dry-run-spec.json" : "raman-hardware-spec.json");
+	const spec = loadSpec(mode === "dry_run" ? "raman/base/dry-run-spec.json" : "raman/base/hardware-spec.json");
 	return {
 		...spec,
 		mode,
@@ -215,7 +215,7 @@ function seedNonFakeRamanRun(
 		unitCount: 1,
 		completedUnits: 1,
 	});
-	writeJson(join(runDir, "spec.json"), options.spec ?? loadSpec("raman-hardware-spec.json"));
+	writeJson(join(runDir, "spec.json"), options.spec ?? loadSpec("raman/base/hardware-spec.json"));
 	writeFileSync(
 		join(runDir, "events.jsonl"),
 		[
@@ -333,12 +333,12 @@ function shiftedPattern(width: number, height: number, dx: number, dy: number): 
 }
 
 test("schema accepts typed Raman acquisition domain", () => {
-	const result = validateExperimentSpec(loadSpec("raman-hardware-spec.json"));
+	const result = validateExperimentSpec(loadSpec("raman/base/hardware-spec.json"));
 	assert.equal(result.valid, true);
 });
 
 test("schema rejects Raman acquisition that exceeds max exposure", () => {
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	const raman = spec.domain?.raman;
 	assert.ok(raman?.acquisition);
 	const result = validateExperimentSpec({
@@ -360,10 +360,10 @@ test("schema rejects Raman acquisition that exceeds max exposure", () => {
 });
 
 test("policy accepts minimal Raman hardware resources and rejects a missing acquirer", () => {
-	const valid = validatePolicy(loadSpec("raman-hardware-spec.json"), getLabState(), { toolName: "run_experiment" });
+	const valid = validatePolicy(loadSpec("raman/base/hardware-spec.json"), getLabState(), { toolName: "run_experiment" });
 	assert.equal(valid.valid, true);
 
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	const missingAcquirer = {
 		...spec,
 		resources: spec.resources.filter((resource) => resource.id !== "lab-acquirer"),
@@ -384,7 +384,7 @@ test("policy accepts minimal Raman hardware resources and rejects a missing acqu
 test("Raman dry-run preflight records a read-only readiness report", () => {
 	const cwd = tempCwd();
 	try {
-		const result = dispatch("run_preflight", { spec: loadSpec("raman-dry-run-spec.json") }, { cwd, commandId: "phase7-preflight" });
+		const result = dispatch("run_preflight", { spec: loadSpec("raman/base/dry-run-spec.json") }, { cwd, commandId: "phase7-preflight" });
 		assert.equal(result.status, "success");
 		const stateAfter = asRecord(result.stateAfter);
 		assert.equal(stateAfter.estimatedRuntimeMinutes, 0.033);
@@ -417,16 +417,16 @@ test("Raman preflight rejects missing XY calibration artifacts", () => {
 });
 
 test("Raman hardware and dry-run specs hash identically for the hardware gate", () => {
-	assert.equal(hashExperimentSpec(loadSpec("raman-hardware-spec.json")), hashExperimentSpec(loadSpec("raman-dry-run-spec.json")));
+	assert.equal(hashExperimentSpec(loadSpec("raman/base/hardware-spec.json")), hashExperimentSpec(loadSpec("raman/base/dry-run-spec.json")));
 });
 
 test("Raman hardware gate ignores preflight report metadata", () => {
 	const cwd = tempCwd();
 	try {
-		const hardwarePreflight = dispatch("run_preflight", { spec: loadSpec("raman-hardware-spec.json") }, { cwd, commandId: "phase7-hw-preflight" });
+		const hardwarePreflight = dispatch("run_preflight", { spec: loadSpec("raman/base/hardware-spec.json") }, { cwd, commandId: "phase7-hw-preflight" });
 		assert.equal(hardwarePreflight.status, "success");
 		const reportId = String(asRecord(asRecord(hardwarePreflight.stateAfter).records).reportId);
-		const gate = validateHardwareGate(loadSpec("raman-hardware-spec.json"), baseApproval(reportId), cwd);
+		const gate = validateHardwareGate(loadSpec("raman/base/hardware-spec.json"), baseApproval(reportId), cwd);
 		assert.equal(gate.valid, true);
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
@@ -436,10 +436,10 @@ test("Raman hardware gate ignores preflight report metadata", () => {
 test("Raman hardware gate only checks collision and laser ceilings", () => {
 	const cwd = tempCwd();
 	try {
-		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman-dry-run-spec.json") }, { cwd, commandId: "phase7-gate-preflight" });
+		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman/base/dry-run-spec.json") }, { cwd, commandId: "phase7-gate-preflight" });
 		assert.equal(dryRun.status, "success");
 		const reportId = String(asRecord(asRecord(dryRun.stateAfter).records).reportId);
-		const spec = loadSpec("raman-hardware-spec.json");
+		const spec = loadSpec("raman/base/hardware-spec.json");
 		const missingSafety = validateHardwareGate(
 			spec,
 			{ approvalId: "appr-missing-safety", operator: "tester", approved: true, dryRunReportId: reportId },
@@ -476,7 +476,7 @@ test("Raman hardware gate only checks collision and laser ceilings", () => {
 test("run_experiment rejects real Raman hardware fake or missing real-capable backends", () => {
 	const cwd = tempCwd();
 	try {
-		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman-dry-run-spec.json") }, { cwd, commandId: "phase7-real-backend-preflight" });
+		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman/base/dry-run-spec.json") }, { cwd, commandId: "phase7-real-backend-preflight" });
 		assert.equal(dryRun.status, "success");
 		const reportId = String(asRecord(asRecord(dryRun.stateAfter).records).reportId);
 
@@ -484,7 +484,7 @@ test("run_experiment rejects real Raman hardware fake or missing real-capable ba
 			dispatch(
 				"run_experiment",
 				{
-					spec: loadSpec("raman-hardware-spec.json"),
+					spec: loadSpec("raman/base/hardware-spec.json"),
 					hardwareExecution: {
 						stageAdapter: "mc_newton_xyz",
 						stagePort: "COM_TEST",
@@ -976,7 +976,7 @@ test("operator Raman hardware validation records readiness evidence", async () =
 		assert.equal(asRecord(incomplete.stateAfter).productionReady, false);
 
 		recordFakeCalibration(cwd, "validation-calibration");
-		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman-dry-run-spec.json") }, { cwd, commandId: "phase7-validation-preflight" });
+		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman/base/dry-run-spec.json") }, { cwd, commandId: "phase7-validation-preflight" });
 		assert.equal(dryRun.status, "success");
 		const dryRunLiveState = asRecord(asRecord(dryRun.stateAfter).liveState);
 		if (asRecord(asRecord(dryRunLiveState.readOnlyProbe).labspecWorker).reachable !== true) {
@@ -1006,7 +1006,7 @@ test("operator Raman hardware validation records readiness evidence", async () =
 		const start = dispatch(
 			"run_experiment",
 			{
-				spec: loadSpec("raman-hardware-spec.json"),
+				spec: loadSpec("raman/base/hardware-spec.json"),
 				hardwarePilot: {
 					stageAdapter: "memory",
 					raman: { acquisitionBackend: "fake" },
@@ -1114,7 +1114,7 @@ test("operator Raman hardware validation records readiness evidence", async () =
 		const missingSmokeIssues = asRecord(missingSmokeValidation.stateAfter).issues as Record<string, unknown>[];
 		assert.ok(missingSmokeIssues.some((issue) => String(issue.message).includes("spectrum smoke acquisition")));
 
-		const nonRamanDryRun = dispatch("run_preflight", { spec: loadSpec("hardware-dry-run-spec.json") }, { cwd, commandId: "phase7-non-raman-preflight" });
+		const nonRamanDryRun = dispatch("run_preflight", { spec: loadSpec("hw/dry-run-spec.json") }, { cwd, commandId: "phase7-non-raman-preflight" });
 		assert.equal(nonRamanDryRun.status, "success");
 		const nonRamanReportId = String(asRecord(asRecord(nonRamanDryRun.stateAfter).records).reportId);
 		const nonRamanPreflightValidation = recordRamanHardwareValidation(
@@ -1146,7 +1146,7 @@ test("operator Raman hardware validation records readiness evidence", async () =
 
 		seedNonFakeRamanRun(cwd, "hw-run-mismatched-spec", {
 			spec: {
-				...loadSpec("raman-hardware-spec.json"),
+				...loadSpec("raman/base/hardware-spec.json"),
 				specId: "spec-raman-mismatched-validation",
 			},
 		});
@@ -1266,8 +1266,8 @@ test("operator Raman hardware validation records readiness evidence", async () =
 		assert.equal(asRecord(record.hardwareEvidence).evidenceMode, "hardware");
 		const evidenceDigest = asRecord(record.evidenceDigest);
 		const specHash = asRecord(evidenceDigest.specHash);
-		assert.equal(specHash.preflight, hashExperimentSpec(loadSpec("raman-dry-run-spec.json")));
-		assert.equal(specHash.minimumRun, hashExperimentSpec(loadSpec("raman-hardware-spec.json")));
+		assert.equal(specHash.preflight, hashExperimentSpec(loadSpec("raman/base/dry-run-spec.json")));
+		assert.equal(specHash.minimumRun, hashExperimentSpec(loadSpec("raman/base/hardware-spec.json")));
 		const evidenceFiles = evidenceDigest.files as Record<string, unknown>[];
 		for (const role of [
 			"read-only-preflight",
@@ -1300,7 +1300,7 @@ test("analysis aggregates Raman spectrum, focus, and correction metadata", () =>
 			completedUnits: 1,
 			stopConditionMet: false,
 		},
-		spec: loadSpec("raman-hardware-spec.json"),
+		spec: loadSpec("raman/base/hardware-spec.json"),
 		events: [
 			{
 				type: "unit_completed",
@@ -1325,14 +1325,14 @@ test("analysis aggregates Raman spectrum, focus, and correction metadata", () =>
 test("run_experiment starts a Raman hardware run and poll_run observes completion", async () => {
 	const cwd = tempCwd();
 	try {
-		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman-dry-run-spec.json") }, { cwd, commandId: "phase7-raman-preflight" });
+		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman/base/dry-run-spec.json") }, { cwd, commandId: "phase7-raman-preflight" });
 		assert.equal(dryRun.status, "success");
 		const reportId = String(asRecord(asRecord(dryRun.stateAfter).records).reportId);
 
 		const start = dispatch(
 			"run_experiment",
 			{
-				spec: loadSpec("raman-hardware-spec.json"),
+				spec: loadSpec("raman/base/hardware-spec.json"),
 				hardwarePilot: {
 					stageAdapter: "memory",
 					raman: { acquisitionBackend: "fake" },
@@ -1368,14 +1368,14 @@ test("run_experiment starts a Raman hardware run and poll_run observes completio
 test("Raman hardware run archives LabSpec request and result files", async () => {
 	const cwd = tempCwd();
 	try {
-		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman-dry-run-spec.json") }, { cwd, commandId: "phase7-labspec-preflight" });
+		const dryRun = dispatch("run_preflight", { spec: loadSpec("raman/base/dry-run-spec.json") }, { cwd, commandId: "phase7-labspec-preflight" });
 		assert.equal(dryRun.status, "success");
 		const reportId = String(asRecord(asRecord(dryRun.stateAfter).records).reportId);
 		const bridgeDir = join(cwd, "external_labspec_bridge");
 		const start = dispatch(
 			"run_experiment",
 			{
-				spec: loadSpec("raman-hardware-spec.json"),
+				spec: loadSpec("raman/base/hardware-spec.json"),
 				hardwarePilot: {
 					stageAdapter: "memory",
 					raman: {

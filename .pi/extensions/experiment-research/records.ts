@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Capabilities } from "./capabilities.ts";
-import type { HardwareRun } from "./kernel/hardware-pilot.ts";
-import type { SimulationRun, SimulationSummary } from "./kernel/simulation.ts";
+import type { HardwareRun } from "./kernel/hw/pilot.ts";
+import type { SimulationRun, SimulationSummary } from "./kernel/sim.ts";
 import type { PreflightResult } from "./preflight.ts";
 import type { ExperimentSpec, HardwarePilotParams, ToolResult } from "./schemas.ts";
 import { getExperimentPoints, getUnitCount } from "./spec-utils.ts";
@@ -349,7 +349,7 @@ function buildResumeSnapshot(
 		unitKind: spec.plan.kind === "steps" ? "step" : "point",
 		nextUnitIndex,
 		safeToResume,
-		requiresOperatorApproval: false,
+		requiresOperatorApproval: spec.mode === "hardware" && status !== "completed",
 		createdAt: new Date().toISOString(),
 	};
 	if (nextUnitIndex < totalUnits) {

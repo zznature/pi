@@ -1,5 +1,5 @@
 import type { Capabilities } from "./capabilities.ts";
-import { resolveRamanXyCalibration } from "./kernel/raman-calibration.ts";
+import { resolveRamanXyCalibration } from "./kernel/raman/calibration.ts";
 import type { LabState } from "./lab-state.ts";
 import { probeLiveState, type LiveStateProbe } from "./live-state.ts";
 import { getResourceIds, getUnitCount } from "./spec-utils.ts";

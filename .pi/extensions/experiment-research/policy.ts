@@ -114,8 +114,13 @@ function validatePointLimits(spec: ExperimentSpec): ValidationIssue[] {
 			issues.push(issue(`points.${point.index}.yUm`, "Point yUm is outside ExperimentSpec motion limits"));
 		}
 		if (point.zUm !== undefined && spec.limits.motion.zUm) {
-			if (point.zUm > spec.limits.motion.zUm.maxUm) {
-				issues.push(issue(`points.${point.index}.zUm`, "Point zUm exceeds limits.motion.zUm.maxUm, the Raman objective collision ceiling"));
+			if (!withinRange(point.zUm, spec.limits.motion.zUm.minUm, spec.limits.motion.zUm.maxUm)) {
+				issues.push(
+					issue(
+						`points.${point.index}.zUm`,
+						spec.domain?.raman ? "Point zUm exceeds limits.motion.zUm.maxUm, the Raman objective collision ceiling" : "Point zUm is outside ExperimentSpec motion limits",
+					),
+				);
 			}
 		}
 	}

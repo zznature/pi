@@ -78,12 +78,12 @@ Raman readiness currently includes:
   leaving operator approval, real-hardware attestation, and checklist booleans
   unset until the operator completes the final review. A copyable current
   real-capable draft example lives at
-  `fixtures/raman-v2-real-validation-payload.draft.json`;
+  `fixtures/raman/v2/real/payload.draft.json`;
   matching operator input examples for dry-run preflight, active probe, and the
   first bootstrap real V2 minimum run live at
-  `fixtures/raman-v2-real-validation-preflight-input.json`,
-  `fixtures/raman-v2-real-validation-active-probe-input.json`, and
-  `fixtures/raman-v2-real-validation-bootstrap-run-input.json`;
+  `fixtures/raman/v2/real/preflight-input.json`,
+  `fixtures/raman/v2/real/active-probe-input.json`, and
+  `fixtures/raman/v2/real/bootstrap-run-input.json`;
 - operator-reviewed Raman hardware validation records through
   `raman_record_hardware_validation`, collecting read-only preflight, active
   smoke, minimum Raman run, optional calibration, safety checklist evidence,
@@ -198,16 +198,16 @@ Experiment-level history is stored in:
 
 ## Fake Experiment
 
-Use `fixtures/valid-spec.json` for a complete simulation loop:
+Use `fixtures/sim/spec.json` for a complete simulation loop:
 
 ```text
 validate_experiment_spec -> run_preflight -> run_experiment -> analyze_run -> plan_next_experiment
 ```
 
-Use `fixtures/hardware-dry-run-spec.json` and `fixtures/hardware-spec.json` for
+Use `fixtures/hw/dry-run-spec.json` and `fixtures/hw/spec.json` for
 the gated non-Raman stage hardware path.
 
-Use `fixtures/raman-dry-run-spec.json` and `fixtures/raman-hardware-spec.json`
+Use `fixtures/raman/base/dry-run-spec.json` and `fixtures/raman/base/hardware-spec.json`
 for the minimal Raman acquisition contract path.
 
 ## CI Checks

@@ -6,9 +6,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { dispatch } from "../dispatch.ts";
-import { recordHardwareCoordinateAudit } from "../kernel/hardware-coordinate-audit.ts";
-import { recordRamanXyCalibration } from "../kernel/raman-calibration.ts";
-import { recordRamanHardwareValidation, validateRamanHardwareValidationReadiness } from "../kernel/raman-validation.ts";
+import { recordHardwareCoordinateAudit } from "../kernel/hw/coord-audit.ts";
+import { recordRamanXyCalibration } from "../kernel/raman/calibration.ts";
+import { recordRamanHardwareValidation, validateRamanHardwareValidationReadiness } from "../kernel/raman/validation.ts";
 import { hashExperimentSpec } from "../run-store.ts";
 import {
 	RamanHardwareValidationParamsSchema,
@@ -74,7 +74,7 @@ function dryRunVariant(spec: ExperimentSpec): ExperimentSpec {
 	};
 }
 
-function seedPreflight(cwd: string, reportId: string, spec: ExperimentSpec = loadSpec("raman-dry-run-spec.json")): void {
+function seedPreflight(cwd: string, reportId: string, spec: ExperimentSpec = loadSpec("raman/base/dry-run-spec.json")): void {
 	writeJson(join(cwd, ".pi", "experiment-runs", "preflights", reportId, "preflight.json"), {
 		reportId,
 		spec,
@@ -151,7 +151,7 @@ function seedCoordinateAudit(cwd: string, spec: ExperimentSpec, coordinateAuditI
 }
 
 function paritySpec(): ExperimentSpec {
-	return loadSpec("raman-v2-validation-hardware-spec.json");
+	return loadSpec("raman/v2/validation/hardware-spec.json");
 }
 
 function seedRamanRun(
@@ -182,7 +182,7 @@ function seedRamanRun(
 		unitCount: 1,
 		completedUnits: 1,
 	});
-	writeJson(join(runDir, "spec.json"), options.spec ?? loadSpec("raman-hardware-spec.json"));
+	writeJson(join(runDir, "spec.json"), options.spec ?? loadSpec("raman/base/hardware-spec.json"));
 	writeFileSync(
 		join(runDir, "events.jsonl"),
 		[
@@ -408,14 +408,14 @@ test("Raman V2 validation enforces parity evidence for autofocus, XY correction,
 });
 
 test("Raman V2 validation spec fixtures stay schema-valid and semantically aligned", () => {
-	const hardwareSpec = loadSpec("raman-v2-validation-hardware-spec.json");
-	const dryRunSpec = loadSpec("raman-v2-validation-dry-run-spec.json");
-	const realHardwareSpec = loadSpec("raman-v2-real-validation-hardware-spec.json");
-	const realDryRunSpec = loadSpec("raman-v2-real-validation-dry-run-spec.json");
-	const realValidationDraft = JSON.parse(readFileSync(join(FIXTURES, "raman-v2-real-validation-payload.draft.json"), "utf-8")) as unknown;
-	const realPreflightInput = JSON.parse(readFileSync(join(FIXTURES, "raman-v2-real-validation-preflight-input.json"), "utf-8")) as unknown;
-	const realActiveProbeInput = JSON.parse(readFileSync(join(FIXTURES, "raman-v2-real-validation-active-probe-input.json"), "utf-8")) as unknown;
-	const realBootstrapRunInput = JSON.parse(readFileSync(join(FIXTURES, "raman-v2-real-validation-bootstrap-run-input.json"), "utf-8")) as unknown;
+	const hardwareSpec = loadSpec("raman/v2/validation/hardware-spec.json");
+	const dryRunSpec = loadSpec("raman/v2/validation/dry-run-spec.json");
+	const realHardwareSpec = loadSpec("raman/v2/real/hardware-spec.json");
+	const realDryRunSpec = loadSpec("raman/v2/real/dry-run-spec.json");
+	const realValidationDraft = JSON.parse(readFileSync(join(FIXTURES, "raman/v2/real/payload.draft.json"), "utf-8")) as unknown;
+	const realPreflightInput = JSON.parse(readFileSync(join(FIXTURES, "raman/v2/real/preflight-input.json"), "utf-8")) as unknown;
+	const realActiveProbeInput = JSON.parse(readFileSync(join(FIXTURES, "raman/v2/real/active-probe-input.json"), "utf-8")) as unknown;
+	const realBootstrapRunInput = JSON.parse(readFileSync(join(FIXTURES, "raman/v2/real/bootstrap-run-input.json"), "utf-8")) as unknown;
 
 	const hardwareValidation = validateExperimentSpec(hardwareSpec);
 	assert.equal(hardwareValidation.valid, true);
@@ -472,7 +472,7 @@ test("Raman V2 validation spec fixtures stay schema-valid and semantically align
 test("Raman validation spec pair tool derives a hash-matched dry-run partner for the hardware fixture", async () => {
 	const cwd = tempCwd();
 	try {
-		const hardwareSpec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+		const hardwareSpec = loadSpec("raman/v2/real/hardware-spec.json");
 		const result = await ramanValidationSpecPairTool.execute(
 			"prepare-validation-spec-pair",
 			{ spec: hardwareSpec },
@@ -501,7 +501,7 @@ test("Raman validation spec pair tool derives a hash-matched dry-run partner for
 test("Raman validation spec pair tool warns when a hardware spec is too narrow for full V2 validation coverage", async () => {
 	const cwd = tempCwd();
 	try {
-		const hardwareSpec = loadSpec("raman-hardware-spec.json");
+		const hardwareSpec = loadSpec("raman/base/hardware-spec.json");
 		const result = await ramanValidationSpecPairTool.execute(
 			"prepare-thin-validation-spec-pair",
 			{ spec: hardwareSpec },
@@ -530,7 +530,7 @@ test("Raman validation spec pair tool warns when a hardware spec is too narrow f
 test("Raman validation spec pair tool warns when the spec enables thermal waiting beyond the current real runtime surface", async () => {
 	const cwd = tempCwd();
 	try {
-		const hardwareSpec = loadSpec("raman-v2-validation-hardware-spec.json");
+		const hardwareSpec = loadSpec("raman/v2/validation/hardware-spec.json");
 		const result = await ramanValidationSpecPairTool.execute(
 			"prepare-full-surface-validation-spec-pair",
 			{ spec: hardwareSpec },
@@ -610,7 +610,7 @@ test("Raman hardware validation draft tool prepares a schema-valid operator draf
 test("Raman hardware validation draft payload can be reviewed into a production-ready V2 validation record", async () => {
 	const cwd = tempCwd();
 	try {
-		const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+		const spec = loadSpec("raman/v2/real/hardware-spec.json");
 		seedPreflight(cwd, "seeded-v2-preflight", dryRunVariant(spec));
 		const activeProbeRecordPath = seedActiveProbe(cwd);
 		seedCalibration(cwd);
@@ -794,7 +794,7 @@ test("Raman validation readiness tool warns when the candidate real spec exceeds
 			{
 				validationId: "thin-tool-check-v2-validation",
 				workflowBackend: "v2_bridge",
-				spec: loadSpec("raman-v2-real-validation-hardware-spec.json"),
+				spec: loadSpec("raman/v2/real/hardware-spec.json"),
 			},
 			undefined,
 			undefined,
@@ -825,7 +825,7 @@ test("Raman validation readiness tool warns when the candidate real spec exceeds
 test("Raman V2 validation readiness rejects tampered validatedCoverage metadata", () => {
 	const cwd = tempCwd();
 	try {
-		const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+		const spec = loadSpec("raman/v2/real/hardware-spec.json");
 		seedPreflight(cwd, "seeded-v2-preflight", dryRunVariant(spec));
 		const activeProbeRecordPath = seedActiveProbe(cwd);
 		seedCalibration(cwd);
@@ -868,7 +868,7 @@ test("real Raman V2 preflight warns when launch readiness preview is missing", (
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			const spec = loadSpec("raman/v2/real/hardware-spec.json");
 			seedCalibration(cwd);
 
 			const result = dispatch("run_preflight", { spec }, { cwd, commandId: "missing-v2-preflight-preview" });
@@ -891,7 +891,7 @@ test("real Raman V2 preflight warns when a planned v2_bridge launch lacks bootst
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			const spec = loadSpec("raman/v2/real/hardware-spec.json");
 			seedCalibration(cwd);
 			seedCoordinateAudit(cwd, spec, "missing-v2-preflight-coordinate-audit");
 
@@ -919,7 +919,7 @@ test("real Raman V2 preflight accepts an operator-approved bootstrap preview for
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			const spec = loadSpec("raman/v2/real/hardware-spec.json");
 			seedCalibration(cwd);
 			seedCoordinateAudit(cwd, spec, "bootstrap-v2-preflight-coordinate-audit");
 
@@ -951,7 +951,7 @@ test("real Raman V2 preflight accepts production-ready v2ValidationId evidence i
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			const spec = loadSpec("raman/v2/real/hardware-spec.json");
 			seedPreflight(cwd, "seeded-v2-preflight", dryRunVariant(spec));
 			seedCoordinateAudit(cwd, spec, "ready-v2-preflight-coordinate-audit");
 			const activeProbeRecordPath = seedActiveProbe(cwd);
@@ -1017,7 +1017,7 @@ test("real Raman V2 dispatch requires production-ready V2 validation evidence be
 			);
 			assert.equal(validation.status, "success");
 
-			const spec = loadSpec("raman-hardware-spec.json");
+			const spec = loadSpec("raman/base/hardware-spec.json");
 			seedCoordinateAudit(cwd, spec, "ready-v2-coordinate-audit");
 			const hardwareExecution = {
 				stageAdapter: "mc_newton_xyz",
@@ -1076,7 +1076,7 @@ test("real Raman V2 dispatch allows an operator-approved bootstrap validation ru
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			const spec = loadSpec("raman/v2/real/hardware-spec.json");
 			seedCoordinateAudit(cwd, spec, "bootstrap-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
@@ -1141,7 +1141,7 @@ test("real Raman V2 dispatch rejects tampered validation evidence before the har
 				"utf-8",
 			);
 
-			const spec = loadSpec("raman-hardware-spec.json");
+			const spec = loadSpec("raman/base/hardware-spec.json");
 			seedCoordinateAudit(cwd, spec, "tampered-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
@@ -1189,7 +1189,7 @@ test("real Raman V2 dispatch rejects thermal waiting until a real thermal backen
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("raman-v2-validation-hardware-spec.json");
+			const spec = loadSpec("raman/v2/validation/hardware-spec.json");
 			seedCoordinateAudit(cwd, spec, "thermal-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
@@ -1246,7 +1246,7 @@ test("real Raman V2 dispatch rejects validation evidence that does not cover the
 			);
 			assert.equal(validation.status, "success");
 
-			const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+			const spec = loadSpec("raman/v2/real/hardware-spec.json");
 			seedCoordinateAudit(cwd, spec, "thin-v2-coordinate-audit");
 			const result = dispatch(
 				"run_experiment",
@@ -1294,7 +1294,7 @@ test("real Raman V2 dispatch rejects validation evidence that does not cover the
 test("Raman validation readiness returns structured coverage metadata for matching real-capable validation evidence", () => {
 	const cwd = tempCwd();
 	try {
-		const spec = loadSpec("raman-v2-real-validation-hardware-spec.json");
+		const spec = loadSpec("raman/v2/real/hardware-spec.json");
 		seedPreflight(cwd, "seeded-v2-preflight", dryRunVariant(spec));
 		const activeProbeRecordPath = seedActiveProbe(cwd);
 		seedCalibration(cwd);

@@ -5,12 +5,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { loadCapabilities } from "../capabilities.ts";
-import { pollRun } from "../kernel/kernel.ts";
+import { pollRun } from "../kernel/run.ts";
 import {
 	reconcileRamanV2Hardware,
 	writeRamanV2MicrostepSnapshot,
 	type RamanV2HardwareReconcileProbe,
-} from "../kernel/raman-v2-resume.ts";
+} from "../kernel/raman/v2-resume.ts";
 import { readResumeSnapshot, relativeArtifact, reserveRun } from "../run-store.ts";
 import type { ExperimentSpec, ToolResult } from "../schemas.ts";
 
@@ -35,7 +35,7 @@ function artifactRef(runId: string, fileName: string): ToolResult["artifacts"][n
 }
 
 function reserveRamanRun(cwd: string): { spec: ExperimentSpec; runId: string } {
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	const reserved = reserveRun(cwd, spec, "raman-v2-resume-reserve", loadCapabilities("hardware"));
 	return { spec, runId: reserved.record.runId };
 }

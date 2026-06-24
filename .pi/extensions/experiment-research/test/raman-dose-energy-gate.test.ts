@@ -29,13 +29,13 @@ function withLaserPower(spec: ExperimentSpec, laserPowerMw: number): HardwareExe
 }
 
 test("schema accepts Raman specs without maxExposureEnergyMj", () => {
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	const result = validateExperimentSpec(spec);
 	assert.equal(result.valid, true);
 });
 
 test("hardware gate rejects requested laser power above limits.powerEnergy.maxLaserPowerMw", () => {
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	const gate = validateHardwareGate(spec, withLaserPower(spec, 2));
 	assert.equal(gate.valid, false);
 	assert.ok(gate.issues.some((issue) => issue.includes("sample_burn")));
@@ -44,14 +44,14 @@ test("hardware gate rejects requested laser power above limits.powerEnergy.maxLa
 });
 
 test("hardware gate accepts requested laser power at or below limits.powerEnergy.maxLaserPowerMw", () => {
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	const gate = validateHardwareGate(spec, withLaserPower(spec, 0.5));
 	assert.equal(gate.valid, true);
 	assert.equal(gate.requestedLaserPowerMw, 0.5);
 });
 
 test("hardware gate defaults to the spec laser ceiling when no explicit laserPowerMw is provided", () => {
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	const gate = validateHardwareGate(spec, {
 		stageAdapter: "memory",
 		settleTimeoutMs: 1_000,

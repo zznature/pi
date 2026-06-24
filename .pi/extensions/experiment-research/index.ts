@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildExperimentCompactionSummary } from "./compaction.ts";
-import { subscribeRamanHardwareRunTerminal, type RamanHardwareRunTerminalEvent } from "./kernel/raman-hardware.ts";
+import { subscribeRamanHardwareRunTerminal, type RamanHardwareRunTerminalEvent } from "./kernel/raman/run.ts";
 import { EXPERIMENT_RESEARCH_PROMPT } from "./prompt.ts";
 import type { ToolResult } from "./schemas.ts";
 import { hardwareBridgeV2ReadTool } from "./tools/hardware-bridge-v2-read.ts";

@@ -9,7 +9,7 @@ import {
 	HardwareBridgeV2ProtocolError,
 	HardwareBridgeV2RequestError,
 	type HardwareBridgeV2Event,
-} from "../kernel/hardware-bridge-v2.ts";
+} from "../kernel/hw/bridge-v2.ts";
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 

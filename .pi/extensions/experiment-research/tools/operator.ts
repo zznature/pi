@@ -1,6 +1,6 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { dispatch } from "../dispatch.ts";
-import { recordHardwareCoordinateAudit } from "../kernel/hardware-coordinate-audit.ts";
+import { recordHardwareCoordinateAudit } from "../kernel/hw/coord-audit.ts";
 import {
 	HardwareCoordinateAuditParamsSchema,
 	OperatorIntentParamsSchema,

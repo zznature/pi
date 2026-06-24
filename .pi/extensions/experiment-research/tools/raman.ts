@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { autoFitAndRecordRamanXyCalibration, fitAndRecordRamanXyCalibration, recordRamanXyCalibration } from "../kernel/raman-calibration.ts";
-import { runRamanActiveProbe } from "../kernel/raman-active-probe.ts";
-import { recordRamanHardwareValidation, validateRamanHardwareValidationReadiness } from "../kernel/raman-validation.ts";
+import { autoFitAndRecordRamanXyCalibration, fitAndRecordRamanXyCalibration, recordRamanXyCalibration } from "../kernel/raman/calibration.ts";
+import { runRamanActiveProbe } from "../kernel/raman/probe.ts";
+import { recordRamanHardwareValidation, validateRamanHardwareValidationReadiness } from "../kernel/raman/validation.ts";
 import { hashExperimentSpec } from "../run-store.ts";
 import {
 	RamanAutoXyCalibrationParamsSchema,

@@ -3,7 +3,7 @@ import {
 	HardwareBridgeV2Client,
 	HardwareBridgeV2RequestError,
 	type HardwareBridgeV2ActionContract,
-} from "../kernel/hardware-bridge-v2.ts";
+} from "../kernel/hw/bridge-v2.ts";
 import { createErrorResult, createSuccessResult } from "../results.ts";
 import {
 	HardwareBridgeV2ReadParamsSchema,

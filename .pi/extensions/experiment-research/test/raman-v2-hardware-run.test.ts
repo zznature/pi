@@ -5,8 +5,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { dispatch } from "../dispatch.ts";
-import { recordRamanXyCalibration } from "../kernel/raman-calibration.ts";
-import { subscribeRamanHardwareRunTerminal, type RamanHardwareRunTerminalEvent } from "../kernel/raman-hardware.ts";
+import { recordRamanXyCalibration } from "../kernel/raman/calibration.ts";
+import { subscribeRamanHardwareRunTerminal, type RamanHardwareRunTerminalEvent } from "../kernel/raman/run.ts";
 import { hashExperimentSpec } from "../records.ts";
 import type { ExperimentSpec, HardwareExecutionParams } from "../schemas.ts";
 
@@ -23,7 +23,7 @@ function tempCwd(): string {
 }
 
 function ramanV2Spec(mode: "dry_run" | "hardware"): ExperimentSpec {
-	const spec = loadSpec(mode === "dry_run" ? "raman-dry-run-spec.json" : "raman-hardware-spec.json");
+	const spec = loadSpec(mode === "dry_run" ? "raman/base/dry-run-spec.json" : "raman/base/hardware-spec.json");
 	return {
 		...spec,
 		mode,

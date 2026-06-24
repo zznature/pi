@@ -39,7 +39,7 @@ function baseApproval(dryRunReportId: string): HardwarePilotParams["approval"] {
 test("analyze_run writes deterministic Phase 5 quality analysis", () => {
 	const cwd = tempCwd();
 	try {
-		const run = dispatch("run_experiment", { spec: loadSpec("valid-spec.json") }, { cwd, commandId: "phase5-run" });
+		const run = dispatch("run_experiment", { spec: loadSpec("sim/spec.json") }, { cwd, commandId: "phase5-run" });
 		assert.equal(run.status, "success");
 		const runId = run.runId ?? "";
 
@@ -63,7 +63,7 @@ test("analyze_run writes deterministic Phase 5 quality analysis", () => {
 test("plan_next_experiment records decision audit and links follow-up run to its parent", () => {
 	const cwd = tempCwd();
 	try {
-		const spec = loadSpec("valid-spec.json");
+		const spec = loadSpec("sim/spec.json");
 		const run = dispatch("run_experiment", { spec }, { cwd, commandId: "phase5-parent-run" });
 		const parentRunId = run.runId ?? "";
 		dispatch("analyze_run", { runId: parentRunId }, { cwd, commandId: "phase5-parent-analysis" });
@@ -127,7 +127,7 @@ test("watchdog rule library requests operator for quality and pauses on budget",
 test("hardware request_operator writes a resume snapshot at the next safe unit boundary", () => {
 	const cwd = tempCwd();
 	try {
-		const dryRun = dispatch("run_preflight", { spec: loadSpec("hardware-dry-run-spec.json") }, { cwd });
+		const dryRun = dispatch("run_preflight", { spec: loadSpec("hw/dry-run-spec.json") }, { cwd });
 		const dryRunState = asRecord(dryRun.stateAfter);
 		const dryRunRecords = asRecord(dryRunState.records);
 		const reportId = String(dryRunRecords.reportId);
@@ -135,7 +135,7 @@ test("hardware request_operator writes a resume snapshot at the next safe unit b
 		const result = dispatch(
 			"run_experiment",
 			{
-				spec: loadSpec("hardware-spec.json"),
+				spec: loadSpec("hw/spec.json"),
 				hardwarePilot: {
 					stageAdapter: "memory",
 					settleTimeoutMs: 1_000,

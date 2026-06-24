@@ -6,15 +6,15 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { loadCapabilities } from "../capabilities.ts";
 import { analyzeRecordedRun } from "../analysis.ts";
-import { HardwareBridgeV2Client, HardwareBridgeV2ProtocolError } from "../kernel/hardware-bridge-v2.ts";
-import { pollRun } from "../kernel/kernel.ts";
+import { HardwareBridgeV2Client, HardwareBridgeV2ProtocolError } from "../kernel/hw/bridge-v2.ts";
+import { pollRun } from "../kernel/run.ts";
 import {
 	executeRamanV2RunUnit,
 	RamanV2WorkflowAbortError,
 	RamanV2WorkflowPauseError,
 	type RamanV2Bridge,
-} from "../kernel/raman-v2-orchestrator.ts";
-import { reconcileRamanV2Hardware } from "../kernel/raman-v2-resume.ts";
+} from "../kernel/raman/v2-orchestrator.ts";
+import { reconcileRamanV2Hardware } from "../kernel/raman/v2-resume.ts";
 import { readResumeSnapshot, reserveRun } from "../run-store.ts";
 import type { ExperimentSpec } from "../schemas.ts";
 import { getExperimentPoints } from "../spec-utils.ts";
@@ -167,7 +167,7 @@ async function currentStagePosition(bridge: HardwareBridgeV2Client): Promise<{ x
 }
 
 function v2Spec(minXyConfidence = 0): ExperimentSpec {
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	return {
 		...spec,
 		resources: [...spec.resources, { id: "lab-camera", kind: "instrument", role: "camera" }],
@@ -209,7 +209,7 @@ function v2Spec(minXyConfidence = 0): ExperimentSpec {
 }
 
 function acquisitionOnlySpec(): ExperimentSpec {
-	const spec = loadSpec("raman-hardware-spec.json");
+	const spec = loadSpec("raman/base/hardware-spec.json");
 	return {
 		...spec,
 		resources: [...spec.resources, { id: "lab-camera", kind: "instrument", role: "camera" }],

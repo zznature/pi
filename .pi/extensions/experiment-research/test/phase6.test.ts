@@ -39,7 +39,7 @@ function readJson(path: string): unknown {
 test("start_run starts without executing and advance_run drives the run to completion", () => {
 	const cwd = tempCwd();
 	try {
-		const start = dispatch("start_run", { spec: loadSpec("valid-spec.json") }, { cwd, commandId: "p6-start" });
+		const start = dispatch("start_run", { spec: loadSpec("sim/spec.json") }, { cwd, commandId: "p6-start" });
 		assert.equal(start.status, "success");
 		const runId = start.runId ?? "";
 		assert.match(runId, /^sim-run-/);
@@ -72,7 +72,7 @@ test("start_run starts without executing and advance_run drives the run to compl
 test("operator pause stops advance_run at the next unit boundary and the run resumes", () => {
 	const cwd = tempCwd();
 	try {
-		const start = dispatch("start_run", { spec: loadSpec("valid-spec.json") }, { cwd, commandId: "p6r-start" });
+		const start = dispatch("start_run", { spec: loadSpec("sim/spec.json") }, { cwd, commandId: "p6r-start" });
 		const runId = start.runId ?? "";
 
 		dispatch("advance_run", { runId, maxUnits: 2 }, { cwd, commandId: "p6r-adv1" });
@@ -101,7 +101,7 @@ test("operator pause stops advance_run at the next unit boundary and the run res
 test("abort_run clears a paused lifecycle run so a new run can start", () => {
 	const cwd = tempCwd();
 	try {
-		const start = dispatch("start_run", { spec: loadSpec("valid-spec.json") }, { cwd, commandId: "p6a-start" });
+		const start = dispatch("start_run", { spec: loadSpec("sim/spec.json") }, { cwd, commandId: "p6a-start" });
 		const runId = start.runId ?? "";
 		dispatch("advance_run", { runId, maxUnits: 1 }, { cwd, commandId: "p6a-adv1" });
 		dispatch("pause_run", { runId, reason: "operator hold" }, { cwd, commandId: "p6a-pause" });
@@ -111,7 +111,7 @@ test("abort_run clears a paused lifecycle run so a new run can start", () => {
 		const abort = dispatch("abort_run", { runId, reason: "operator abort" }, { cwd, commandId: "p6a-abort" });
 		assert.equal(abort.status, "success");
 
-		const start2 = dispatch("start_run", { spec: loadSpec("valid-spec.json") }, { cwd, commandId: "p6a-start2" });
+		const start2 = dispatch("start_run", { spec: loadSpec("sim/spec.json") }, { cwd, commandId: "p6a-start2" });
 		assert.equal(start2.status, "success");
 		assert.notEqual(start2.runId, runId);
 	} finally {
@@ -122,7 +122,7 @@ test("abort_run clears a paused lifecycle run so a new run can start", () => {
 test("advance_run on a completed run is rejected as not advanceable", () => {
 	const cwd = tempCwd();
 	try {
-		const start = dispatch("start_run", { spec: loadSpec("valid-spec.json") }, { cwd, commandId: "p6c-start" });
+		const start = dispatch("start_run", { spec: loadSpec("sim/spec.json") }, { cwd, commandId: "p6c-start" });
 		const runId = start.runId ?? "";
 		dispatch("advance_run", { runId }, { cwd, commandId: "p6c-adv" });
 
@@ -137,13 +137,13 @@ test("advance_run on a completed run is rejected as not advanceable", () => {
 test("start_run rejects a non-simulation spec and refuses a second concurrent run", () => {
 	const cwd = tempCwd();
 	try {
-		const hardware = dispatch("start_run", { spec: loadSpec("hardware-spec.json") }, { cwd, commandId: "p6m-hw" });
+		const hardware = dispatch("start_run", { spec: loadSpec("hw/spec.json") }, { cwd, commandId: "p6m-hw" });
 		assert.equal(hardware.status, "error");
 		assert.equal(hardware.errorCode, "lifecycle_mode_not_supported");
 
-		const startA = dispatch("start_run", { spec: loadSpec("valid-spec.json") }, { cwd, commandId: "p6m-a" });
+		const startA = dispatch("start_run", { spec: loadSpec("sim/spec.json") }, { cwd, commandId: "p6m-a" });
 		assert.equal(startA.status, "success");
-		const startB = dispatch("start_run", { spec: loadSpec("valid-spec.json") }, { cwd, commandId: "p6m-b" });
+		const startB = dispatch("start_run", { spec: loadSpec("sim/spec.json") }, { cwd, commandId: "p6m-b" });
 		assert.equal(startB.status, "error");
 		assert.equal(startB.errorCode, "policy_rejected");
 	} finally {

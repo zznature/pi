@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { dispatch } from "../dispatch.ts";
-import { validateHardwareCoordinateAuditReadiness } from "../kernel/hardware-coordinate-audit.ts";
+import { validateHardwareCoordinateAuditReadiness } from "../kernel/hw/coord-audit.ts";
 import type { ExperimentSpec } from "../schemas.ts";
 import { recordHardwareCoordinateAuditTool } from "../tools/operator.ts";
 
@@ -76,7 +76,7 @@ function baseHardwareExecution(coordinateAuditId?: string) {
 }
 
 function zOnlyHardwareSpec(): ExperimentSpec {
-	const base = loadSpec("hardware-spec.json");
+	const base = loadSpec("hw/spec.json");
 	return {
 		...base,
 		specId: "spec-z-only-adjustment",
@@ -108,7 +108,7 @@ function zOnlyHardwareSpec(): ExperimentSpec {
 test("record_hardware_coordinate_audit writes an operator-approved coordinate audit record", async () => {
 	const cwd = tempCwd();
 	try {
-		const spec = loadSpec("hardware-spec.json");
+		const spec = loadSpec("hw/spec.json");
 		const result = await recordHardwareCoordinateAuditTool.execute(
 			"record-coordinate-audit",
 			{
@@ -145,7 +145,7 @@ test("run_preflight warns when a planned real hardware launch preview lacks coor
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("hardware-spec.json");
+			const spec = loadSpec("hw/spec.json");
 			const result = dispatch(
 				"run_preflight",
 				{ spec, hardwareExecution: { stageAdapter: "mc_newton_xyz" } },
@@ -170,7 +170,7 @@ test("run_experiment rejects supervised real hardware without coordinateAuditId"
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabled(() => {
 		try {
-			const spec = loadSpec("hardware-spec.json");
+			const spec = loadSpec("hw/spec.json");
 			const result = dispatch(
 				"run_experiment",
 				{ spec, hardwareExecution: baseHardwareExecution() },
@@ -248,7 +248,7 @@ test("run_experiment rejects coordinateAuditId records that do not match the cur
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabledAsync(async () => {
 		try {
-			const spec = loadSpec("hardware-spec.json");
+			const spec = loadSpec("hw/spec.json");
 			const mismatchedPlan = {
 				kind: "points",
 				points: [
@@ -290,7 +290,7 @@ test("run_experiment gets past the coordinate audit gate when the coordinateAudi
 	const cwd = tempCwd();
 	return withSimulatedHardwareDisabledAsync(async () => {
 		try {
-			const spec = loadSpec("hardware-spec.json");
+			const spec = loadSpec("hw/spec.json");
 			const record = await recordHardwareCoordinateAuditTool.execute(
 				"record-ready-coordinate-audit",
 				{
