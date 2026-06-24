@@ -10,21 +10,21 @@ import {
 	type ReservedRun,
 	type ResumeSnapshot,
 	type RunStatus,
-} from "../run-store.ts";
-import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../labspec-bridge.ts";
-import type { ExperimentSpec, HardwarePilotParams, RamanErrorCode, ToolResult } from "../schemas.ts";
-import { getExperimentPoints, getUnitCount, type ExperimentPoint } from "../spec-utils.ts";
-import { evaluateWatchdog } from "../watchdog.ts";
+} from "../../run-store.ts";
+import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../../labspec-bridge.ts";
+import type { ExperimentSpec, HardwarePilotParams, RamanErrorCode, ToolResult } from "../../schemas.ts";
+import { getExperimentPoints, getUnitCount, type ExperimentPoint } from "../../spec-utils.ts";
+import { evaluateWatchdog } from "../../watchdog.ts";
 import {
 	HardwareBridgeV2Client,
 	HardwareBridgeV2ProtocolError,
 	HardwareBridgeV2RequestError,
 	type HardwareBridgeV2Event,
-} from "./hardware-bridge-v2.ts";
-import { normalizeMatrix2x2, resolveRamanXyCalibration } from "./raman-calibration.ts";
-import { RamanBridgeClient, RamanBridgeProtocolError, RamanBridgeRequestError, type RamanBridgeEvent } from "./raman-bridge.ts";
-import { executeRamanV2RunUnit, RamanV2WorkflowAbortError, RamanV2WorkflowPauseError } from "./raman-v2-orchestrator.ts";
-import type { RunState } from "./kernel.ts";
+} from "../hw/bridge-v2.ts";
+import { normalizeMatrix2x2, resolveRamanXyCalibration } from "./calibration.ts";
+import { RamanBridgeClient, RamanBridgeProtocolError, RamanBridgeRequestError, type RamanBridgeEvent } from "./bridge.ts";
+import { executeRamanV2RunUnit, RamanV2WorkflowAbortError, RamanV2WorkflowPauseError } from "./v2-orchestrator.ts";
+import type { RunState } from "../run.ts";
 
 export interface RamanHardwareRunStart {
 	runState: RunState;

@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../labspec-bridge.ts";
-import { createErrorResult, createSuccessResult } from "../results.ts";
-import { artifactUriPath } from "../run-store.ts";
-import type { RamanActiveProbeParams, ToolResult } from "../schemas.ts";
-import { RamanBridgeClient, RamanBridgeRequestError } from "./raman-bridge.ts";
+import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../../labspec-bridge.ts";
+import { createErrorResult, createSuccessResult } from "../../results.ts";
+import { artifactUriPath } from "../../run-store.ts";
+import type { RamanActiveProbeParams, ToolResult } from "../../schemas.ts";
+import { RamanBridgeClient, RamanBridgeRequestError } from "./bridge.ts";
 
 interface RamanActiveProbeContext {
 	cwd: string;

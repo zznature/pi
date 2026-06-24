@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../labspec-bridge.ts";
-import { createErrorResult, createSuccessResult } from "../results.ts";
-import { artifactUriPath } from "../run-store.ts";
+import { DEFAULT_LABSPEC_BRIDGE_DIR } from "../../labspec-bridge.ts";
+import { createErrorResult, createSuccessResult } from "../../results.ts";
+import { artifactUriPath } from "../../run-store.ts";
 import type {
 	RamanAutoXyCalibrationParams,
 	RamanFitXyCalibrationParams,
 	RamanRecordXyCalibrationParams,
 	ToolResult,
 	ValidationIssue,
-} from "../schemas.ts";
-import { RamanBridgeClient, RamanBridgeRequestError } from "./raman-bridge.ts";
+} from "../../schemas.ts";
+import { RamanBridgeClient, RamanBridgeRequestError } from "./bridge.ts";
 
 export type Matrix2x2 = [[number, number], [number, number]];
 

@@ -16,7 +16,7 @@ import {
 } from "../run-store.ts";
 import type { ExperimentSpec, ToolResult } from "../schemas.ts";
 import { getExperimentPoints, getUnitCount } from "../spec-utils.ts";
-import { simulatePoint, type SimulationPointRecord } from "./simulation.ts";
+import { simulatePoint, type SimulationPointRecord } from "./sim.ts";
 
 export interface RunState {
 	runId: string;

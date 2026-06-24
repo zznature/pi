@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { createErrorResult, createSuccessResult } from "../results.ts";
-import { artifactUriPath, hashExperimentSpec, readRecordedEvents, readRecordedSpec, readRecordedSummary } from "../run-store.ts";
+import { createErrorResult, createSuccessResult } from "../../results.ts";
+import { artifactUriPath, hashExperimentSpec, readRecordedEvents, readRecordedSpec, readRecordedSummary } from "../../run-store.ts";
 import {
 	type ExperimentSpec,
 	RamanHardwareValidationParamsSchema,
@@ -10,9 +10,9 @@ import {
 	type ToolResult,
 	type ValidationIssue,
 	validateSchema,
-} from "../schemas.ts";
-import { getRamanValidationCoverage, type RamanValidationCoverage } from "../spec-utils.ts";
-import { resolveRamanXyCalibration } from "./raman-calibration.ts";
+} from "../../schemas.ts";
+import { getRamanValidationCoverage, type RamanValidationCoverage } from "../../spec-utils.ts";
+import { resolveRamanXyCalibration } from "./calibration.ts";
 
 interface HardwareValidationRecord {
 	schemaVersion: "1";

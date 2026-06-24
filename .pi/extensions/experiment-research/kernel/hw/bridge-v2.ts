@@ -80,7 +80,7 @@ export class HardwareBridgeV2Client {
 		this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
 		this.onEvent = options.onEvent;
 		const kernelDir = dirname(fileURLToPath(import.meta.url));
-		const extensionDir = dirname(kernelDir);
+		const extensionDir = dirname(dirname(kernelDir));
 		const repoRoot = dirname(dirname(dirname(extensionDir)));
 		const bridgePath = options.bridgePath ?? join(extensionDir, "hardware_bridge_v2.py");
 		const stageRoot = options.stageRoot ?? resolve(repoRoot, "docs", "Raman");

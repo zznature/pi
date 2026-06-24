@@ -1,9 +1,9 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import type { ExperimentSpec, HardwarePilotParams, RamanErrorCode } from "../schemas.ts";
-import { getExperimentPoints, type ExperimentPoint } from "../spec-utils.ts";
-import { evaluateWatchdog } from "../watchdog.ts";
-import type { StageAdapter, StagePosition } from "./stage-adapter.ts";
+import type { ExperimentSpec, HardwarePilotParams, RamanErrorCode } from "../../schemas.ts";
+import { getExperimentPoints, type ExperimentPoint } from "../../spec-utils.ts";
+import { evaluateWatchdog } from "../../watchdog.ts";
+import type { StageAdapter, StagePosition } from "./stage.ts";
 
 export interface HardwareAutofocusRecord {
 	zBestUm: number;

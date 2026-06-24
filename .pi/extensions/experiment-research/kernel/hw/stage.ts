@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { HardwarePilotParams } from "../schemas.ts";
-import type { ExperimentPoint } from "../spec-utils.ts";
+import type { HardwarePilotParams } from "../../schemas.ts";
+import type { ExperimentPoint } from "../../spec-utils.ts";
 
 export interface StagePosition {
 	xUm: number;
@@ -61,7 +61,7 @@ export class PythonMCNewtonStageAdapter implements StageAdapter {
 		this.port = port;
 		this.cwd = cwd;
 		this.python = python;
-		const extensionDir = dirname(dirname(fileURLToPath(import.meta.url)));
+		const extensionDir = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 		this.bridgePath = join(extensionDir, "stage_bridge.py");
 	}
 
