@@ -309,13 +309,38 @@ function invalidResumeFromResult(commandId: string, spec: ExperimentSpec, resume
 
 type RamanLaunchExecutionPreview = HardwareExecutionParams | PreflightHardwareExecutionParams;
 
+function boundedZAdjustmentExemptionIssues(spec: ExperimentSpec): string[] {
+	const points = spec.plan.kind === "points" ? spec.plan.points : [];
+	const point = points[0];
+	const issues: string[] = [];
+	if (spec.domain?.raman) {
+		issues.push("bounded_z_adjustment coordinate audit exemption is not allowed for Raman hardware runs.");
+	}
+	if (spec.plan.kind !== "points" || points.length !== 1 || !point) {
+		issues.push("bounded_z_adjustment coordinate audit exemption requires a single explicit point plan.");
+		return issues;
+	}
+	if (point.zUm === undefined) {
+		issues.push("bounded_z_adjustment coordinate audit exemption requires an explicit target zUm.");
+	}
+	if (!spec.limits.motion.zUm) {
+		issues.push("bounded_z_adjustment coordinate audit exemption requires explicit zUm motion limits.");
+	} else if (point.zUm !== undefined && (point.zUm < spec.limits.motion.zUm.minUm || point.zUm > spec.limits.motion.zUm.maxUm)) {
+		issues.push("bounded_z_adjustment coordinate audit exemption target zUm is outside ExperimentSpec zUm motion limits.");
+	}
+	return issues;
+}
+
 function realHardwareCoordinateAuditIssues(
 	cwd: string,
 	spec: ExperimentSpec,
-	hardwareExecution: Pick<RamanLaunchExecutionPreview, "stageAdapter" | "coordinateAuditId">,
+	hardwareExecution: Pick<RamanLaunchExecutionPreview, "stageAdapter" | "coordinateAuditId" | "coordinateAuditExemption">,
 ): string[] {
 	if (!isRealHardwareExecution(hardwareExecution.stageAdapter)) return [];
 	if (!hardwareExecution.coordinateAuditId) {
+		if (hardwareExecution.coordinateAuditExemption === "bounded_z_adjustment") {
+			return boundedZAdjustmentExemptionIssues(spec);
+		}
 		return ["Supervised real hardware execution requires hardwareExecution.coordinateAuditId from an operator-reviewed coordinate audit record."];
 	}
 	const readiness = validateHardwareCoordinateAuditReadiness(cwd, hardwareExecution.coordinateAuditId, spec);

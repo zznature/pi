@@ -197,6 +197,9 @@ const RamanAutofocusSchema = Type.Object(
 		coarseStepUm: Type.Number({ exclusiveMinimum: 0 }),
 		fineRangeUm: Type.Number({ minimum: 0 }),
 		fineStepUm: Type.Number({ exclusiveMinimum: 0 }),
+		coarseStageToleranceUm: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		fineStageToleranceUm: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		finalStageToleranceUm: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
 		metric: RamanFocusMetricSchema,
 		minConfidence: Type.Number({ minimum: 0, maximum: 1 }),
 		onFailure: RamanFailurePolicySchema,
@@ -345,6 +348,7 @@ const HardwareExecutionSchema = Type.Object(
 	{
 		stageAdapter: Type.Union([Type.Literal("memory"), Type.Literal("mc_newton_xyz")]),
 		coordinateAuditId: Type.Optional(Type.String({ minLength: 1 })),
+		coordinateAuditExemption: Type.Optional(Type.Literal("bounded_z_adjustment")),
 		stagePort: Type.Optional(Type.String({ minLength: 1 })),
 		stagePython: Type.Optional(
 			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to 'python' on PATH" }),
@@ -365,6 +369,7 @@ const PreflightHardwareExecutionSchema = Type.Object(
 	{
 		stageAdapter: Type.Union([Type.Literal("memory"), Type.Literal("mc_newton_xyz")]),
 		coordinateAuditId: Type.Optional(Type.String({ minLength: 1 })),
+		coordinateAuditExemption: Type.Optional(Type.Literal("bounded_z_adjustment")),
 		stagePort: Type.Optional(Type.String({ minLength: 1 })),
 		stagePython: Type.Optional(
 			Type.String({ minLength: 1, description: "Python interpreter for the stage bridge; defaults to 'python' on PATH" }),
@@ -777,6 +782,18 @@ export const HardwareCoordinateAuditParamsSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+export const HardwareBridgeV2ReadParamsSchema = Type.Object(
+	{
+		domain: Type.String({ minLength: 1 }),
+		action: Type.String({ minLength: 1 }),
+		payload: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+		python: Type.Optional(Type.String({ minLength: 1 })),
+		stageRoot: Type.Optional(Type.String({ minLength: 1 })),
+		timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
+	},
+	{ additionalProperties: false },
+);
+
 export type ExperimentSpec = Static<typeof ExperimentSpecSchema>;
 export type ToolResult = Static<typeof ToolResultSchema>;
 export type ErrorCode = Static<typeof ErrorCodeSchema>;
@@ -803,6 +820,7 @@ export type RamanHardwareValidationDraftParams = Static<typeof RamanHardwareVali
 export type RamanValidationSpecPairParams = Static<typeof RamanValidationSpecPairParamsSchema>;
 export type GetExperimentStateParams = Static<typeof GetExperimentStateParamsSchema>;
 export type HardwareCoordinateAuditParams = Static<typeof HardwareCoordinateAuditParamsSchema>;
+export type HardwareBridgeV2ReadParams = Static<typeof HardwareBridgeV2ReadParamsSchema>;
 
 export interface ValidationIssue {
 	path: string;

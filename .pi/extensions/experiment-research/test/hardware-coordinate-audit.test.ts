@@ -75,6 +75,36 @@ function baseHardwareExecution(coordinateAuditId?: string) {
 	};
 }
 
+function zOnlyHardwareSpec(): ExperimentSpec {
+	const base = loadSpec("hardware-spec.json");
+	return {
+		...base,
+		specId: "spec-z-only-adjustment",
+		objective: "Move only Z to a bounded absolute position.",
+		limits: {
+			...base.limits,
+			motion: {
+				xUm: { minUm: 900, maxUm: 1000 },
+				yUm: { minUm: 1500, maxUm: 1600 },
+				zUm: { minUm: 2000, maxUm: 2200 },
+			},
+			acquisition: {
+				maxExposureMs: 100,
+				maxUnits: 1,
+			},
+		},
+		plan: {
+			kind: "points",
+			points: [{ xUm: 947.997, yUm: 1581.384, zUm: 2105.665 }],
+		},
+		stoppingRules: {
+			maxRuntimeMinutes: 1,
+			maxUnits: 1,
+			stopOnError: true,
+		},
+	};
+}
+
 test("record_hardware_coordinate_audit writes an operator-approved coordinate audit record", async () => {
 	const cwd = tempCwd();
 	try {
@@ -150,6 +180,64 @@ test("run_experiment rejects supervised real hardware without coordinateAuditId"
 			assert.match(result.summary, /coordinate audit gate/);
 			const issues = asRecord(result.stateAfter).issues as string[];
 			assert.ok(issues.some((issue) => issue.includes("coordinateAuditId")));
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+});
+
+test("run_experiment accepts bounded Z adjustment coordinate audit exemption before the dry-run gate", () => {
+	const cwd = tempCwd();
+	return withSimulatedHardwareDisabled(() => {
+		try {
+			const spec = zOnlyHardwareSpec();
+			const result = dispatch(
+				"run_experiment",
+				{
+					spec,
+					hardwareExecution: {
+						...baseHardwareExecution(),
+						coordinateAuditExemption: "bounded_z_adjustment",
+					},
+				},
+				{ cwd, commandId: "bounded-z-adjustment-exemption-run" },
+			);
+			assert.equal(result.errorCode, "hardware_gate_failed");
+			assert.match(result.summary, /Hardware gate failed/);
+			const issues = asRecord(result.stateAfter).issues as string[];
+			assert.ok(issues.some((issue) => issue.includes("dry-run preflight")));
+			assert.equal(issues.some((issue) => issue.includes("coordinateAuditId") || issue.includes("coordinate audit")), false);
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+});
+
+test("run_experiment rejects bounded Z adjustment exemption outside z motion limits", () => {
+	const cwd = tempCwd();
+	return withSimulatedHardwareDisabled(() => {
+		try {
+			const spec = {
+				...zOnlyHardwareSpec(),
+				plan: {
+					kind: "points" as const,
+					points: [{ xUm: 947.997, yUm: 1581.384, zUm: 2300 }],
+				},
+			};
+			const result = dispatch(
+				"run_experiment",
+				{
+					spec,
+					hardwareExecution: {
+						...baseHardwareExecution(),
+						coordinateAuditExemption: "bounded_z_adjustment",
+					},
+				},
+				{ cwd, commandId: "bounded-z-adjustment-exemption-out-of-range-run" },
+			);
+			assert.equal(result.errorCode, "policy_rejected");
+			const issues = asRecord(result.stateAfter).issues as Array<{ message: string }>;
+			assert.ok(issues.some((issue) => issue.message.includes("outside ExperimentSpec motion limits")));
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}

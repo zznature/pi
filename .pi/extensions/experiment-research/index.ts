@@ -5,6 +5,7 @@ import { EXPERIMENT_RESEARCH_PROMPT } from "./prompt.ts";
 import type { ToolResult } from "./schemas.ts";
 import { analyzeRunTool } from "./tools/analyze-run.ts";
 import { getExperimentStateTool } from "./tools/experiment-state.ts";
+import { hardwareBridgeV2ReadTool } from "./tools/hardware-bridge-v2-read.ts";
 import { recordHardwareCoordinateAuditTool } from "./tools/hardware-coordinate-audit.ts";
 import { getLabCapabilitiesTool, getLabStateTool } from "./tools/lab-state.ts";
 import { advanceRunTool, pollRunTool, startRunTool } from "./tools/lifecycle.ts";
@@ -26,6 +27,7 @@ const PLANNER_TOOL_NAMES = [
 	"get_lab_capabilities",
 	"get_lab_state",
 	"get_experiment_state",
+	"hardware_bridge_v2_read",
 	"validate_experiment_spec",
 	"run_preflight",
 	"run_experiment",
@@ -33,6 +35,7 @@ const PLANNER_TOOL_NAMES = [
 	"advance_run",
 	"analyze_run",
 	"plan_next_experiment",
+	"raman_active_probe",
 ];
 
 // Operator/watchdog tools are registered so they can be invoked out-of-band, but
@@ -43,7 +46,6 @@ const OPERATOR_TOOL_NAMES = [
 	"poll_run",
 	"request_operator",
 	"record_hardware_coordinate_audit",
-	"raman_active_probe",
 	"raman_record_xy_calibration",
 	"raman_fit_xy_calibration",
 	"raman_auto_xy_calibration",
@@ -128,6 +130,7 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 	pi.registerTool(getLabStateTool);
 	pi.registerTool(getLabCapabilitiesTool);
 	pi.registerTool(getExperimentStateTool);
+	pi.registerTool(hardwareBridgeV2ReadTool);
 	pi.registerTool(validateExperimentSpecTool);
 	pi.registerTool(runPreflightTool);
 	pi.registerTool(runExperimentTool);
@@ -155,6 +158,7 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 			activeTools.add(toolName);
 		}
 		// Operator/watchdog tools stay out of the planner default active set.
+		// raman_active_probe remains active because it is the approved high-level path for frequent frame-only status captures.
 		for (const toolName of OPERATOR_TOOL_NAMES) {
 			activeTools.delete(toolName);
 		}
