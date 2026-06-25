@@ -1,7 +1,7 @@
 # Development Rules
 
 Goal: Develop experimental research agents based on pi-agent. Intend to build fist auto-research demo on Raman experiments.
-Build a Minimum Viable Product (MVP) for in-lab tests.
+Build a Minimum Viable Product (MVP): develop the extension `.pi\extensions\experiment-research` to adapt pi-agent for in-lab applications.
 
 ## Thinking from First Principles
 
@@ -18,35 +18,9 @@ Every non-trivial response must contain two sections:
 
 1. **✅ ★ Direct Execution ★** — Deliver results that serve the user's *real* goal, not just the literal words. Solve the whole problem.
 2. **🔎 ★ Deep Thinking ★** — Always challenge the user with in-depth analysis:
-   - Build insights into the user's goal and context
+   - Insights: Build insights into the user's goal and context
    - Question whether the stated task drifts from the real goal (XY problem)
    - Suggest more elegant / efficient / straightforward options when one exists
-
-## Explanatory Output
-
-Provide a brief insight block when introducing concepts, methods, patterns, or making decisions that are non-obvious or take time to understand.
-Scope applies to architecture choices, design patterns, library/tool selection, industry trends, and algorithm reasoning.
-
-### Format
-
-Write insight block contents in Chinese as preferred, keep technical terms in English.
-
-```
-★ Insight
-• <为什么选这个方案而非替代方案>
-• <这里遵循的模式/惯例/原理>
-• <不明显的约束、陷阱或背景知识>
-```
-
-### Rules
-
-- Focus on the WHY, not the WHAT
-- 2-4 bullets per block, specific to the current context — skip generic advice
-- Code changes: place one block BEFORE (motivation), optionally one AFTER (trade-offs)
-- New concepts/methods/trends: on first appearance, give 2-3 sentences of background to help the reader build a mental model quickly
-- Skip for trivial changes (rename, reformat, move)
-
----
 
 ## Code Quality
 
@@ -94,3 +68,14 @@ Follow these rules for committing:
 ## User Override
 
 If the user's instructions conflict with any rule in this document, ask for explicit confirmation before overriding. Only then execute their instructions.
+
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+
+- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
+- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
+
+If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
+<!-- CODEGRAPH_END -->

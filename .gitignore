@@ -26,7 +26,11 @@ artifacts/*
 .zed/
 .idea/
 .claude/
+.cursor/
 CLAUDE.md
+.codegraph/
+.mcp.json
+opencode.jsonc
 *.swp
 *.swo
 *~
