@@ -76,6 +76,7 @@
 	},
 	"hardwareExecution": {
 		"stageAdapter": "mc_newton_xyz",
+		"stagePort": "<mc-newton-stage-port>",
 		"coordinateAuditId": "<coordinate-audit-id>",
 		"raman": {
 			"workflowBackend": "v2_bridge",

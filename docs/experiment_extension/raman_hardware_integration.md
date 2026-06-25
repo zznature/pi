@@ -184,7 +184,7 @@ interface HardwareActionContract {
 
 对当前阶段还应明确两点：
 
-- **current real-capable baseline** 是 `.pi/extensions/experiment-research/fixtures/raman-v2-real-validation-*.json` 这一组模板；它覆盖 autofocus、XY correction 和 acquisition，但**不包含 real thermal waiting**。
+- **current real-capable baseline** 是 `.pi/extensions/experiment-research/fixtures/raman/v2/real/*.json` 这一组模板；它覆盖 autofocus、XY correction 和 acquisition，但**不包含 real thermal waiting**。
 - `raman-v2-validation-hardware-spec.json` / `raman-v2-validation-dry-run-spec.json` 代表 **future full-surface** 目标覆盖面，当前不能直接当作 real-hardware 放行基线。
 
 ## G8 真实硬件验证 Runbook
@@ -216,8 +216,8 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
 仓库内现在有两类模板：
 
 - **current real-capable** 模板：
-  - hardware：`.pi/extensions/experiment-research/fixtures/raman-v2-real-validation-hardware-spec.json`
-  - dry-run：`.pi/extensions/experiment-research/fixtures/raman-v2-real-validation-dry-run-spec.json`
+  - hardware：`.pi/extensions/experiment-research/fixtures/raman/v2/real/hardware-spec.json`
+  - dry-run：`.pi/extensions/experiment-research/fixtures/raman/v2/real/dry-run-spec.json`
 - **future full-surface** 模板：
   - hardware：`.pi/extensions/experiment-research/fixtures/raman-v2-validation-hardware-spec.json`
   - dry-run：`.pi/extensions/experiment-research/fixtures/raman-v2-validation-dry-run-spec.json`
@@ -230,7 +230,7 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
 {
   "tool": "raman_prepare_validation_spec_pair",
   "input": {
-    "spec": "load .pi/extensions/experiment-research/fixtures/raman-v2-real-validation-hardware-spec.json"
+    "spec": "load .pi/extensions/experiment-research/fixtures/raman/v2/real/hardware-spec.json"
   }
 }
 ```
@@ -257,7 +257,7 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
 {
   "tool": "run_preflight",
   "input": {
-    "spec": "load .pi/extensions/experiment-research/fixtures/raman-v2-real-validation-dry-run-spec.json"
+    "spec": "load .pi/extensions/experiment-research/fixtures/raman/v2/real/dry-run-spec.json"
   }
 }
 ```
@@ -361,6 +361,7 @@ G8 的目标不是“跑过一次 V2 就算完成”，而是生成一份后续�
         "autofocusBackend": "labspec_file_bridge",
         "xyCorrectionBackend": "phase_correlation"
       },
+      "stagePort": "<mc-newton-stage-port>",
       "settleTimeoutMs": 1000,
       "heartbeatTimeoutMs": 10000,
       "maxConsecutiveErrors": 2,
@@ -388,7 +389,7 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
 
 如果现场想先把字段拼装成一份可审阅草稿，再逐项确认 checklist / approval / hardware attestation，建议先调用 `raman_prepare_hardware_validation_payload` 生成 draft payload，然后再把审阅后的最终值提交给 `raman_record_hardware_validation`。
 
-仓库内也提供了一份可直接对照的 current real-capable 草稿示例：`.pi/extensions/experiment-research/fixtures/raman-v2-real-validation-payload.draft.json`。这份文件是 schema-valid 的 draft，不代表已经完成 operator review。
+仓库内也提供了一份可直接对照的 current real-capable 草稿示例：`.pi/extensions/experiment-research/fixtures/raman/v2/real/payload.draft.json`。这份文件是 schema-valid 的 draft，不代表已经完成 operator review。
 
 生成草稿时，可直接参考下面这类调用：
 
@@ -494,7 +495,7 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
   "input": {
     "validationId": "raman-v2-prod-20260621-a",
     "workflowBackend": "v2_bridge",
-    "spec": "load .pi/extensions/experiment-research/fixtures/raman-v2-real-validation-hardware-spec.json"
+    "spec": "load .pi/extensions/experiment-research/fixtures/raman/v2/real/hardware-spec.json"
   }
 }
 ```
@@ -505,7 +506,7 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
 {
   "tool": "run_experiment",
   "input": {
-    "spec": "load .pi/extensions/experiment-research/fixtures/raman-v2-real-validation-hardware-spec.json",
+    "spec": "load .pi/extensions/experiment-research/fixtures/raman/v2/real/hardware-spec.json",
     "hardwareExecution": {
       "stageAdapter": "mc_newton_xyz",
       "raman": {
@@ -515,6 +516,7 @@ operator 审阅 Step 2-5 的证据后，调用 `raman_record_hardware_validation
         "autofocusBackend": "labspec_file_bridge",
         "xyCorrectionBackend": "phase_correlation"
       },
+      "stagePort": "<mc-newton-stage-port>",
       "settleTimeoutMs": 1000,
       "heartbeatTimeoutMs": 10000,
       "maxConsecutiveErrors": 2,
