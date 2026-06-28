@@ -97,14 +97,14 @@
 
 **作用**
 
-- 给 admission / approvals / lease / mode gate 用
-- 表达 lab state、审批、安全边界、资源并发约束
+- 给 admission / supervisor confirmation / lease / mode gate 用
+- 表达 lab readiness、监督人在场、危险场景确认与资源并发约束
 - 不属于 procedure 本体
 
 **生产者**
 
 - policy engine
-- operator approval flow
+- operator supervision flow
 - lab state service
 - resource manager
 
@@ -120,12 +120,12 @@
 - `policyId`
 - `experimentId`
 - `applicableProcedureSpecId`
-- `modeGate`
-- `approvalRequirements`
-- `approvedScopes[]`
+- `executionMode`
+- `requiresSupervisorPresence`
+- `startChecks`
+- `hazardControls`
 - `resourceLeaseRequirements`
-- `concurrencyRules`
-- `safetyEnvelope`
+- `singleActiveRun`
 - `capabilitySnapshotRef?`
 - `validityWindow?`
 
@@ -201,6 +201,7 @@ User / Planner
    -> compile
    -> ProcedureSpec
    -> admission against RunPolicy
+   -> supervisor confirms run
    -> kernel.execute(ProcedureSpec)
    -> RunState
    -> summary / artifacts
@@ -235,7 +236,7 @@ runs/<runId>/
 约束如下：
 
 - `run.json` 是唯一主记录文件，包含 run identity、inlined `ProcedureSpec`、
-  当前 `RunState` 快照、approval / lease / capability 的必要摘要，以及 artifact 索引。
+  当前 `RunState` 快照、supervisor confirmation / lease / capability 的必要摘要，以及 artifact 索引。
 - `events.jsonl` 是唯一 append-only 运行日志，记录生命周期事件、unit 事件、
   watchdog 事件、pause/abort 和错误事件。
 - `artifacts/` 只放真实实验产物，如光谱、图片、导出数据；records 不是 artifacts。
@@ -284,7 +285,7 @@ type ProcedureSpec = {
   intentId: string
   procedureId: string
   procedureVersion: string
-  mode: "simulation" | "dry_run" | "hardware"
+  mode: "live-supervised"
   resourceBindings: Array<{ resourceId: string; role: string }>
   parameters: Record<string, unknown>
   limits: Record<string, unknown>
@@ -293,12 +294,24 @@ type ProcedureSpec = {
 
 type RunPolicy = {
   policyId: string
+  experimentId: string
   applicableProcedureSpecId: string
-  modeGate: "simulation" | "dry_run" | "hardware"
-  approvalRequirements: string[]
-  approvedScopes?: string[]
-  concurrencyRules?: string[]
-  safetyEnvelope?: Record<string, unknown>
+  executionMode: "live-supervised"
+  requiresSupervisorPresence: true
+  startChecks: {
+    preflightReady: boolean
+    controlAvailable: boolean
+  }
+  hazardControls: {
+    objectiveCollisionGuard: true
+    requireUserConfirmationAboveLaserPowerMw: 10
+  }
+  resourceLeaseRequirements: Array<{
+    resourceId: string
+    mode: "exclusive-control"
+    ttlSec: number
+  }>
+  singleActiveRun: true
 }
 
 type RunState = {
