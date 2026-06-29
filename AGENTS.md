@@ -3,6 +3,13 @@
 Goal: Develop experimental research agents based on pi-agent. Intend to build fist auto-research demo on Raman experiments.
 Build a Minimum Viable Product (MVP): develop the extension `.pi\extensions\experiment-research` to adapt pi-agent for in-lab applications.
 
+Implementation should always follow `docs/design-ideas/core-ideas.md`, which is user-authored design guidelines.
+- When implementation may go beyond the design, ask user to improve it.
+- Agent can only edit it with user's direct order.
+- The tech plans are also in `docs/design-ideas/`. Tech docs should be updated with the actual implementing and reflect the actual code.
+
+`.pi/extensions/experiment-research` is a reference-only legacy implementation for the MVP rebuild. It may be mined for useful patterns or hardware-specific knowledge.
+
 ## Thinking from First Principles
 
 ### Mindset
@@ -18,7 +25,7 @@ Every non-trivial response must contain two sections:
 
 1. **✅ ★ Direct Execution ★** — Deliver results that serve the user's *real* goal, not just the literal words. Solve the whole problem.
 2. **🔎 ★ Deep Thinking ★** — Always challenge the user with in-depth analysis:
-   - Insights: Build insights into the user's goal and context
+   - Insights: Dig insights in the building process
    - Question whether the stated task drifts from the real goal
    - Suggest more elegant / efficient / straightforward options when one exists
 
@@ -45,7 +52,6 @@ Every non-trivial response must contain two sections:
 - For `packages/coding-agent/test/suite/`, use `test/suite/harness.ts` + the faux provider. No real provider APIs, keys, or paid tokens.
 - Put issue-specific regressions under `packages/coding-agent/test/suite/regressions/` named `<issue-number>-<short-slug>.test.ts`.
 - For ad-hoc scripts, `write` them to a temp file (e.g. `/tmp`), run, edit if needed, remove when done. Don't embed multi-line scripts in `bash` commands.
-- Never commit unless the user asks.
 
 ## Dependency and Install Security
 
@@ -72,10 +78,10 @@ If the user's instructions conflict with any rule in this document, ask for expl
 <!-- CODEGRAPH_START -->
 ## CodeGraph
 
-In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+In repositories indexed by CodeGraph (a `.codegraph/codegraph.db` file exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
 
 - **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
 - **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
 
-If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
+If there is no `.codegraph/codegraph.db` file, skip CodeGraph entirely — indexing is the user's decision.
 <!-- CODEGRAPH_END -->
