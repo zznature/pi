@@ -162,6 +162,31 @@ simulationAvailable: false
 - `ProcedureSpec.resources` 只引用 `resourceId`
 - runtime 负责把 `resourceId` 解析成真实 driver session
 
+### 5.4 实验室默认配置与本地覆盖
+
+Raman MVP rebuild 将实验室稳定硬件事实固化在可提交配置中：
+
+```text
+.pi/raman-lab-config/raman-runtime.lab.json
+```
+
+该文件表达实验室默认资源、driver、端口、bridge 目录和 stage limits。
+LabAgent 初始化时加载它，把设备能力与边界带入上下文。
+
+如果某台机器需要临时覆盖端口、路径或启用状态，使用 git-ignored 本地文件：
+
+```text
+.pi/raman-lab-config/raman-runtime.local.json
+```
+
+加载优先级固定为：
+
+```text
+raman-runtime.local.json > raman-runtime.lab.json > no live runtime
+```
+
+这避免把临时现场调整写回实验室默认配置，同时让设备少变的实验室环境具备稳定初始化上下文。
+
 ## 6. Raman Driver 分层
 
 本文把 Raman 接入分成三层：
@@ -324,12 +349,18 @@ operator 需要的不是完整实验入口，而是现场维护与证据链工�
 - `poll_run`
 - `pause_run`
 - `abort_run`
+- `raman_get_hardware_status`
+- `raman_get_stage_position`
+- `raman_stage_move_relative`
 - `raman_active_probe`
 - `raman_record_xy_calibration`（MVP 不实现，随 XY correction 一并推迟）
 - `raman_fit_xy_calibration`（MVP 不实现，随 XY correction 一并推迟）
 - `raman_check_hardware_validation`
 
 这些 tool 可以有更明确的硬件意味，但仍然不应退化成裸驱动命令。
+其中 `raman_stage_move_relative` 属于 operator 确认后的 stage-only nudge：
+它应读取当前位置、计算目标、用 runtime stage resource limits 做硬边界校验；
+它不应为了单轴移动构造 Raman 采谱 `ProcedureSpec`，也不应要求 frame provider / spectrometer 参与。
 
 ### 7.3 明确不暴露为 Planner Tool 的能力
 
@@ -459,6 +490,27 @@ Raman 是真实硬件，因此只靠 `approve_and_start_run` 不够，还需要 
 - stage 能否连接并读位置
 - frame bridge 目录可用性
 - spectrum bridge 目录可用性
+
+MVP rebuild 中，普通状态读取应优先通过 operator tool 完成：
+
+- `raman_get_hardware_status` 返回 runtime 注册状态、preflight readiness、control availability、资源 id 和当前 stage position（若可读）。
+- `raman_get_stage_position` 只读取当前 X/Y/Z 坐标。
+
+这两类读取不应要求 agent 构造 `ProcedureSpec`，也不应退回 legacy bridge。
+
+### 10.1.1 Confirmed Stage Nudge
+
+实验现场常见的“小幅移动 stage”不是 Raman 采谱 run。
+MVP rebuild 应提供单独的 operator tool：
+
+- 输入：`axis`、`deltaUm`、可选 `timeoutMs`、确认标志
+- 读取当前 stage position
+- 计算目标 position
+- 校验 runtime stage resource limits
+- 未确认时只返回目标和风险，不执行移动
+- 确认后调用 runtime `stage.move_absolute_and_wait`
+
+该入口仍然是受控硬件动作，但不属于 `raman_single_point_probe`、`raman_parameter_search` 或 `raman_grid_mapping`。
 
 ### 10.2 Active Probe
 

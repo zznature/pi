@@ -455,6 +455,7 @@ docs freeze
   - [x] frame provider
   - [x] spectrometer
 - [x] 定义 runtime actions：
+  - [x] `stage.get_position`
   - [x] `stage.move_absolute_and_wait`
   - [x] `autofocus.run_single`
   - [x] `frame.capture_latest`
@@ -554,6 +555,46 @@ docs freeze
 ### Suggested Codex Goal
 
 `Implement bounded Raman parameter search and bounded Raman mapping runs.`
+
+## Phase 10.5: Add Operator Hardware Surface For Lab Use
+
+### Objective
+
+补齐实验现场必须使用、但不属于完整 Raman `ProcedureSpec` run 的维护入口，避免 agent 为了读状态或移动 stage 而退回 legacy bridge，或把简单操作伪装成采谱 run。
+
+### Scope
+
+- read-only hardware status
+- read-only stage position
+- confirmed stage-only relative motion
+- runtime config example
+
+### Checklist
+
+- [x] 新 runtime contract 支持 `stage.get_position`
+- [x] Python runtime adapter 支持只读 stage position
+- [x] 新增 operator-facing tools：
+  - [x] `raman_get_hardware_status`
+  - [x] `raman_get_stage_position`
+  - [x] `raman_stage_move_relative`
+- [x] stage-only relative move 不要求 frame provider / spectrometer 资源
+- [x] stage-only relative move 通过 runtime stage resource limits 做边界拒绝
+- [x] stage-only relative move 在未显式确认时只返回 proposal，不执行 motion
+- [x] 提供可提交的实验室默认配置 `.pi/raman-lab-config/raman-runtime.lab.json`
+- [x] 支持 git-ignored 本地覆盖 `.pi/raman-lab-config/raman-runtime.local.json`
+- [x] runtime 配置加载优先级固定为 `local > lab > none`
+- [x] `get_lab_state` 暴露 runtime config source 和配置资源摘要
+
+### Exit Criteria
+
+- 用户询问连接状态或当前位置时，agent 直接走 read-only operator tool。
+- 用户要求小幅 stage nudge 时，agent 不再构造 `raman_single_point_probe`。
+- legacy extension 不再是 MVP 现场操作的必要路径。
+- LabAgent 初始化时可把稳定实验室设备资源加载进上下文，本地临时改动不会污染 lab default。
+
+### Suggested Codex Goal
+
+`Add operator-facing Raman hardware status, position read, and confirmed stage relative move tools to the MVP rebuild.`
 
 ## Open Issues
 

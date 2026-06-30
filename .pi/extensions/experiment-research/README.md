@@ -10,6 +10,10 @@ Current status:
   - `get_lab_state`
   - `validate_procedure_spec`
   - `run_preflight`
+- operator-facing tools:
+  - `raman_get_hardware_status`
+  - `raman_get_stage_position`
+  - `raman_stage_move_relative`
 - core schema modules available under `schemas/`:
   - `experiment-intent.ts`
   - `procedure-spec.ts`
@@ -58,17 +62,25 @@ Current status:
   - `live-runtime.ts`
   - `python-runtime.ts`
   - `index.ts`
+- stage-only operator reads and nudges use the registered Raman live runtime directly.
+  They do not require a Raman `ProcedureSpec`, frame provider, or spectrometer
+  resource unless the operation itself needs those devices.
 
 ## Live Raman Runtime Configuration
 
-The rebuild does not assume real hardware is always available. Live-supervised
-execution is enabled per workspace by creating:
+The rebuild loads stable lab hardware context at session start. Runtime config
+resolution is:
 
 ```text
-.pi/experiment-research/raman-runtime.json
+.pi/raman-lab-config/raman-runtime.local.json
+> .pi/raman-lab-config/raman-runtime.lab.json
+> no live runtime
 ```
 
-Minimal shape:
+`raman-runtime.lab.json` is the committed lab default. `raman-runtime.local.json`
+is a git-ignored local override for temporary port/path/enablement changes.
+
+Current lab default:
 
 ```json
 {
@@ -81,7 +93,7 @@ Minimal shape:
     "runtime": "raman_python",
     "driver": "mc_newton_xyz",
     "config": {
-      "port": "COM5",
+      "port": "COM17",
       "xChannel": 1,
       "yChannel": 2,
       "zChannel": 3,
@@ -120,13 +132,25 @@ Minimal shape:
     },
     "leasePolicy": "exclusive",
     "simulationAvailable": false
+  },
+  "preflight": {
+    "requirePythonRoot": true,
+    "requireBridgeDirs": false,
+    "connectStage": true
   }
 }
 ```
 
-Set `"enabled": false` to keep hardware disabled explicitly. Without an enabled
-registered runtime, live-supervised `approve_and_start_run` returns
-`live_runtime_unavailable`; simulation remains available.
+Set `"enabled": false` in `raman-runtime.local.json` to keep hardware disabled
+explicitly on one machine. Without an enabled registered runtime,
+live-supervised `approve_and_start_run` returns `live_runtime_unavailable`;
+simulation remains available.
+
+The committed lab default lives at:
+
+```text
+.pi/raman-lab-config/raman-runtime.lab.json
+```
 
 ## Tests
 
