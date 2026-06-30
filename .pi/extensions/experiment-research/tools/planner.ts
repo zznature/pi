@@ -4,7 +4,7 @@ import type { ProcedureSpec } from "../schemas/index.ts";
 import { ProcedureSpecValidator, formatValidationErrors } from "../schemas/index.ts";
 import { summarizeProcedureProposal } from "../planner/procedure-spec-builder.ts";
 import { compileProcedureSpec } from "../kernel/compile-units.ts";
-import { getRamanLiveRuntime } from "../runtime/raman/index.ts";
+import { getRamanLiveRuntime, getRamanPythonRuntimeConfigInfo } from "../runtime/raman/index.ts";
 
 const EmptyParamsSchema = Type.Object({}, { additionalProperties: false });
 
@@ -281,15 +281,23 @@ export const getLabStateTool = {
 	parameters: EmptyParamsSchema,
 	executionMode: "sequential",
 	async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+		const runtimeConfig = getRamanPythonRuntimeConfigInfo(ctx.cwd);
+		const liveRuntimeRegistered = getRamanLiveRuntime(ctx.cwd) !== undefined;
 		return success("LabAgents planner proposal flow is active.", {
 			source: "experiment-research",
 			stage: "phase10-bounded-search-and-mapping",
 			canValidateProcedureSpecs: true,
 			canRunPreflight: true,
 			canExecuteSimulationRuns: true,
-			canExecuteLiveSinglePointRuns: getRamanLiveRuntime(ctx.cwd) !== undefined,
-			canExecuteLiveParameterSearchRuns: getRamanLiveRuntime(ctx.cwd) !== undefined,
-			canExecuteLiveGridMappingRuns: getRamanLiveRuntime(ctx.cwd) !== undefined,
+			canExecuteLiveSinglePointRuns: liveRuntimeRegistered,
+			canExecuteLiveParameterSearchRuns: liveRuntimeRegistered,
+			canExecuteLiveGridMappingRuns: liveRuntimeRegistered,
+			runtimeConfig: {
+				source: runtimeConfig.source,
+				path: runtimeConfig.path,
+				enabled: runtimeConfig.enabled,
+			},
+			configuredResources: runtimeConfig.resources,
 			requiresApproval: true,
 			executionEntryPoint: "validate_procedure_spec -> run_preflight -> propose_run -> approve_and_start_run",
 			goodEnoughDecisionMode: "explicit_rules",

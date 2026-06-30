@@ -20,6 +20,7 @@ import {
 	type AutofocusRunSingleAction,
 	type FrameCaptureLatestAction,
 	type SpectrometerAcquireSpectrumAction,
+	type StageGetPositionAction,
 	type StageMoveAbsoluteAndWaitAction,
 } from "./actions.ts";
 import type { FrameProviderResource, SpectrometerResource, StageResource } from "./resources.ts";
@@ -32,6 +33,7 @@ export interface RamanLivePreflightResult {
 
 export interface RamanStageRuntime {
 	resource: StageResource;
+	getPosition(action: StageGetPositionAction): Promise<ActionResult> | ActionResult;
 	moveAbsoluteAndWait(action: StageMoveAbsoluteAndWaitAction): Promise<ActionResult> | ActionResult;
 }
 

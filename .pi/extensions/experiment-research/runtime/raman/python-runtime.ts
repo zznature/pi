@@ -11,6 +11,7 @@ import {
 	type AutofocusRunSingleAction,
 	type FrameCaptureLatestAction,
 	type SpectrometerAcquireSpectrumAction,
+	type StageGetPositionAction,
 	type StageMoveAbsoluteAndWaitAction,
 } from "./actions.ts";
 import { registerRamanLiveRuntime, clearRamanLiveRuntime, type RamanLivePreflightResult, type RamanLiveRuntime } from "./live-runtime.ts";
@@ -23,9 +24,36 @@ import {
 	type StageResource,
 } from "./resources.ts";
 
-export const RAMAN_PYTHON_RUNTIME_CONFIG_PATH = join(".pi", "experiment-research", "raman-runtime.json");
+export const RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH = join(".pi", "raman-lab-config", "raman-runtime.local.json");
+export const RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH = join(".pi", "raman-lab-config", "raman-runtime.lab.json");
 
-interface RamanPythonRuntimeConfig {
+export type RamanPythonRuntimeConfigSource = "local" | "lab" | "none";
+
+export interface RamanPythonRuntimeConfigInfo {
+	source: RamanPythonRuntimeConfigSource;
+	path?: string;
+	enabled: boolean;
+	resources?: {
+		stage: {
+			resourceId: string;
+			driver: string;
+			port: string;
+			limits: StageResource["limits"];
+		};
+		frameProvider: {
+			resourceId: string;
+			driver: string;
+			bridgeDir: string;
+		};
+		spectrometer: {
+			resourceId: string;
+			driver: string;
+			bridgeDir: string;
+		};
+	};
+}
+
+export interface RamanPythonRuntimeConfig {
 	enabled: boolean;
 	pythonExecutable?: string;
 	pythonRoot?: string;
@@ -45,7 +73,18 @@ interface RamanPythonRuntimeConfig {
 	};
 }
 
-type PythonActionKind = "preflight" | "stage_move" | "frame_capture" | "autofocus" | "spectrum";
+interface RamanPythonRuntimeConfigCandidate {
+	source: Exclude<RamanPythonRuntimeConfigSource, "none">;
+	path: string;
+}
+
+interface LoadedRamanPythonRuntimeConfig {
+	source: Exclude<RamanPythonRuntimeConfigSource, "none">;
+	path: string;
+	config: RamanPythonRuntimeConfig;
+}
+
+type PythonActionKind = "preflight" | "stage_position" | "stage_move" | "frame_capture" | "autofocus" | "spectrum";
 
 interface PythonRequest {
 	action: PythonActionKind;
@@ -189,6 +228,22 @@ try:
             success("Python Raman preflight completed.", details)
         else:
             success("Python Raman preflight completed.", details)
+
+    elif action == "stage_position":
+        from stage.mc_newton_xyz_stage import MCNewtonXYZStageController
+        controller = MCNewtonXYZStageController(
+            stage["config"]["port"],
+            baudrate=stage["config"]["baudrate"],
+            x_channel=stage["config"]["xChannel"],
+            y_channel=stage["config"]["yChannel"],
+            z_channel=stage["config"]["zChannel"],
+        )
+        try:
+            controller.connect()
+            position = controller.get_position_um()
+            success("Stage position read.", {"position": {"xUm": position.x_um, "yUm": position.y_um, "zUm": position.z_um}})
+        finally:
+            controller.disconnect()
 
     elif action == "stage_move":
         from stage.mc_newton_xyz_stage import MCNewtonXYZStageController
@@ -502,11 +557,20 @@ async function runPythonBridge(
 	});
 }
 
-function readConfig(cwd: string): RamanPythonRuntimeConfig | undefined {
-	const path = join(cwd, RAMAN_PYTHON_RUNTIME_CONFIG_PATH);
-	if (!existsSync(path)) {
-		return undefined;
-	}
+function configCandidates(cwd: string): RamanPythonRuntimeConfigCandidate[] {
+	return [
+		{
+			source: "local",
+			path: join(cwd, RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH),
+		},
+		{
+			source: "lab",
+			path: join(cwd, RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH),
+		},
+	];
+}
+
+function readConfigFile(path: string): RamanPythonRuntimeConfig {
 	const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
 	if (!isRecord(parsed) || typeof parsed.enabled !== "boolean") {
 		throw new Error(`Invalid Raman Python runtime config at ${path}: enabled must be boolean.`);
@@ -520,6 +584,62 @@ function readConfig(cwd: string): RamanPythonRuntimeConfig | undefined {
 		throw new Error(`Invalid Raman Python runtime config at ${path}: enabled config requires valid stage, frameProvider, and spectrometer resources.`);
 	}
 	return parsed as unknown as RamanPythonRuntimeConfig;
+}
+
+function readConfig(cwd: string): LoadedRamanPythonRuntimeConfig | undefined {
+	for (const candidate of configCandidates(cwd)) {
+		const path = candidate.path;
+		if (!existsSync(path)) {
+			continue;
+		}
+		return {
+			source: candidate.source,
+			path,
+			config: readConfigFile(path),
+		};
+	}
+	return undefined;
+}
+
+export function getRamanPythonRuntimeConfigInfo(cwd: string): RamanPythonRuntimeConfigInfo {
+	const loaded = readConfig(cwd);
+	if (!loaded) {
+		return {
+			source: "none",
+			enabled: false,
+		};
+	}
+	const { config } = loaded;
+	if (!config.enabled) {
+		return {
+			source: loaded.source,
+			path: loaded.path,
+			enabled: false,
+		};
+	}
+	return {
+		source: loaded.source,
+		path: loaded.path,
+		enabled: config.enabled,
+		resources: {
+			stage: {
+				resourceId: config.stage.resourceId,
+				driver: config.stage.driver,
+				port: config.stage.config.port,
+				limits: config.stage.limits,
+			},
+			frameProvider: {
+				resourceId: config.frameProvider.resourceId,
+				driver: config.frameProvider.driver,
+				bridgeDir: config.frameProvider.config.bridgeDir,
+			},
+			spectrometer: {
+				resourceId: config.spectrometer.resourceId,
+				driver: config.spectrometer.driver,
+				bridgeDir: config.spectrometer.config.bridgeDir,
+			},
+		},
+	};
 }
 
 function createActionResult(response: PythonResponse, artifacts: ArtifactRef[] = []): ActionResult {
@@ -554,6 +674,15 @@ export function createRamanPythonRuntime(cwd: string, config: RamanPythonRuntime
 		},
 		stage: {
 			resource: resolvedConfig.stage,
+			getPosition: async (action: StageGetPositionAction): Promise<ActionResult> =>
+				createActionResult(
+					await runPythonBridge(
+						resolvedConfig,
+						"stage_position",
+						{ timeoutMs: action.timeoutMs },
+						action.timeoutMs + 10_000,
+					),
+				),
 			moveAbsoluteAndWait: async (action: StageMoveAbsoluteAndWaitAction): Promise<ActionResult> =>
 				createActionResult(
 					await runPythonBridge(
@@ -618,10 +747,11 @@ export function createRamanPythonRuntime(cwd: string, config: RamanPythonRuntime
 }
 
 export function registerConfiguredRamanPythonRuntime(cwd: string): boolean {
-	const config = readConfig(cwd);
-	if (!config) {
+	const loaded = readConfig(cwd);
+	if (!loaded) {
 		return false;
 	}
+	const { config } = loaded;
 	if (!config.enabled) {
 		clearRamanLiveRuntime(cwd);
 		return false;

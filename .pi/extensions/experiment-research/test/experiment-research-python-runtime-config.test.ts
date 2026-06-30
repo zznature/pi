@@ -1,12 +1,13 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import experimentResearchExtension from "../index.ts";
 import {
 	clearRamanLiveRuntime,
 	getRamanLiveRuntime,
-	RAMAN_PYTHON_RUNTIME_CONFIG_PATH,
+	RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH,
+	RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH,
 	type RamanLiveRuntime,
 	registerRamanLiveRuntime,
 	successActionResult,
@@ -60,7 +61,7 @@ function loadExperimentExtension(): CapturedExtension {
 	return { tools, handlers };
 }
 
-function createRuntimeConfig(enabled: boolean): Record<string, unknown> {
+function createRuntimeConfig(enabled: boolean, port = "COM5"): Record<string, unknown> {
 	return {
 		enabled,
 		pythonExecutable: "python",
@@ -71,7 +72,7 @@ function createRuntimeConfig(enabled: boolean): Record<string, unknown> {
 			runtime: "raman_python",
 			driver: "mc_newton_xyz",
 			config: {
-				port: "COM5",
+				port,
 				xChannel: 1,
 				yChannel: 2,
 				zChannel: 3,
@@ -114,10 +115,16 @@ function createRuntimeConfig(enabled: boolean): Record<string, unknown> {
 	};
 }
 
-function writeRuntimeConfig(cwd: string, enabled: boolean): void {
-	const configPath = join(cwd, RAMAN_PYTHON_RUNTIME_CONFIG_PATH);
-	mkdirSync(join(configPath, ".."), { recursive: true });
-	writeFileSync(configPath, `${JSON.stringify(createRuntimeConfig(enabled), null, 2)}\n`, "utf-8");
+function writeRuntimeConfig(cwd: string, relativePath: string, enabled: boolean, port = "COM5"): void {
+	const configPath = join(cwd, relativePath);
+	mkdirSync(dirname(configPath), { recursive: true });
+	writeFileSync(configPath, `${JSON.stringify(createRuntimeConfig(enabled, port), null, 2)}\n`, "utf-8");
+}
+
+function writeDisabledRuntimeConfig(cwd: string, relativePath: string): void {
+	const configPath = join(cwd, relativePath);
+	mkdirSync(dirname(configPath), { recursive: true });
+	writeFileSync(configPath, `${JSON.stringify({ enabled: false }, null, 2)}\n`, "utf-8");
 }
 
 function createNoHardwareRuntime(): RamanLiveRuntime {
@@ -127,6 +134,11 @@ function createNoHardwareRuntime(): RamanLiveRuntime {
 		},
 		stage: {
 			resource: createRuntimeConfig(true).stage as RamanLiveRuntime["stage"]["resource"],
+			getPosition() {
+				return successActionResult("not used", {
+					position: { xUm: 0, yUm: 0, zUm: 0 },
+				});
+			},
 			moveAbsoluteAndWait() {
 				return successActionResult("not used");
 			},
@@ -152,20 +164,56 @@ function createNoHardwareRuntime(): RamanLiveRuntime {
 }
 
 describe("experiment research Python Raman runtime config", () => {
-	it("registers the Python live runtime from enabled workspace config without touching hardware", async () => {
+	it("registers the Python live runtime from enabled lab config without touching hardware", async () => {
 		const cwd = createTempCwd();
-		writeRuntimeConfig(cwd, true);
+		writeRuntimeConfig(cwd, RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH, true);
 		const extension = loadExperimentExtension();
 		const [sessionStart] = extension.handlers.get("session_start") ?? [];
 
 		await sessionStart?.({ type: "session_start", reason: "startup" }, { cwd } as ExtensionContext);
 
 		expect(getRamanLiveRuntime(cwd)).toBeDefined();
+		const labState = await extension.tools
+			.get("get_lab_state")
+			?.execute("lab-state", {}, undefined, undefined, { cwd } as ExtensionContext);
+		const details = labState?.details as Record<string, unknown>;
+		const stateAfter = details.stateAfter as Record<string, unknown>;
+		expect(stateAfter.runtimeConfig).toEqual(
+			expect.objectContaining({
+				source: "lab",
+				enabled: true,
+			}),
+		);
 	});
 
-	it("keeps hardware disabled when config is explicitly disabled", async () => {
+	it("prefers local config over lab config", async () => {
 		const cwd = createTempCwd();
-		writeRuntimeConfig(cwd, false);
+		writeRuntimeConfig(cwd, RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH, true, "COM5");
+		writeRuntimeConfig(cwd, RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH, true, "COM17");
+		const extension = loadExperimentExtension();
+		const [sessionStart] = extension.handlers.get("session_start") ?? [];
+
+		await sessionStart?.({ type: "session_start", reason: "startup" }, { cwd } as ExtensionContext);
+
+		const runtime = getRamanLiveRuntime(cwd);
+		expect(runtime?.stage.resource.config.port).toBe("COM17");
+		const labState = await extension.tools
+			.get("get_lab_state")
+			?.execute("lab-state", {}, undefined, undefined, { cwd } as ExtensionContext);
+		const details = labState?.details as Record<string, unknown>;
+		const stateAfter = details.stateAfter as Record<string, unknown>;
+		expect(stateAfter.runtimeConfig).toEqual(
+			expect.objectContaining({
+				source: "local",
+				enabled: true,
+			}),
+		);
+	});
+
+	it("keeps hardware disabled when local config is explicitly disabled", async () => {
+		const cwd = createTempCwd();
+		writeRuntimeConfig(cwd, RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH, true);
+		writeDisabledRuntimeConfig(cwd, RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH);
 		registerRamanLiveRuntime(cwd, createNoHardwareRuntime());
 		const extension = loadExperimentExtension();
 		const [sessionStart] = extension.handlers.get("session_start") ?? [];
@@ -179,5 +227,11 @@ describe("experiment research Python Raman runtime config", () => {
 		const details = labState?.details as Record<string, unknown>;
 		const stateAfter = details.stateAfter as Record<string, unknown>;
 		expect(stateAfter.canExecuteLiveSinglePointRuns).toBe(false);
+		expect(stateAfter.runtimeConfig).toEqual(
+			expect.objectContaining({
+				source: "local",
+				enabled: false,
+			}),
+		);
 	});
 });

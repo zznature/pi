@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { EXPERIMENT_RESEARCH_PROMPT } from "./prompt.ts";
+import { ramanGetHardwareStatusTool, ramanGetStagePositionTool, ramanStageMoveRelativeTool } from "./tools/operator.ts";
 import { getLabCapabilitiesTool, getLabStateTool, runPreflightTool, validateProcedureSpecTool } from "./tools/planner.ts";
 import { abortRunTool, approveAndStartRunTool, pauseRunTool, pollRunTool, proposeRunTool, runProcedureTool } from "./tools/runtime.ts";
 import { registerConfiguredRamanPythonRuntime } from "./runtime/raman/index.ts";
@@ -14,6 +15,9 @@ const PLANNER_TOOL_NAMES = [
 	"poll_run",
 	"pause_run",
 	"abort_run",
+	"raman_get_hardware_status",
+	"raman_get_stage_position",
+	"raman_stage_move_relative",
 ];
 
 export default function experimentResearchExtension(pi: ExtensionAPI) {
@@ -21,6 +25,9 @@ export default function experimentResearchExtension(pi: ExtensionAPI) {
 	pi.registerTool(getLabStateTool);
 	pi.registerTool(validateProcedureSpecTool);
 	pi.registerTool(runPreflightTool);
+	pi.registerTool(ramanGetHardwareStatusTool);
+	pi.registerTool(ramanGetStagePositionTool);
+	pi.registerTool(ramanStageMoveRelativeTool);
 	pi.registerTool(proposeRunTool);
 	pi.registerTool(approveAndStartRunTool);
 	pi.registerTool(runProcedureTool);

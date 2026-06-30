@@ -50,6 +50,15 @@ export const StageMoveAbsoluteAndWaitActionSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+export const StageGetPositionActionSchema = Type.Object(
+	{
+		action: Type.Literal("stage.get_position"),
+		resourceId: Type.String({ minLength: 1 }),
+		timeoutMs: Type.Integer({ minimum: 1 }),
+	},
+	{ additionalProperties: false },
+);
+
 export const AutofocusRunSingleActionSchema = Type.Object(
 	{
 		action: Type.Literal("autofocus.run_single"),
@@ -108,6 +117,7 @@ export const SpectrometerAcquireSpectrumActionSchema = Type.Object(
 );
 
 export const RamanRuntimeActionSchema = Type.Union([
+	StageGetPositionActionSchema,
 	StageMoveAbsoluteAndWaitActionSchema,
 	AutofocusRunSingleActionSchema,
 	FrameCaptureLatestActionSchema,
@@ -117,6 +127,7 @@ export const RamanRuntimeActionSchema = Type.Union([
 export type ActionStatus = Static<typeof ActionStatusSchema>;
 export type ActionError = Static<typeof ActionErrorSchema>;
 export type ActionResult = Static<typeof ActionResultSchema>;
+export type StageGetPositionAction = Static<typeof StageGetPositionActionSchema>;
 export type StageMoveAbsoluteAndWaitAction = Static<typeof StageMoveAbsoluteAndWaitActionSchema>;
 export type AutofocusRunSingleAction = Static<typeof AutofocusRunSingleActionSchema>;
 export type FrameCaptureLatestAction = Static<typeof FrameCaptureLatestActionSchema>;
@@ -124,6 +135,7 @@ export type SpectrometerAcquireSpectrumAction = Static<typeof SpectrometerAcquir
 export type RamanRuntimeAction = Static<typeof RamanRuntimeActionSchema>;
 
 export const ActionResultValidator = compileSchema(ActionResultSchema);
+export const StageGetPositionActionValidator = compileSchema(StageGetPositionActionSchema);
 export const StageMoveAbsoluteAndWaitActionValidator = compileSchema(StageMoveAbsoluteAndWaitActionSchema);
 export const AutofocusRunSingleActionValidator = compileSchema(AutofocusRunSingleActionSchema);
 export const FrameCaptureLatestActionValidator = compileSchema(FrameCaptureLatestActionSchema);
