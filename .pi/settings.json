@@ -1,5 +1,14 @@
 {
   "packages": [
-    "npm:pi-web-access"
+    {
+      "source": "npm:pi-web-access",
+      "extensions": [],
+      "skills": [],
+      "prompts": [],
+      "themes": []
+    }
+  ],
+  "extensions": [
+    "!extensions/experiment-research-legacy/**"
   ]
 }
