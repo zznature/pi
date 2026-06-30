@@ -1,4 +1,4 @@
-# Raman 硬件与 Tool 接入方案
+﻿# Raman 硬件与 Tool 接入方案
 
 本文不讨论 kernel 的执行状态机。那部分已经在 `kernel-execution-model.md` 里定义。
 
@@ -25,7 +25,7 @@ Raman 不是最终架构本身，而是第一块真实硬件样板。
    - stage
    - frame capture
    - autofocus
-   - XY correction
+   - XY correction (future/reference only)
    - spectrum acquisition
 3. 足够复杂，能逼出一套通用硬件接入边界
 
@@ -82,7 +82,7 @@ Raman 不是最终架构本身，而是第一块真实硬件样板。
 | stage | `stage/models.py`, `stage/mc_newton_xyz_stage.py` | 真实 XYZ stage driver |
 | autofocus frame bridge | `autofocus/labspec_file_bridge.py` | LabSpec worker frame provider |
 | autofocus logic | `autofocus/models.py`, `autofocus/scanner.py`, `autofocus/controller.py` | 单点 autofocus 复合动作 |
-| XY correction | `calibration/xy_corrector.py`, `calibration/stage_adapter.py` | 图像配准与位移执行 |
+| XY correction | `calibration/xy_corrector.py`, `calibration/stage_adapter.py` | reference-only; not part of MVP runtime surface |
 | spectrum acquisition | `mapping/labspec.py`, `acquire-spectrum/request_labspec_spectrum.py` | 单点采谱 |
 | mapping reference | `mapping/planner.py`, `mapping/runner.py` | 领域参考实现，不是最终 kernel |
 
@@ -162,7 +162,7 @@ simulationAvailable: false
 - `ProcedureSpec.resources` 只引用 `resourceId`
 - runtime 负责把 `resourceId` 解析成真实 driver session
 
-## 6. Raman driver 分层
+## 6. Raman Driver 分层
 
 本文把 Raman 接入分成三层：
 
@@ -174,7 +174,7 @@ simulationAvailable: false
 
 贴近设备原语，不理解实验目标。
 
-#### Stage driver
+#### Stage Driver
 
 建议基于：
 
@@ -190,7 +190,7 @@ simulationAvailable: false
 - `stop`
 - `disconnect`
 
-#### Frame driver
+#### Frame Driver
 
 建议基于：
 
@@ -204,7 +204,7 @@ simulationAvailable: false
 
 不要把“启动 video session 后轮询 frame 文件夹”的细节泄漏给上层。
 
-#### Spectrum driver
+#### Spectrum Driver
 
 建议基于：
 
@@ -244,14 +244,16 @@ MVP 不必一开始拆到 `begin / poll / collect`。
 - `fineCurveArtifact?`
 - `message`
 
-#### XY correction
+#### XY Correction（MVP 不实现，reference-only）
+
+> XY correction 在当前 MVP 不接入。本小节保留为 reference，用于未来 mapping 累积误差补偿增量。详见 `implementation-plan.md` 的 Open issues。
 
 基于：
 
 - `calibration/xy_corrector.py`
 - `calibration/stage_adapter.py`
 
-建议暴露为：
+未来若启用，建议暴露为：
 
 - `xy_correction.estimate_and_apply`
 
@@ -263,7 +265,7 @@ MVP 不必一开始拆到 `begin / poll / collect`。
 - `referenceFrameArtifact`
 - `currentFrameArtifact`
 
-#### Spectrum acquisition wrapper
+#### Spectrum Acquisition Wrapper
 
 基于：
 
@@ -295,11 +297,11 @@ tool 要回答的是：
 
 - 哪些 Python 函数存在
 
-## 7. Planner / Operator tool 分工
+## 7. Planner / Operator Tool 分工
 
 Raman 接入至少应区分两类 tool surface。
 
-### 7.1 Planner-facing tools
+### 7.1 Planner-Facing Tools
 
 planner 只能看到实验管理和实验能力入口，例如：
 
@@ -315,7 +317,7 @@ planner 只能看到实验管理和实验能力入口，例如：
 - 让 planner 生成与发起 `ProcedureSpec`
 - 不让 planner 直接碰 Raman driver
 
-### 7.2 Operator / maintenance tools
+### 7.2 Operator / Maintenance Tools
 
 operator 需要的不是完整实验入口，而是现场维护与证据链工具，例如：
 
@@ -323,13 +325,13 @@ operator 需要的不是完整实验入口，而是现场维护与证据链工�
 - `pause_run`
 - `abort_run`
 - `raman_active_probe`
-- `raman_record_xy_calibration`
-- `raman_fit_xy_calibration`
+- `raman_record_xy_calibration`（MVP 不实现，随 XY correction 一并推迟）
+- `raman_fit_xy_calibration`（MVP 不实现，随 XY correction 一并推迟）
 - `raman_check_hardware_validation`
 
 这些 tool 可以有更明确的硬件意味，但仍然不应退化成裸驱动命令。
 
-### 7.3 明确不暴露为 planner tool 的能力
+### 7.3 明确不暴露为 Planner Tool 的能力
 
 下面这些不能直接给 planner：
 
@@ -343,7 +345,7 @@ operator 需要的不是完整实验入口，而是现场维护与证据链工�
 
 如果这些能力进了 planner surface，Agent 就会直接开始拼驱动调用。
 
-## 8. Raman runtime action 面
+## 8. Raman Runtime Action 面
 
 tool surface 之下，runtime 需要稳定 action contract。
 
@@ -370,7 +372,7 @@ frame.capture_latest
 autofocus.run_single
 ```
 
-### XY correction
+### XY Correction（MVP 不实现，reference-only）
 
 ```text
 xy_correction.estimate_and_apply
@@ -400,7 +402,7 @@ resources:
 limits:
   maxLaserPowerMw: 1.0
   minObjectiveClearanceUm: 200.0
-  maxXyCorrectionUm: 5.0
+  # maxXyCorrectionUm: 5.0  # MVP 不实现，随 XY correction 一并推迟
 plan:
   kind: grid_scan
   grid:
@@ -414,7 +416,6 @@ plan:
     - kind: move_to_point
     - kind: autofocus
     - kind: capture_frame
-    - kind: apply_xy_correction
     - kind: acquire_spectrum
 domain:
   raman:
@@ -426,11 +427,12 @@ domain:
         coarseStepUm: 10
         fineRangeUm: 15
         fineStepUm: 2
-    xyCorrection:
-      enabled: true
-      minConfidence: 0.4
-      maxCorrectionUm: 5.0
-      calibrationId: xy-calib-202606
+    # xyCorrection: MVP 不实现（reference-only），启用前不要把 apply_xy_correction 放进 perPoint
+    # xyCorrection:
+    #   enabled: true
+    #   minConfidence: 0.4
+    #   maxCorrectionUm: 5.0
+    #   calibrationId: xy-calib-202606
     acquisition:
       integrationTimeS: 10
       accumulations: 1
@@ -448,18 +450,17 @@ domain:
 
 ## 10. 预检与维护工具如何接 Raman
 
-Raman 是真实硬件，因此只靠 `run_experiment` 不够，还需要 operator-only 的维护入口。
+Raman 是真实硬件，因此只靠 `approve_and_start_run` 不够，还需要 operator-only 的维护入口。
 
-### 10.1 Read-only preflight
+### 10.1 Read-Only Preflight
 
 应检查：
 
 - stage 能否连接并读位置
 - frame bridge 目录可用性
 - spectrum bridge 目录可用性
-- calibration artifact 是否存在
 
-### 10.2 Active probe
+### 10.2 Active Probe
 
 应允许 operator 显式做：
 
@@ -468,13 +469,15 @@ Raman 是真实硬件，因此只靠 `run_experiment` 不够，还需要 operato
 
 但这类动作不能混入 planner 的 dry-run 语义。
 
-### 10.3 Calibration tools
+### 10.3 Calibration Tools（MVP 不实现，随 XY correction 一并推迟）
+
+> 标定工具链服务于 XY correction，当前 MVP 不接入。本小节保留为 reference。
 
 Raman 特有但很现实的一类维护操作是标定：
 
 - 记录 XY calibration
 - 拟合 calibration
-- 审核 calibration artifact
+- calibration artifact review is future/reference only
 
 这些操作不属于 planner 的日常实验策略，而属于 operator / maintenance surface。
 
@@ -482,14 +485,15 @@ Raman 特有但很现实的一类维护操作是标定：
 
 Raman 接入时，必须明确哪些产物由 runtime 产出并登记。
 
-至少应包括：
+MVP 最小必需产物应包括：
 
 - frame 原图
 - autofocus coarse/fine 曲线
-- XY correction reference/current frame
 - spectrum 原始 txt
 - spectrum plot
 - LabSpec request/result 文件
+
+> `XY correction reference/current frame` artifacts remain future/reference only and are outside the MVP artifact baseline.
 
 这里的原则是：
 
@@ -501,18 +505,19 @@ Raman 接入时，必须明确哪些产物由 runtime 产出并登记。
 
 Raman 接入必须把 Python 异常归一化成结构化错误码，而不是把 traceback 暴露给 kernel 或 Agent。
 
-建议最少区分：
+MVP 最小错误模型建议至少区分：
 
 - `stage_connection_error`
 - `stage_timeout`
 - `frame_timeout`
 - `autofocus_no_peak`
 - `autofocus_low_confidence`
-- `xy_correction_low_confidence`
 - `spectrum_request_pending`
 - `spectrum_timeout`
 - `worker_result_error`
 - `bridge_protocol_error`
+
+> `xy_correction_low_confidence` remains a future/reference error code and is outside the MVP error surface.
 
 并且每个错误至少带：
 
@@ -552,7 +557,7 @@ Raman 接入必须把 Python 异常归一化成结构化错误码，而不是把
 - frame provider 资源
 - spectrometer 资源
 
-### Phase 2: 收敛 Raman drivers
+### Phase 2: 收敛 Raman Drivers
 
 先完成：
 
@@ -560,15 +565,15 @@ Raman 接入必须把 Python 异常归一化成结构化错误码，而不是把
 - frame driver
 - spectrum driver
 
-### Phase 3: 收敛 composite actions
+### Phase 3: 收敛 Composite Actions
 
 再完成：
 
 - autofocus
-- XY correction
 - single spectrum acquisition wrapper
+- （XY correction 推迟，MVP 不实现）
 
-### Phase 4: 收敛 tool surface
+### Phase 4: 收敛 Tool Surface
 
 分别整理：
 
