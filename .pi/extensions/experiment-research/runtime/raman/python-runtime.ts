@@ -26,6 +26,7 @@ import {
 
 export const RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH = join(".pi", "raman-lab-config", "raman-runtime.local.json");
 export const RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH = join(".pi", "raman-lab-config", "raman-runtime.lab.json");
+export const RAMAN_HARDWARE_PYTHON_DRIVER_PATH = join(".pi", "raman-lab-config", "hardware-python-driver");
 
 export type RamanPythonRuntimeConfigSource = "local" | "lab" | "none";
 
@@ -468,7 +469,7 @@ async function runPythonBridge(
 ): Promise<PythonResponse> {
 	const request: PythonRequest = {
 		action,
-		pythonRoot: resolve(config.pythonRoot ?? join(process.cwd(), "docs", "Raman")),
+		pythonRoot: resolve(config.pythonRoot ?? join(process.cwd(), RAMAN_HARDWARE_PYTHON_DRIVER_PATH)),
 		stage: config.stage,
 		frameProvider: config.frameProvider,
 		spectrometer: config.spectrometer,
@@ -652,7 +653,7 @@ function createActionResult(response: PythonResponse, artifacts: ArtifactRef[] =
 export function createRamanPythonRuntime(cwd: string, config: RamanPythonRuntimeConfig): RamanLiveRuntime {
 	const resolvedConfig: RamanPythonRuntimeConfig = {
 		...config,
-		pythonRoot: resolve(cwd, config.pythonRoot ?? join("docs", "Raman")),
+		pythonRoot: resolve(cwd, config.pythonRoot ?? RAMAN_HARDWARE_PYTHON_DRIVER_PATH),
 	};
 	return {
 		preflight: async (): Promise<RamanLivePreflightResult> => {

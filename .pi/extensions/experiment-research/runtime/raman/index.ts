@@ -71,6 +71,7 @@ export {
 export {
 	RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH,
 	RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH,
+	RAMAN_HARDWARE_PYTHON_DRIVER_PATH,
 	createRamanPythonRuntime,
 	getRamanPythonRuntimeConfigInfo,
 	registerConfiguredRamanPythonRuntime,

@@ -8,6 +8,7 @@ import {
 	getRamanLiveRuntime,
 	RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH,
 	RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH,
+	RAMAN_HARDWARE_PYTHON_DRIVER_PATH,
 	type RamanLiveRuntime,
 	registerRamanLiveRuntime,
 	successActionResult,
@@ -65,7 +66,7 @@ function createRuntimeConfig(enabled: boolean, port = "COM5"): Record<string, un
 	return {
 		enabled,
 		pythonExecutable: "python",
-		pythonRoot: "docs/Raman",
+		pythonRoot: RAMAN_HARDWARE_PYTHON_DRIVER_PATH,
 		stage: {
 			resourceId: "stage-main",
 			kind: "stage",

@@ -584,6 +584,9 @@ docs freeze
 - [x] 支持 git-ignored 本地覆盖 `.pi/raman-lab-config/raman-runtime.local.json`
 - [x] runtime 配置加载优先级固定为 `local > lab > none`
 - [x] `get_lab_state` 暴露 runtime config source 和配置资源摘要
+- [x] live runtime Python import root 固化到 `.pi/raman-lab-config/hardware-python-driver`
+- [x] `docs/Raman` 降级为 reference/prototype，不再进入 live runtime import path
+- [x] vendor wheel 固化到 `.pi/raman-lab-config/hardware-python-driver/vendor`，live driver 不再从 `assets/manuals` 查找 SDK
 
 ### Exit Criteria
 

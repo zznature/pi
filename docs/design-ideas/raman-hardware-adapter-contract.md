@@ -187,6 +187,23 @@ raman-runtime.local.json > raman-runtime.lab.json > no live runtime
 
 这避免把临时现场调整写回实验室默认配置，同时让设备少变的实验室环境具备稳定初始化上下文。
 
+Live runtime 使用的 Python 硬件驱动固定在：
+
+```text
+.pi/raman-lab-config/hardware-python-driver
+```
+
+`raman-runtime.lab.json` 的 `pythonRoot` 应指向该目录。
+该目录同时包含真实硬件 driver 所需的 vendor wheel：
+
+```text
+.pi/raman-lab-config/hardware-python-driver/vendor
+```
+
+`docs/Raman` 仅作为 research prototype / reference source，不进入 live runtime import path；
+`assets/manuals` 仅作为原始资料归档，不进入 live runtime SDK lookup path。
+因此修改 `docs/Raman` 或 `assets/manuals` 不应改变 LabAgent 的真实硬件行为。
+
 ## 6. Raman Driver 分层
 
 本文把 Raman 接入分成三层：

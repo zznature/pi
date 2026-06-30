@@ -86,7 +86,7 @@ Current lab default:
 {
   "enabled": true,
   "pythonExecutable": "python",
-  "pythonRoot": "docs/Raman",
+  "pythonRoot": ".pi/raman-lab-config/hardware-python-driver",
   "stage": {
     "resourceId": "stage-main",
     "kind": "stage",
