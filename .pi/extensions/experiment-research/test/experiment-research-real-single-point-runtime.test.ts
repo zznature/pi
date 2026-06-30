@@ -183,6 +183,11 @@ function createLiveRuntime(
 					zRangeUm: [0, 5_000],
 				},
 			},
+			getPosition() {
+				return successActionResult("Stage position read.", {
+					position: { xUm: 1000, yUm: 2000, zUm: 250 },
+				});
+			},
 			moveAbsoluteAndWait(action) {
 				return successActionResult("Stage moved.", {
 					finalPosition: action.target,

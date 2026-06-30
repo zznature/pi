@@ -73,6 +73,9 @@ describe("experiment research rebuild skeleton", () => {
 				"poll_run",
 				"pause_run",
 				"abort_run",
+				"raman_get_hardware_status",
+				"raman_get_stage_position",
+				"raman_stage_move_relative",
 			]),
 		);
 
@@ -85,8 +88,9 @@ describe("experiment research rebuild skeleton", () => {
 			}),
 		);
 		expect(promptResult.systemPrompt).toContain("base prompt");
-		expect(promptResult.systemPrompt).toContain("MVP rebuild mode");
-		expect(promptResult.systemPrompt).toContain("registered Raman live runtime");
+		expect(promptResult.systemPrompt).toContain("Lab Agent");
+		expect(promptResult.systemPrompt).toContain("raman_get_hardware_status");
+		expect(promptResult.systemPrompt).toContain("Raman hardware");
 		expect(promptResult.systemPrompt).toContain("propose_run followed by approve_and_start_run");
 	});
 

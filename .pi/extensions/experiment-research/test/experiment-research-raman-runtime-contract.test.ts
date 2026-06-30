@@ -8,6 +8,7 @@ import {
 	RamanResourceValidator,
 	RamanRuntimeActionValidator,
 	SpectrometerAcquireSpectrumActionValidator,
+	StageGetPositionActionValidator,
 	StageMoveAbsoluteAndWaitActionValidator,
 	StageResourceValidator,
 	successActionResult,
@@ -71,6 +72,11 @@ describe("experiment research Raman runtime contract", () => {
 	});
 
 	it("accepts the MVP runtime actions for motion, autofocus, frame capture, and spectrum acquisition", () => {
+		const getPositionAction = {
+			action: "stage.get_position",
+			resourceId: "mc_newton_xyz_main",
+			timeoutMs: 2_000,
+		};
 		const moveAction = {
 			action: "stage.move_absolute_and_wait",
 			resourceId: "mc_newton_xyz_main",
@@ -107,10 +113,12 @@ describe("experiment research Raman runtime contract", () => {
 			timeoutMs: 30_000,
 		};
 
+		expect(StageGetPositionActionValidator.Check(getPositionAction)).toBe(true);
 		expect(StageMoveAbsoluteAndWaitActionValidator.Check(moveAction)).toBe(true);
 		expect(AutofocusRunSingleActionValidator.Check(autofocusAction)).toBe(true);
 		expect(FrameCaptureLatestActionValidator.Check(frameAction)).toBe(true);
 		expect(SpectrometerAcquireSpectrumActionValidator.Check(spectrumAction)).toBe(true);
+		expect(RamanRuntimeActionValidator.Check(getPositionAction)).toBe(true);
 		expect(RamanRuntimeActionValidator.Check(moveAction)).toBe(true);
 		expect(RamanRuntimeActionValidator.Check(autofocusAction)).toBe(true);
 		expect(RamanRuntimeActionValidator.Check(frameAction)).toBe(true);
