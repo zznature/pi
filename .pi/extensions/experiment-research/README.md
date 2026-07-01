@@ -60,8 +60,10 @@ Current status:
   - `resources.ts`
   - `actions.ts`
   - `live-runtime.ts`
-  - `python-runtime.ts`
+  - `python-runtime.ts` (persistent Python hardware daemon client)
   - `index.ts`
+- the live Python hardware driver entrypoint lives at
+  `.pi/raman-lab-config/hardware-python-driver/raman_runtime_daemon.py`
 - stage-only operator reads and nudges use the registered Raman live runtime directly.
   They do not require a Raman `ProcedureSpec`, frame provider, or spectrometer
   resource unless the operation itself needs those devices.
@@ -150,6 +152,44 @@ The committed lab default lives at:
 
 ```text
 .pi/raman-lab-config/raman-runtime.lab.json
+```
+
+## Live Raman Runtime Transport (Persistent Daemon)
+
+The Python live runtime talks to one long-lived hardware daemon instead of
+spawning a fresh process per action:
+
+```text
+.pi/raman-lab-config/hardware-python-driver/raman_runtime_daemon.py
+```
+
+`createRamanPythonRuntime` spawns this script lazily on the first action and
+keeps it alive, so a multi-point mapping run connects to the stage and LabSpec
+frame bridge once instead of reconnecting on every move/autofocus/frame/spectrum
+action. Properties relevant to mapping reliability:
+
+- **One persistent session.** Stage and frame-provider sessions are opened on
+  first use and reused for the whole run. Stage channels are disabled after each
+  motion (no axis left energized between actions), but the serial connection
+  stays open.
+- **Serialized access.** All actions and operator tools share one daemon and are
+  queued one-at-a-time, so the single hardware session is never touched
+  concurrently. This is a transport-level correctness guarantee, not a policy
+  lease (multi-agent lease arbitration remains a target-state item).
+- **Timeout recovery.** A timed-out action kills and resets the daemon; the next
+  action respawns it. Hard safety limits (motion bounds, objective clearance,
+  laser power) are still enforced in TypeScript before each action regardless of
+  transport.
+- **Idle release.** After `daemon.idleShutdownMs` (default 30000 ms) with no
+  action, the daemon shuts down cleanly and releases the serial port so other
+  lab software can use it; the next action respawns it.
+
+Optional config (in `raman-runtime.lab.json` / `raman-runtime.local.json`):
+
+```json
+{
+  "daemon": { "idleShutdownMs": 30000 }
+}
 ```
 
 ## Tests

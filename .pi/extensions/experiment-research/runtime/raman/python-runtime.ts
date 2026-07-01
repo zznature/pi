@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ArtifactRef } from "../../schemas/tool-result.ts";
@@ -27,6 +27,10 @@ import {
 export const RAMAN_PYTHON_RUNTIME_LOCAL_CONFIG_PATH = join(".pi", "raman-lab-config", "raman-runtime.local.json");
 export const RAMAN_PYTHON_RUNTIME_LAB_CONFIG_PATH = join(".pi", "raman-lab-config", "raman-runtime.lab.json");
 export const RAMAN_HARDWARE_PYTHON_DRIVER_PATH = join(".pi", "raman-lab-config", "hardware-python-driver");
+export const RAMAN_RUNTIME_DAEMON_SCRIPT = "raman_runtime_daemon.py";
+
+const DEFAULT_DAEMON_IDLE_SHUTDOWN_MS = 30_000;
+const DAEMON_GRACEFUL_KILL_MS = 2_000;
 
 export type RamanPythonRuntimeConfigSource = "local" | "lab" | "none";
 
@@ -72,6 +76,9 @@ export interface RamanPythonRuntimeConfig {
 		targetPeakMinWavenumber?: number;
 		targetPeakMaxWavenumber?: number;
 	};
+	daemon?: {
+		idleShutdownMs?: number;
+	};
 }
 
 interface RamanPythonRuntimeConfigCandidate {
@@ -87,7 +94,8 @@ interface LoadedRamanPythonRuntimeConfig {
 
 type PythonActionKind = "preflight" | "stage_position" | "stage_move" | "frame_capture" | "autofocus" | "spectrum";
 
-interface PythonRequest {
+interface PythonRequestEnvelope {
+	requestId: string;
 	action: PythonActionKind;
 	pythonRoot: string;
 	stage: StageResource;
@@ -113,279 +121,6 @@ interface PythonFailure {
 }
 
 type PythonResponse = PythonSuccess | PythonFailure;
-
-const PYTHON_BRIDGE_SOURCE = String.raw`
-import json
-import math
-import statistics
-import sys
-from pathlib import Path
-
-def emit(value):
-    print(json.dumps(value, ensure_ascii=False))
-
-def fail(error_code, message, retry_safe=False, needs_operator=True, safe_to_resume=False, payload=None):
-    emit({
-        "ok": False,
-        "errorCode": error_code,
-        "message": message,
-        "retrySafe": retry_safe,
-        "needsOperator": needs_operator,
-        "safeToResume": safe_to_resume,
-        "payload": payload or {},
-    })
-
-def success(summary, payload=None):
-    emit({"ok": True, "summary": summary, "payload": payload or {}})
-
-def stable_file(path):
-    try:
-        if not path.exists() or path.stat().st_size <= 0:
-            return False
-        return True
-    except OSError:
-        return False
-
-def latest_frame_path(bridge_dir, image_format):
-    frame_dir = bridge_dir / "frames"
-    candidates = sorted(frame_dir.glob(f"*.{image_format}"), key=lambda p: p.stat().st_mtime if p.exists() else 0)
-    for path in reversed(candidates):
-        if stable_file(path):
-            return str(path)
-    return ""
-
-def parse_spectrum_metrics(output_path, saturation_intensity=None, target_min=None, target_max=None):
-    if not output_path:
-        return {"saturated": False, "snr": 0.0, "targetPeakBaselineRatio": 0.0}
-    path = Path(output_path)
-    if not path.exists():
-        return {"saturated": False, "snr": 0.0, "targetPeakBaselineRatio": 0.0}
-    points = []
-    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        parts = line.replace(",", " ").split()
-        values = []
-        for part in parts:
-            try:
-                values.append(float(part))
-            except ValueError:
-                pass
-        if len(values) >= 2:
-            points.append((values[0], values[1]))
-        elif len(values) == 1:
-            points.append((float(len(points)), values[0]))
-    if not points:
-        return {"saturated": False, "snr": 0.0, "targetPeakBaselineRatio": 0.0}
-    intensities = [point[1] for point in points]
-    baseline = statistics.median(intensities)
-    noise = statistics.pstdev(intensities) if len(intensities) > 1 else 0.0
-    peak = max(intensities)
-    if target_min is not None and target_max is not None:
-        target_values = [value for x, value in points if target_min <= x <= target_max]
-        if target_values:
-            peak = max(target_values)
-    snr = (peak - baseline) / noise if noise > 0 else 0.0
-    denominator = abs(baseline) if abs(baseline) > 1e-9 else 1.0
-    return {
-        "saturated": bool(saturation_intensity is not None and max(intensities) >= saturation_intensity),
-        "snr": float(max(0.0, snr)),
-        "targetPeakBaselineRatio": float(peak / denominator),
-    }
-
-try:
-    request = json.loads(sys.stdin.read())
-    python_root = Path(request["pythonRoot"]).resolve()
-    sys.path.insert(0, str(python_root))
-    action = request["action"]
-    stage = request["stage"]
-    frame_provider = request["frameProvider"]
-    spectrometer = request["spectrometer"]
-    payload = request.get("payload", {})
-
-    if action == "preflight":
-        details = {
-            "pythonRootExists": python_root.exists(),
-            "frameBridgeDirExists": Path(frame_provider["config"]["bridgeDir"]).exists(),
-            "spectrumBridgeDirExists": Path(spectrometer["config"]["bridgeDir"]).exists(),
-        }
-        if payload.get("requirePythonRoot", True) and not details["pythonRootExists"]:
-            fail("python_root_missing", f"Python root does not exist: {python_root}", payload=details)
-        elif payload.get("requireBridgeDirs", False) and (not details["frameBridgeDirExists"] or not details["spectrumBridgeDirExists"]):
-            fail("bridge_dir_missing", "One or more LabSpec bridge directories are missing.", payload=details)
-        elif payload.get("connectStage", False):
-            from stage.mc_newton_xyz_stage import MCNewtonXYZStageController
-            controller = MCNewtonXYZStageController(
-                stage["config"]["port"],
-                baudrate=stage["config"]["baudrate"],
-                x_channel=stage["config"]["xChannel"],
-                y_channel=stage["config"]["yChannel"],
-                z_channel=stage["config"]["zChannel"],
-            )
-            try:
-                controller.connect()
-                position = controller.get_position_um()
-                details["stagePosition"] = {"xUm": position.x_um, "yUm": position.y_um, "zUm": position.z_um}
-            finally:
-                controller.disconnect()
-            success("Python Raman preflight completed.", details)
-        else:
-            success("Python Raman preflight completed.", details)
-
-    elif action == "stage_position":
-        from stage.mc_newton_xyz_stage import MCNewtonXYZStageController
-        controller = MCNewtonXYZStageController(
-            stage["config"]["port"],
-            baudrate=stage["config"]["baudrate"],
-            x_channel=stage["config"]["xChannel"],
-            y_channel=stage["config"]["yChannel"],
-            z_channel=stage["config"]["zChannel"],
-        )
-        try:
-            controller.connect()
-            position = controller.get_position_um()
-            success("Stage position read.", {"position": {"xUm": position.x_um, "yUm": position.y_um, "zUm": position.z_um}})
-        finally:
-            controller.disconnect()
-
-    elif action == "stage_move":
-        from stage.mc_newton_xyz_stage import MCNewtonXYZStageController
-        target = payload["target"]
-        controller = MCNewtonXYZStageController(
-            stage["config"]["port"],
-            baudrate=stage["config"]["baudrate"],
-            x_channel=stage["config"]["xChannel"],
-            y_channel=stage["config"]["yChannel"],
-            z_channel=stage["config"]["zChannel"],
-        )
-        try:
-            controller.connect()
-            controller.move_absolute_and_wait_um(
-                x_um=target.get("xUm"),
-                y_um=target.get("yUm"),
-                z_um=target.get("zUm"),
-                timeout_ms=int(payload["timeoutMs"]),
-            )
-            position = controller.get_position_um()
-            success("Stage moved to requested point.", {"finalPosition": {"xUm": position.x_um, "yUm": position.y_um, "zUm": position.z_um}})
-        finally:
-            controller.disconnect()
-
-    elif action == "frame_capture":
-        from pathlib import Path
-        from autofocus.labspec_file_bridge import LabSpecFileBridgeFrameProvider
-        bridge_dir = Path(frame_provider["config"]["bridgeDir"])
-        image_format = frame_provider["config"]["imageFormat"]
-        provider = LabSpecFileBridgeFrameProvider(
-            bridge_dir,
-            image_format=image_format,
-            min_capture_interval_ms=frame_provider["config"]["minCaptureIntervalMs"],
-            initial_timeout_ms=int(payload["timeoutMs"]),
-        )
-        try:
-            provider.connect()
-            frame = provider.wait_for_next(after_ts=0.0, timeout_ms=int(payload["timeoutMs"]))
-            success("Frame captured through LabSpec bridge.", {
-                "timestamp": frame.timestamp,
-                "seq": frame.seq,
-                "shape": list(frame.image.shape),
-                "framePath": latest_frame_path(bridge_dir, image_format),
-            })
-        finally:
-            provider.disconnect()
-
-    elif action == "autofocus":
-        from pathlib import Path
-        from autofocus.controller import AutofocusController
-        from autofocus.labspec_file_bridge import LabSpecFileBridgeFrameProvider
-        from autofocus.models import AutofocusParams, ROI
-        from stage.mc_newton_xyz_stage import MCNewtonXYZStageController
-        z_range = stage["limits"]["zRangeUm"]
-        params = payload.get("params") or {}
-        stage_controller = MCNewtonXYZStageController(
-            stage["config"]["port"],
-            baudrate=stage["config"]["baudrate"],
-            x_channel=stage["config"]["xChannel"],
-            y_channel=stage["config"]["yChannel"],
-            z_channel=stage["config"]["zChannel"],
-        )
-        frame_provider_runtime = LabSpecFileBridgeFrameProvider(
-            Path(frame_provider["config"]["bridgeDir"]),
-            image_format=frame_provider["config"]["imageFormat"],
-            min_capture_interval_ms=frame_provider["config"]["minCaptureIntervalMs"],
-            initial_timeout_ms=int(payload["timeoutMs"]),
-        )
-        try:
-            stage_controller.connect()
-            frame_provider_runtime.connect()
-            controller = AutofocusController(stage_controller, frame_provider_runtime)
-            result = controller.run_single(
-                ROI(**payload["roi"]),
-                AutofocusParams(
-                    z_min_um=z_range[0],
-                    z_max_um=z_range[1],
-                    coarse_range_um=params.get("coarseRangeUm", 80.0),
-                    coarse_step_um=params.get("coarseStepUm", 10.0),
-                    fine_range_um=params.get("fineRangeUm", 15.0),
-                    fine_step_um=params.get("fineStepUm", 2.0),
-                ),
-            )
-            response_payload = {
-                "status": str(result.status.value),
-                "zBestUm": result.z_best_um,
-                "finalScore": result.final_score,
-                "confidence": result.confidence,
-                "message": result.message,
-            }
-            if str(result.status.value) == "ok":
-                success("Autofocus completed.", response_payload)
-            else:
-                fail(f"autofocus_{result.status.value}", result.message or str(result.status.value), retry_safe=True, safe_to_resume=True, payload=response_payload)
-        finally:
-            frame_provider_runtime.disconnect()
-            stage_controller.disconnect()
-
-    elif action == "spectrum":
-        from pathlib import Path
-        from mapping.labspec import LabSpecFileBridgeRamanAcquirer, LabSpecWorkerAcquisitionConfig
-        acquisition = payload["acquisition"]
-        output_dir = payload.get("outputDir") or str(Path(spectrometer["config"]["bridgeDir"]) / "spectra")
-        output_path = Path(output_dir) / f"{payload['pointId']}.{acquisition.get('saveFormat') or 'txt'}"
-        config = LabSpecWorkerAcquisitionConfig(
-            bridge_dir=spectrometer["config"]["bridgeDir"],
-            integration_time_s=acquisition["integrationTimeMs"] / 1000.0,
-            accumulations=acquisition["accumulations"],
-            timeout_s=payload["timeoutMs"] / 1000.0,
-            save_path=output_path,
-            save_format=acquisition.get("saveFormat") or "txt",
-            request_filename=spectrometer["config"]["requestFilename"],
-            result_filename=spectrometer["config"]["resultFilename"],
-            laser_power_percent=acquisition.get("laserPowerMw"),
-        )
-        acquirer = LabSpecFileBridgeRamanAcquirer(config)
-        result = acquirer.acquire_point(payload["pointId"], payload.get("metadata") or {})
-        result_payload = {
-            "outputPath": result.output_path or "",
-            "message": result.message,
-            "metadata": result.metadata,
-        }
-        result_payload.update(parse_spectrum_metrics(
-            result.output_path,
-            payload.get("saturationIntensity"),
-            payload.get("targetPeakMinWavenumber"),
-            payload.get("targetPeakMaxWavenumber"),
-        ))
-        spectrum_plot_path = result.metadata.get("spectrum_plot_path", "")
-        if spectrum_plot_path:
-            result_payload["spectrumPlotPath"] = spectrum_plot_path
-        if result.ok:
-            success("Spectrum acquired through LabSpec bridge.", result_payload)
-        else:
-            fail("spectrum_acquisition_failed", result.message or "LabSpec spectrum acquisition failed.", retry_safe=False, safe_to_resume=False, payload=result_payload)
-
-    else:
-        fail("unknown_python_action", f"Unsupported Python Raman action: {action}")
-except Exception as exc:
-    fail("python_runtime_error", str(exc), retry_safe=False, needs_operator=True, safe_to_resume=False)
-`;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -426,20 +161,7 @@ function toActionFailure(response: PythonFailure): ActionResult {
 	return failedActionResult(response.message, error, response.payload ?? {});
 }
 
-function parsePythonResponse(stdout: string): PythonResponse {
-	const lines = stdout.split(/\r?\n/u).filter((line) => line.trim().length > 0);
-	const lastLine = lines[lines.length - 1];
-	if (!lastLine) {
-		return {
-			ok: false,
-			errorCode: "python_runtime_no_output",
-			message: "Python Raman runtime returned no structured output.",
-			retrySafe: false,
-			needsOperator: true,
-			safeToResume: false,
-		};
-	}
-	const parsed: unknown = JSON.parse(lastLine);
+function toPythonResponse(parsed: unknown): PythonResponse {
 	if (!isRecord(parsed) || typeof parsed.ok !== "boolean") {
 		throw new Error("Python Raman runtime returned an invalid response shape.");
 	}
@@ -461,101 +183,282 @@ function parsePythonResponse(stdout: string): PythonResponse {
 	};
 }
 
-async function runPythonBridge(
-	config: RamanPythonRuntimeConfig,
-	action: PythonActionKind,
-	payload: Record<string, unknown>,
-	timeoutMs: number,
-): Promise<PythonResponse> {
-	const request: PythonRequest = {
-		action,
-		pythonRoot: resolve(config.pythonRoot ?? join(process.cwd(), RAMAN_HARDWARE_PYTHON_DRIVER_PATH)),
-		stage: config.stage,
-		frameProvider: config.frameProvider,
-		spectrometer: config.spectrometer,
-		payload,
-	};
+interface PendingRequest {
+	requestId: string;
+	settle: (response: PythonResponse) => void;
+}
 
-	return new Promise((resolveResult) => {
-		const child = spawn(config.pythonExecutable ?? "python", ["-c", PYTHON_BRIDGE_SOURCE], {
-			stdio: ["pipe", "pipe", "pipe"],
-			windowsHide: true,
-		});
-		let stdout = "";
-		let stderr = "";
-		let settled = false;
-		const timer = setTimeout(() => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			child.kill();
-			resolveResult({
-				ok: false,
-				errorCode: "python_runtime_timeout",
-				message: `Python Raman action ${action} timed out after ${timeoutMs} ms.`,
-				retrySafe: false,
-				needsOperator: true,
-				safeToResume: false,
-				payload: { stderr },
-			});
-		}, timeoutMs);
+export interface RamanPythonDaemonOptions {
+	command: string;
+	scriptPath: string;
+	cwd: string;
+	pythonRoot: string;
+	stage: StageResource;
+	frameProvider: FrameProviderResource;
+	spectrometer: SpectrometerResource;
+	idleShutdownMs: number;
+}
 
-		child.stdout.on("data", (chunk: Buffer) => {
-			stdout += chunk.toString("utf-8");
+/**
+ * Persistent client for the Python Raman hardware daemon.
+ *
+ * The daemon is spawned lazily on the first action and kept alive so a
+ * multi-point mapping run connects to hardware once instead of reconnecting on
+ * every action. Requests are serialized so the single hardware session is never
+ * touched concurrently (operator tools and the active run share one daemon).
+ * A timed-out action kills and resets the daemon; the next action respawns it.
+ */
+export class RamanPythonDaemon {
+	private readonly options: RamanPythonDaemonOptions;
+	private child: ChildProcessWithoutNullStreams | undefined;
+	private stdoutBuffer = "";
+	private pending: PendingRequest | undefined;
+	private queue: Promise<PythonResponse | void> = Promise.resolve();
+	private idleTimer: ReturnType<typeof setTimeout> | undefined;
+
+	constructor(options: RamanPythonDaemonOptions) {
+		this.options = options;
+	}
+
+	request(action: PythonActionKind, payload: Record<string, unknown>, timeoutMs: number): Promise<PythonResponse> {
+		const result = this.queue.then(
+			() => this.sendOne(action, payload, timeoutMs),
+			() => this.sendOne(action, payload, timeoutMs),
+		);
+		this.queue = result.catch(() => undefined);
+		return result;
+	}
+
+	shutdown(): void {
+		this.clearIdleTimer();
+		const child = this.child;
+		if (!child) {
+			return;
+		}
+		this.detachChild();
+		this.settlePending({
+			ok: false,
+			errorCode: "python_runtime_closed",
+			message: "Python Raman daemon was shut down before the action completed.",
+			retrySafe: true,
+			needsOperator: false,
+			safeToResume: true,
 		});
-		child.stderr.on("data", (chunk: Buffer) => {
-			stderr += chunk.toString("utf-8");
-		});
-		child.on("error", (cause) => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			clearTimeout(timer);
-			resolveResult({
-				ok: false,
-				errorCode: "python_runtime_spawn_failed",
-				message: cause.message,
-				retrySafe: false,
-				needsOperator: true,
-				safeToResume: false,
-			});
-		});
-		child.on("close", (code) => {
-			if (settled) {
-				return;
-			}
-			settled = true;
-			clearTimeout(timer);
-			if (code !== 0) {
-				resolveResult({
-					ok: false,
-					errorCode: "python_runtime_exit_failed",
-					message: `Python Raman action ${action} exited with code ${code}.`,
-					retrySafe: false,
-					needsOperator: true,
-					safeToResume: false,
-					payload: { stderr, stdout },
-				});
-				return;
-			}
+		try {
+			child.stdin.end();
+		} catch {
+			// stdin may already be closed.
+		}
+		const killTimer = setTimeout(() => {
 			try {
-				resolveResult(parsePythonResponse(stdout));
+				child.kill();
+			} catch {
+				// process may already have exited.
+			}
+		}, DAEMON_GRACEFUL_KILL_MS);
+		killTimer.unref();
+		child.once("close", () => clearTimeout(killTimer));
+	}
+
+	private sendOne(action: PythonActionKind, payload: Record<string, unknown>, timeoutMs: number): Promise<PythonResponse> {
+		return new Promise<PythonResponse>((resolveResult) => {
+			this.clearIdleTimer();
+			let child: ChildProcessWithoutNullStreams;
+			try {
+				child = this.ensureChild();
 			} catch (cause) {
 				resolveResult({
 					ok: false,
-					errorCode: "python_runtime_parse_failed",
+					errorCode: "python_runtime_spawn_failed",
 					message: cause instanceof Error ? cause.message : String(cause),
 					retrySafe: false,
 					needsOperator: true,
 					safeToResume: false,
-					payload: { stdout, stderr },
 				});
+				return;
+			}
+
+			const requestId = randomUUID();
+			let done = false;
+			const timer = setTimeout(() => {
+				if (done) {
+					return;
+				}
+				done = true;
+				this.pending = undefined;
+				this.killChild();
+				resolveResult({
+					ok: false,
+					errorCode: "python_runtime_timeout",
+					message: `Python Raman action ${action} timed out after ${timeoutMs} ms.`,
+					retrySafe: false,
+					needsOperator: true,
+					safeToResume: false,
+				});
+			}, timeoutMs);
+
+			this.pending = {
+				requestId,
+				settle: (response) => {
+					if (done) {
+						return;
+					}
+					done = true;
+					clearTimeout(timer);
+					this.scheduleIdleShutdown();
+					resolveResult(response);
+				},
+			};
+
+			const envelope: PythonRequestEnvelope = {
+				requestId,
+				action,
+				pythonRoot: this.options.pythonRoot,
+				stage: this.options.stage,
+				frameProvider: this.options.frameProvider,
+				spectrometer: this.options.spectrometer,
+				payload,
+			};
+			try {
+				child.stdin.write(`${JSON.stringify(envelope)}\n`);
+			} catch {
+				// The close/error handlers settle the pending request when the daemon is gone.
 			}
 		});
-		child.stdin.end(JSON.stringify(request));
-	});
+	}
+
+	private ensureChild(): ChildProcessWithoutNullStreams {
+		if (this.child) {
+			return this.child;
+		}
+		const child = spawn(this.options.command, [this.options.scriptPath], {
+			cwd: this.options.cwd,
+			stdio: ["pipe", "pipe", "pipe"],
+			windowsHide: true,
+		});
+		child.stdout.setEncoding("utf-8");
+		child.stdout.on("data", (chunk: string) => this.onStdout(child, chunk));
+		child.stderr.resume();
+		child.stdin.on("error", () => {
+			// A daemon that exits early surfaces through the close handler; ignore EPIPE on stdin.
+		});
+		child.on("error", (cause) => this.onChildGone(child, "python_runtime_spawn_failed", cause.message));
+		child.on("close", (code) => this.onChildGone(child, "python_runtime_exit_failed", `Python Raman daemon exited with code ${code}.`));
+		this.child = child;
+		this.stdoutBuffer = "";
+		return child;
+	}
+
+	private onStdout(child: ChildProcessWithoutNullStreams, chunk: string): void {
+		if (child !== this.child) {
+			return;
+		}
+		this.stdoutBuffer += chunk;
+		let newlineIndex = this.stdoutBuffer.indexOf("\n");
+		while (newlineIndex !== -1) {
+			const line = this.stdoutBuffer.slice(0, newlineIndex).trim();
+			this.stdoutBuffer = this.stdoutBuffer.slice(newlineIndex + 1);
+			if (line.length > 0) {
+				this.consumeLine(line);
+			}
+			newlineIndex = this.stdoutBuffer.indexOf("\n");
+		}
+	}
+
+	private consumeLine(line: string): void {
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(line);
+		} catch {
+			return;
+		}
+		const pending = this.pending;
+		if (!pending || !isRecord(parsed) || parsed.requestId !== pending.requestId) {
+			return;
+		}
+		this.pending = undefined;
+		try {
+			pending.settle(toPythonResponse(parsed));
+		} catch (cause) {
+			pending.settle({
+				ok: false,
+				errorCode: "python_runtime_parse_failed",
+				message: cause instanceof Error ? cause.message : String(cause),
+				retrySafe: false,
+				needsOperator: true,
+				safeToResume: false,
+			});
+		}
+	}
+
+	private onChildGone(child: ChildProcessWithoutNullStreams, errorCode: string, message: string): void {
+		if (child !== this.child) {
+			return;
+		}
+		this.detachChild();
+		this.settlePending({
+			ok: false,
+			errorCode,
+			message,
+			retrySafe: false,
+			needsOperator: true,
+			safeToResume: false,
+		});
+	}
+
+	private settlePending(response: PythonResponse): void {
+		const pending = this.pending;
+		if (!pending) {
+			return;
+		}
+		this.pending = undefined;
+		pending.settle(response);
+	}
+
+	private killChild(): void {
+		const child = this.child;
+		this.detachChild();
+		if (child) {
+			try {
+				child.kill();
+			} catch {
+				// process may already have exited.
+			}
+		}
+	}
+
+	private detachChild(): void {
+		this.child = undefined;
+		this.stdoutBuffer = "";
+	}
+
+	private scheduleIdleShutdown(): void {
+		this.clearIdleTimer();
+		if (!this.child || this.options.idleShutdownMs <= 0) {
+			return;
+		}
+		this.idleTimer = setTimeout(() => this.shutdown(), this.options.idleShutdownMs);
+		this.idleTimer.unref();
+	}
+
+	private clearIdleTimer(): void {
+		if (this.idleTimer) {
+			clearTimeout(this.idleTimer);
+			this.idleTimer = undefined;
+		}
+	}
+}
+
+const daemonRegistry = new Map<string, RamanPythonDaemon>();
+
+function registerDaemon(cwd: string, daemon: RamanPythonDaemon): void {
+	daemonRegistry.get(cwd)?.shutdown();
+	daemonRegistry.set(cwd, daemon);
+}
+
+export function shutdownRamanPythonDaemon(cwd: string): void {
+	daemonRegistry.get(cwd)?.shutdown();
+	daemonRegistry.delete(cwd);
 }
 
 function configCandidates(cwd: string): RamanPythonRuntimeConfigCandidate[] {
@@ -651,14 +554,23 @@ function createActionResult(response: PythonResponse, artifacts: ArtifactRef[] =
 }
 
 export function createRamanPythonRuntime(cwd: string, config: RamanPythonRuntimeConfig): RamanLiveRuntime {
-	const resolvedConfig: RamanPythonRuntimeConfig = {
-		...config,
-		pythonRoot: resolve(cwd, config.pythonRoot ?? RAMAN_HARDWARE_PYTHON_DRIVER_PATH),
-	};
+	const pythonRoot = resolve(cwd, config.pythonRoot ?? RAMAN_HARDWARE_PYTHON_DRIVER_PATH);
+	const resolvedConfig: RamanPythonRuntimeConfig = { ...config, pythonRoot };
+	const daemon = new RamanPythonDaemon({
+		command: resolvedConfig.pythonExecutable ?? "python",
+		scriptPath: join(pythonRoot, RAMAN_RUNTIME_DAEMON_SCRIPT),
+		cwd,
+		pythonRoot,
+		stage: resolvedConfig.stage,
+		frameProvider: resolvedConfig.frameProvider,
+		spectrometer: resolvedConfig.spectrometer,
+		idleShutdownMs: resolvedConfig.daemon?.idleShutdownMs ?? DEFAULT_DAEMON_IDLE_SHUTDOWN_MS,
+	});
+	registerDaemon(cwd, daemon);
+
 	return {
 		preflight: async (): Promise<RamanLivePreflightResult> => {
-			const response = await runPythonBridge(
-				resolvedConfig,
+			const response = await daemon.request(
 				"preflight",
 				{
 					requirePythonRoot: resolvedConfig.preflight?.requirePythonRoot ?? true,
@@ -676,29 +588,16 @@ export function createRamanPythonRuntime(cwd: string, config: RamanPythonRuntime
 		stage: {
 			resource: resolvedConfig.stage,
 			getPosition: async (action: StageGetPositionAction): Promise<ActionResult> =>
-				createActionResult(
-					await runPythonBridge(
-						resolvedConfig,
-						"stage_position",
-						{ timeoutMs: action.timeoutMs },
-						action.timeoutMs + 10_000,
-					),
-				),
+				createActionResult(await daemon.request("stage_position", { timeoutMs: action.timeoutMs }, action.timeoutMs + 10_000)),
 			moveAbsoluteAndWait: async (action: StageMoveAbsoluteAndWaitAction): Promise<ActionResult> =>
 				createActionResult(
-					await runPythonBridge(
-						resolvedConfig,
-						"stage_move",
-						{ target: action.target, timeoutMs: action.timeoutMs },
-						action.timeoutMs + 10_000,
-					),
+					await daemon.request("stage_move", { target: action.target, timeoutMs: action.timeoutMs }, action.timeoutMs + 10_000),
 				),
 		},
 		autofocus: {
 			runSingle: async (action: AutofocusRunSingleAction): Promise<ActionResult> =>
 				createActionResult(
-					await runPythonBridge(
-						resolvedConfig,
+					await daemon.request(
 						"autofocus",
 						{ roi: action.roi, params: action.params ?? {}, timeoutMs: action.timeoutMs },
 						action.timeoutMs + 10_000,
@@ -708,12 +607,7 @@ export function createRamanPythonRuntime(cwd: string, config: RamanPythonRuntime
 		frame: {
 			resource: resolvedConfig.frameProvider,
 			captureLatest: async (action: FrameCaptureLatestAction): Promise<ActionResult> => {
-				const response = await runPythonBridge(
-					resolvedConfig,
-					"frame_capture",
-					{ timeoutMs: action.timeoutMs },
-					action.timeoutMs + 10_000,
-				);
+				const response = await daemon.request("frame_capture", { timeoutMs: action.timeoutMs }, action.timeoutMs + 10_000);
 				return createActionResult(response, response.ok ? asArtifact(response.payload.framePath, "frame", "LabSpec frame") : []);
 			},
 		},
@@ -721,8 +615,7 @@ export function createRamanPythonRuntime(cwd: string, config: RamanPythonRuntime
 			resource: resolvedConfig.spectrometer,
 			acquireSpectrum: async (action: SpectrometerAcquireSpectrumAction): Promise<ActionResult> => {
 				const pointId = `point-${randomUUID().slice(0, 8)}`;
-				const response = await runPythonBridge(
-					resolvedConfig,
+				const response = await daemon.request(
 					"spectrum",
 					{
 						pointId,
@@ -755,6 +648,7 @@ export function registerConfiguredRamanPythonRuntime(cwd: string): boolean {
 	const { config } = loaded;
 	if (!config.enabled) {
 		clearRamanLiveRuntime(cwd);
+		shutdownRamanPythonDaemon(cwd);
 		return false;
 	}
 	registerRamanLiveRuntime(cwd, createRamanPythonRuntime(cwd, config));
