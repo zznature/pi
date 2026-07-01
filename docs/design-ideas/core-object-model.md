@@ -72,6 +72,7 @@
 - `ProcedureSpec` 承载实验方案和具体步骤组织
 - 步骤类型必须来自受控的 `procedure/step` 库
 - 可以有受控的重复结构，例如 `grid_scan`、`point_list`、`repeat_n`
+- Raman 单点当前位置采集使用显式 `current_position` plan，不用 `{xUm: 0, yUm: 0, zUm: 200}` 这类占位绝对坐标表达当前位置
 - 不允许任意 `for / while / if` 之类通用脚本控制流
 - 用户确认整次 bounded run 后，`ProcedureSpec` 会被冻结为本次 run 的唯一执行输入
 

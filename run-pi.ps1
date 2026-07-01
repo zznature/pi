@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+$env:PI_OFFLINE = "1"
 
 # Run pi agent; this wrapper only controls the launch path and system prompt source.
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

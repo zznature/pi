@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export PI_OFFLINE=1
 
 # Run pi agent; this wrapper only controls the launch path and system prompt source.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

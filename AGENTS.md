@@ -8,7 +8,7 @@ Implementation should always follow `docs/design-ideas/core-ideas.md`, which is 
 - Agent can only edit it with user's direct order.
 - The tech plans are also in `docs/design-ideas/`. Tech docs should be updated with the actual implementing and reflect the actual code.
 
-`.pi/extensions/experiment-research-legacy` is a reference-only legacy implementation for the MVP rebuild. It may be mined for useful patterns or hardware-specific knowledge.
+`.pi/extensions/experiment-research-legacy` is reference-only and soon to be deprecated.
 
 ## Thinking from First Principles
 
@@ -17,7 +17,6 @@ Implementation should always follow `docs/design-ideas/core-ideas.md`, which is 
 - Always reason from first principles — reject blind experience and path dependence
 - Do not assume the user fully understands their own goal; stay prudent and challenge
 - If the goal is unclear, **stop and discuss** before proceeding
-- If the goal is clear but the path is suboptimal, propose a shorter, lower-cost alternative directly
 
 ### Response Structure
 
