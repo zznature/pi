@@ -122,6 +122,25 @@ describe("experiment research planner proposal flow", () => {
 		expect(gridMapping.preview.risks.some((risk) => risk.code === "multi_point_mapping")).toBe(true);
 	});
 
+	it("builds current-position single-point proposals without placeholder coordinates", () => {
+		const currentPosition = buildProcedureProposal({
+			...commonBuilderInput(),
+			procedureId: "raman_single_point_probe",
+		});
+
+		expect(ProcedureSpecValidator.Check(currentPosition.spec)).toBe(true);
+		expect(currentPosition.spec.plan).toEqual({
+			kind: "current_position",
+			perPoint: [
+				{ kind: "move_to_point" },
+				{ kind: "autofocus" },
+				{ kind: "capture_frame" },
+				{ kind: "acquire_spectrum" },
+			],
+		});
+		expect(currentPosition.preview.unitCount).toBe(1);
+	});
+
 	it("registers validation and preflight planner tools that summarize bounded proposal state", async () => {
 		const extension = loadExperimentExtension();
 		const context = {} as ExtensionContext;

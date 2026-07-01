@@ -62,6 +62,7 @@ function loadExperimentExtension(): CapturedExtension {
 function createSinglePointSpec(overrides?: {
 	laserPowerMw?: number;
 	pointZUm?: number;
+	currentPosition?: boolean;
 	procedureId?: "raman_single_point_probe" | "raman_parameter_search" | "raman_grid_mapping";
 	maxAttempts?: number;
 }): {
@@ -97,15 +98,19 @@ function createSinglePointSpec(overrides?: {
 			zRangeUm: { minUm: 0, maxUm: 5_000 },
 		},
 		plan: {
-			kind: "point_list",
-			points: Array.from(
-				{ length: overrides?.procedureId === "raman_parameter_search" ? (overrides.maxAttempts ?? 3) : 1 },
-				() => ({
-					xUm: 1000,
-					yUm: 2000,
-					zUm: overrides?.pointZUm ?? 250,
-				}),
-			),
+			...(overrides?.currentPosition
+				? { kind: "current_position" }
+				: {
+						kind: "point_list",
+						points: Array.from(
+							{ length: overrides?.procedureId === "raman_parameter_search" ? (overrides.maxAttempts ?? 3) : 1 },
+							() => ({
+								xUm: 1000,
+								yUm: 2000,
+								zUm: overrides?.pointZUm ?? 250,
+							}),
+						),
+					}),
 			perPoint: [
 				{ kind: "move_to_point" },
 				{ kind: "autofocus" },
@@ -149,6 +154,7 @@ function createLiveRuntime(
 	preflightReady = true,
 	controlAvailable = true,
 	observations?: Array<{ saturated: boolean; snr: number; targetPeakBaselineRatio: number }>,
+	metrics?: { stageMoveCalls: number },
 ): RamanLiveRuntime {
 	let spectrumCall = 0;
 	return {
@@ -189,6 +195,9 @@ function createLiveRuntime(
 				});
 			},
 			moveAbsoluteAndWait(action) {
+				if (metrics) {
+					metrics.stageMoveCalls += 1;
+				}
 				return successActionResult("Stage moved.", {
 					finalPosition: action.target,
 				});
@@ -407,6 +416,38 @@ describe("experiment research real supervised single-point runtime", () => {
 		expect(events.map((event) => event.eventType)).toEqual(
 			expect.arrayContaining(["run_started", "unit_started", "unit_completed", "run_completed"]),
 		);
+	});
+
+	it("executes a live current-position single-point run without issuing a stage move", async () => {
+		const cwd = createTempCwd();
+		tempRoots.push(cwd);
+		const metrics = { stageMoveCalls: 0 };
+		registerRamanLiveRuntime(cwd, createLiveRuntime(true, true, undefined, metrics));
+		const extension = loadExperimentExtension();
+		const context = { cwd } as ExtensionContext;
+		const spec = createSinglePointSpec({ currentPosition: true });
+		const proposalId = await proposeRun(extension, spec, context);
+
+		const started = await extension.tools.get("approve_and_start_run")?.execute(
+			"approve-live-current-position",
+			{
+				proposalId,
+				spec,
+				executionMode: "live-supervised",
+				admission: {
+					preflightReady: true,
+					controlAvailable: true,
+				},
+			},
+			undefined,
+			undefined,
+			context,
+		);
+		const runId = (started?.details as Record<string, unknown>).runId as string;
+		const terminalState = await pollUntilTerminal(extension, runId, context, ["completed"]);
+
+		expect(terminalState.status).toBe("completed");
+		expect(metrics.stageMoveCalls).toBe(0);
 	});
 
 	it("executes live bounded parameter search and stops early once acceptable conditions are confirmed", async () => {

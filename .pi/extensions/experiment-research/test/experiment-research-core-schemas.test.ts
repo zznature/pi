@@ -109,6 +109,16 @@ describe("experiment research core schemas", () => {
 
 		expect(ProcedureSpecValidator.Check(pointListSpec)).toBe(true);
 		expect(ProcedureSpecValidator.Check(gridScanSpec)).toBe(true);
+		expect(
+			ProcedureSpecValidator.Check({
+				...pointListSpec,
+				procedureSpecId: "proc-spec-current-position",
+				plan: {
+					kind: "current_position",
+					perPoint: [{ kind: "autofocus" }, { kind: "acquire_spectrum" }],
+				},
+			}),
+		).toBe(true);
 	});
 
 	it("rejects procedure spec shapes that are explicitly out of MVP scope", () => {

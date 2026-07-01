@@ -3,7 +3,7 @@ import type {
 	ExecutionUnitPoint,
 } from "../schemas/execution-unit.ts";
 import { ExecutionUnitValidator } from "../schemas/execution-unit.ts";
-import type { GridScanPlan, Point, PointListPlan, ProcedureSpec } from "../schemas/procedure-spec.ts";
+import type { CurrentPositionPlan, GridScanPlan, Point, PointListPlan, ProcedureSpec } from "../schemas/procedure-spec.ts";
 import { formatValidationErrors } from "../schemas/validation.ts";
 
 function formatUnitIndex(index: number): string {
@@ -37,6 +37,7 @@ function buildPointListUnits(spec: ProcedureSpec, plan: PointListPlan): Executio
 		unitId: createUnitId(spec.procedureSpecId, index),
 		index,
 		unitKind: "point",
+		positionRef: "absolute",
 		point: toExecutionPoint(point),
 		actions: plan.perPoint,
 		limits: spec.limits,
@@ -71,6 +72,7 @@ function buildGridScanUnits(spec: ProcedureSpec, plan: GridScanPlan): ExecutionU
 		unitId: createUnitId(spec.procedureSpecId, index),
 		index,
 		unitKind: "point",
+		positionRef: "absolute",
 		point,
 		actions: plan.perPoint,
 		limits: spec.limits,
@@ -79,6 +81,23 @@ function buildGridScanUnits(spec: ProcedureSpec, plan: GridScanPlan): ExecutionU
 			artifactPathPrefix: createArtifactPrefix(spec.procedureSpecId, index),
 		},
 	}));
+}
+
+function buildCurrentPositionUnit(spec: ProcedureSpec, plan: CurrentPositionPlan): ExecutionUnit[] {
+	return [
+		{
+			unitId: createUnitId(spec.procedureSpecId, 0),
+			index: 0,
+			unitKind: "point",
+			positionRef: "current",
+			actions: plan.perPoint,
+			limits: spec.limits,
+			resumeKey: createResumeKey(spec.procedureSpecId, 0),
+			artifactScope: {
+				artifactPathPrefix: createArtifactPrefix(spec.procedureSpecId, 0),
+			},
+		},
+	];
 }
 
 function assertCompiledUnits(units: ExecutionUnit[]): ExecutionUnit[] {
@@ -94,6 +113,10 @@ function assertCompiledUnits(units: ExecutionUnit[]): ExecutionUnit[] {
 
 export function compileProcedureSpec(spec: ProcedureSpec): ExecutionUnit[] {
 	const units =
-		spec.plan.kind === "point_list" ? buildPointListUnits(spec, spec.plan) : buildGridScanUnits(spec, spec.plan);
+		spec.plan.kind === "point_list"
+			? buildPointListUnits(spec, spec.plan)
+			: spec.plan.kind === "grid_scan"
+				? buildGridScanUnits(spec, spec.plan)
+				: buildCurrentPositionUnit(spec, spec.plan);
 	return assertCompiledUnits(units);
 }

@@ -82,6 +82,25 @@ describe("experiment research unit compilation", () => {
 		expect(units.every((unit) => ExecutionUnitValidator.Check(unit))).toBe(true);
 	});
 
+	it("compiles current_position plans into one current-position unit without absolute coordinates", () => {
+		const spec = {
+			...createBaseProcedureSpec(),
+			procedureId: "raman_single_point_probe",
+			plan: {
+				kind: "current_position",
+				perPoint: [{ kind: "move_to_point" }, { kind: "autofocus" }, { kind: "acquire_spectrum" }],
+			},
+		};
+
+		const units = compileProcedureSpec(spec as ProcedureSpec);
+
+		expect(units).toHaveLength(1);
+		expect(units[0]?.positionRef).toBe("current");
+		expect(units[0]?.point).toBeUndefined();
+		expect(units[0]?.actions).toEqual(spec.plan.perPoint);
+		expect(units.every((unit) => ExecutionUnitValidator.Check(unit))).toBe(true);
+	});
+
 	it("compiles grid_scan plans into stable snake-ordered point units", () => {
 		const spec = createBaseProcedureSpec();
 

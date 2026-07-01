@@ -10,6 +10,7 @@ export {
 	ProcedureIdSchema,
 	ResourceRefSchema,
 	PointSchema,
+	CurrentPositionPlanSchema,
 	SemanticStepSchema,
 	ProcedureLimitsSchema,
 	StoppingRulesSchema,
@@ -22,6 +23,7 @@ export {
 	type ProcedureId,
 	type GridScanPlan,
 	type PointListPlan,
+	type CurrentPositionPlan,
 	type ResourceRef,
 	type Point,
 	type SemanticStep,
@@ -36,10 +38,12 @@ export {
 	ExecutionUnitSchema,
 	ExecutionUnitValidator,
 	ExecutionUnitKindSchema,
+	ExecutionUnitPositionRefSchema,
 	ArtifactScopeSchema,
 	type ExecutionUnit,
 	type ExecutionUnitKind,
 	type ExecutionUnitPoint,
+	type ExecutionUnitPositionRef,
 	type ArtifactScope,
 } from "./execution-unit.ts";
 export {

@@ -191,6 +191,35 @@ class HardwareSession:
             self._stage = None
 
 
+class _ZOnlyStageAdapter:
+    """Expose the XYZ stage session through the autofocus ZStage protocol."""
+
+    def __init__(self, stage: Any) -> None:
+        self._stage = stage
+
+    def get_position_um(self) -> float:
+        return float(self._stage.get_position_um().z_um)
+
+    def move_absolute_um(self, z_um: float) -> None:
+        self._stage.move_absolute_um(z_um=float(z_um))
+
+    def set_target_tolerance_um(self, tolerance_um: float) -> None:
+        self._stage.set_axis_target_tolerance_um("z", float(tolerance_um))
+
+    def move_relative_um(self, dz_um: float) -> None:
+        self._stage.move_relative_um(dz_um=float(dz_um))
+
+    def wait_settled(self, timeout_ms: int) -> None:
+        wait_settled = getattr(self._stage, "wait_settled")
+        try:
+            wait_settled(int(timeout_ms), axes={"z"})
+        except TypeError:
+            wait_settled(int(timeout_ms))
+
+    def stop(self) -> None:
+        self._stage.stop()
+
+
 def _handle_preflight(session: HardwareSession, request: dict, payload: dict) -> dict:
     python_root = Path(request["pythonRoot"]).resolve()
     frame_cfg = request["frameProvider"]
@@ -267,7 +296,7 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
     z_range = stage_cfg["limits"]["zRangeUm"]
     params = payload.get("params") or {}
     timeout_ms = int(payload["timeoutMs"])
-    stage = session.stage(stage_cfg)
+    stage = _ZOnlyStageAdapter(session.stage(stage_cfg))
     provider = session.frame(request["frameProvider"], timeout_ms)
     controller = AutofocusController(stage, provider)
     try:

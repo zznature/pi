@@ -174,6 +174,9 @@ describe("experiment research operator tools", () => {
 		const statusState = asRecord(statusDetails.stateAfter);
 
 		expect(statusDetails.status).toBe("success");
+		expect(asRecord(statusResult).content).toEqual([
+			{ type: "text", text: "Raman hardware status is ready. Stage position: X=100 um, Y=200 um, Z=300 um." },
+		]);
 		expect(statusState.realRuntimeRegistered).toBe(true);
 		expect(statusState.preflightReady).toBe(true);
 		expect(statusState.stagePosition).toEqual({ xUm: 100, yUm: 200, zUm: 300 });
@@ -185,6 +188,9 @@ describe("experiment research operator tools", () => {
 		const positionState = asRecord(positionDetails.stateAfter);
 
 		expect(positionDetails.status).toBe("success");
+		expect(asRecord(positionResult).content).toEqual([
+			{ type: "text", text: "Stage position read: X=100 um, Y=200 um, Z=300 um." },
+		]);
 		expect(positionState.position).toEqual({ xUm: 100, yUm: 200, zUm: 300 });
 	});
 
@@ -202,6 +208,12 @@ describe("experiment research operator tools", () => {
 		const proposalState = asRecord(proposalDetails.stateAfter);
 
 		expect(proposalDetails.status).toBe("warning");
+		expect(asRecord(proposalResult).content).toEqual([
+			{
+				type: "text",
+				text: "Stage relative move requires explicit confirmation before execution. Current: X=100 um, Y=200 um, Z=300 um. Target: X=150 um, Y=200 um, Z=300 um.",
+			},
+		]);
 		expect(proposalState.requiresConfirmation).toBe(true);
 		expect(proposalState.target).toEqual({ xUm: 150, yUm: 200, zUm: 300 });
 		expect(position.xUm).toBe(100);
@@ -213,6 +225,9 @@ describe("experiment research operator tools", () => {
 		const moveState = asRecord(moveDetails.stateAfter);
 
 		expect(moveDetails.status).toBe("success");
+		expect(asRecord(moveResult).content).toEqual([
+			{ type: "text", text: "Stage relative move completed. Target: X=150 um, Y=200 um, Z=300 um." },
+		]);
 		expect(moveState.target).toEqual({ xUm: 150, yUm: 200, zUm: 300 });
 		expect(position.xUm).toBe(150);
 	});

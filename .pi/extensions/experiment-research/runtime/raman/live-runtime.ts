@@ -90,6 +90,12 @@ export interface LiveRamanUnitOptions {
 	};
 }
 
+interface StagePosition {
+	xUm: number;
+	yUm: number;
+	zUm: number;
+}
+
 const liveRuntimeRegistry = new Map<string, RamanLiveRuntime>();
 
 function toRuntimeError(actionResult: ActionResult, fallbackCode: string, scope: RuntimeError["scope"] = "unit"): RuntimeError {
@@ -133,7 +139,53 @@ function ensureRange(
 	return undefined;
 }
 
-function enforceMotionHardLimits(spec: ProcedureSpec, unit: ExecutionUnit, runtime: RamanLiveRuntime): ActionResult | undefined {
+function readNumber(record: Record<string, unknown>, key: string): number | undefined {
+	const value = record[key];
+	return typeof value === "number" ? value : undefined;
+}
+
+function stagePositionFromActionResult(result: ActionResult): StagePosition | undefined {
+	const payload = result.payload;
+	if (payload === undefined) {
+		return undefined;
+	}
+	const position = payload.position;
+	if (typeof position !== "object" || position === null || Array.isArray(position)) {
+		return undefined;
+	}
+	const record = position as Record<string, unknown>;
+	const xUm = readNumber(record, "xUm");
+	const yUm = readNumber(record, "yUm");
+	const zUm = readNumber(record, "zUm");
+	if (xUm === undefined || yUm === undefined || zUm === undefined) {
+		return undefined;
+	}
+	return { xUm, yUm, zUm };
+}
+
+async function resolveUnitPosition(unit: ExecutionUnit, runtime: RamanLiveRuntime, stageResourceId: string): Promise<ActionResult | StagePosition> {
+	if (unit.positionRef === "current") {
+		const positionResult = await runtime.stage.getPosition({
+			action: "stage.get_position",
+			resourceId: stageResourceId,
+			timeoutMs: 10_000,
+		});
+		if (positionResult.status !== "success") {
+			return positionResult;
+		}
+		const position = stagePositionFromActionResult(positionResult);
+		if (!position) {
+			return failedActionResult("Stage position result did not include xUm, yUm, and zUm.", {
+				errorCode: "invalid_stage_position_result",
+				message: "Live Raman current-position execution requires a complete stage position.",
+				retrySafe: false,
+				needsOperator: true,
+				safeToResume: false,
+			});
+		}
+		return position;
+	}
+
 	if (!unit.point) {
 		return failedActionResult("Single-point live execution requires point coordinates.", {
 			errorCode: "missing_point_coordinates",
@@ -143,15 +195,18 @@ function enforceMotionHardLimits(spec: ProcedureSpec, unit: ExecutionUnit, runti
 			safeToResume: false,
 		});
 	}
+	return unit.point;
+}
 
+function enforceMotionHardLimits(spec: ProcedureSpec, position: StagePosition, runtime: RamanLiveRuntime): ActionResult | undefined {
 	const stageLimits = runtime.stage.resource.limits;
 	const xResult =
 		ensureRange(
-			unit.point.xUm,
+			position.xUm,
 			spec.limits.xRangeUm?.minUm ?? stageLimits.xRangeUm[0],
 			spec.limits.xRangeUm?.maxUm ?? stageLimits.xRangeUm[1],
 			"motion_out_of_bounds",
-			`Requested X position ${unit.point.xUm} um is outside the allowed motion range.`,
+			`Requested X position ${position.xUm} um is outside the allowed motion range.`,
 		);
 	if (xResult) {
 		return xResult;
@@ -159,11 +214,11 @@ function enforceMotionHardLimits(spec: ProcedureSpec, unit: ExecutionUnit, runti
 
 	const yResult =
 		ensureRange(
-			unit.point.yUm,
+			position.yUm,
 			spec.limits.yRangeUm?.minUm ?? stageLimits.yRangeUm[0],
 			spec.limits.yRangeUm?.maxUm ?? stageLimits.yRangeUm[1],
 			"motion_out_of_bounds",
-			`Requested Y position ${unit.point.yUm} um is outside the allowed motion range.`,
+			`Requested Y position ${position.yUm} um is outside the allowed motion range.`,
 		);
 	if (yResult) {
 		return yResult;
@@ -171,23 +226,22 @@ function enforceMotionHardLimits(spec: ProcedureSpec, unit: ExecutionUnit, runti
 
 	const zResult =
 		ensureRange(
-			unit.point.zUm,
+			position.zUm,
 			spec.limits.zRangeUm?.minUm ?? stageLimits.zRangeUm[0],
 			spec.limits.zRangeUm?.maxUm ?? stageLimits.zRangeUm[1],
 			"motion_out_of_bounds",
-			`Requested Z position ${unit.point.zUm} um is outside the allowed motion range.`,
+			`Requested Z position ${position.zUm} um is outside the allowed motion range.`,
 		);
 	if (zResult) {
 		return zResult;
 	}
 
 	if (
-		unit.point.zUm !== undefined &&
 		spec.limits.minObjectiveClearanceUm !== undefined &&
-		unit.point.zUm < spec.limits.minObjectiveClearanceUm
+		position.zUm < spec.limits.minObjectiveClearanceUm
 	) {
 		return failedActionResult(
-			`Requested Z position ${unit.point.zUm} um violates minObjectiveClearanceUm ${spec.limits.minObjectiveClearanceUm} um.`,
+			`Requested Z position ${position.zUm} um violates minObjectiveClearanceUm ${spec.limits.minObjectiveClearanceUm} um.`,
 			{
 				errorCode: "objective_clearance_violation",
 				message: "Requested motion would move the objective below the approved clearance.",
@@ -338,18 +392,27 @@ export async function runLiveRamanUnit(
 	_currentState: RunState,
 	options: LiveRamanUnitOptions = {},
 ): Promise<LiveRamanUnitResult> {
-	const preMoveFailure = enforceMotionHardLimits(spec, unit, runtime);
+	const artifactRefs: ArtifactRef[] = [];
+	const stageResourceId = findResourceId(spec, "stage");
+	const unitPosition = await resolveUnitPosition(unit, runtime, stageResourceId);
+	if ("status" in unitPosition) {
+		return {
+			status: "failed",
+			error: toRuntimeError(unitPosition, unitPosition.errorCode ?? "stage_position_read_failed"),
+			artifactRefs,
+		};
+	}
+
+	const preMoveFailure = enforceMotionHardLimits(spec, unitPosition, runtime);
 	if (preMoveFailure) {
 		return {
 			status: "failed",
 			error: toRuntimeError(preMoveFailure, "motion_out_of_bounds"),
-			artifactRefs: [],
+			artifactRefs,
 		};
 	}
 
-	const artifactRefs: ArtifactRef[] = [];
 	const acquisition = options.acquisitionOverride ?? spec.domain.raman.acquisition;
-	const stageResourceId = findResourceId(spec, "stage");
 	const frameProviderResourceId = findResourceId(spec, "frame_provider");
 	const spectrometerResourceId = findResourceId(spec, "spectrometer");
 	let autofocusResult: ActionResult | undefined;
@@ -357,13 +420,16 @@ export async function runLiveRamanUnit(
 
 	for (const action of unit.actions) {
 		if (action.kind === "move_to_point") {
+			if (unit.positionRef === "current") {
+				continue;
+			}
 			const moveResult = await runtime.stage.moveAbsoluteAndWait({
 				action: "stage.move_absolute_and_wait",
 				resourceId: stageResourceId,
 				target: {
-					xUm: unit.point?.xUm ?? 0,
-					yUm: unit.point?.yUm ?? 0,
-					zUm: unit.point?.zUm,
+					xUm: unitPosition.xUm,
+					yUm: unitPosition.yUm,
+					zUm: unitPosition.zUm,
 				},
 				timeoutMs: 15_000,
 			});

@@ -170,7 +170,15 @@ export const PointListPlanSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
-export const ProcedurePlanSchema = Type.Union([GridScanPlanSchema, PointListPlanSchema]);
+export const CurrentPositionPlanSchema = Type.Object(
+	{
+		kind: Type.Literal("current_position"),
+		perPoint: Type.Array(SemanticStepSchema, { minItems: 1 }),
+	},
+	{ additionalProperties: false },
+);
+
+export const ProcedurePlanSchema = Type.Union([GridScanPlanSchema, PointListPlanSchema, CurrentPositionPlanSchema]);
 
 export const ProcedureIdSchema = Type.Union([
 	Type.Literal("raman_single_point_probe"),
@@ -206,6 +214,7 @@ export type RamanDomain = Static<typeof RamanDomainSchema>;
 export type ProcedureDomain = Static<typeof ProcedureDomainSchema>;
 export type GridScanPlan = Static<typeof GridScanPlanSchema>;
 export type PointListPlan = Static<typeof PointListPlanSchema>;
+export type CurrentPositionPlan = Static<typeof CurrentPositionPlanSchema>;
 export type ProcedurePlan = Static<typeof ProcedurePlanSchema>;
 export type ProcedureId = Static<typeof ProcedureIdSchema>;
 export type ProcedureSpec = Static<typeof ProcedureSpecSchema>;

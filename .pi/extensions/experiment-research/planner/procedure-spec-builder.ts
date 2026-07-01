@@ -75,7 +75,7 @@ interface BaseProcedureBuilderInput {
 
 export interface SinglePointProbeBuilderInput extends BaseProcedureBuilderInput {
 	procedureId: "raman_single_point_probe";
-	point: Point;
+	point?: Point;
 }
 
 export interface ParameterSearchBuilderInput extends BaseProcedureBuilderInput {
@@ -156,6 +156,13 @@ function createPlan(input: ProcedureSpecBuilderInput): ProcedureSpec["plan"] {
 		};
 	}
 
+	if (!input.point) {
+		return {
+			kind: "current_position",
+			perPoint: defaultActions(),
+		};
+	}
+
 	return {
 		kind: "point_list",
 		points: [{ ...input.point }],
@@ -214,6 +221,10 @@ function hasPoint(unit: ExecutionUnit): unit is ExecutionUnit & { point: NonNull
 }
 
 function classifyMotionRangeRisks(spec: ProcedureSpec): ProposalRisk[] {
+	if (spec.plan.kind === "current_position") {
+		return [];
+	}
+
 	const points =
 		spec.plan.kind === "point_list"
 			? spec.plan.points

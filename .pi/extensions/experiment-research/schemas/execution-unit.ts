@@ -19,6 +19,8 @@ export const ExecutionUnitPointSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+export const ExecutionUnitPositionRefSchema = Type.Union([Type.Literal("absolute"), Type.Literal("current")]);
+
 export const ArtifactScopeSchema = Type.Object(
 	{
 		artifactPathPrefix: Type.String({ minLength: 1 }),
@@ -31,6 +33,7 @@ export const ExecutionUnitSchema = Type.Object(
 		unitId: Type.String({ minLength: 1 }),
 		index: Type.Integer({ minimum: 0 }),
 		unitKind: ExecutionUnitKindSchema,
+		positionRef: Type.Optional(ExecutionUnitPositionRefSchema),
 		point: Type.Optional(ExecutionUnitPointSchema),
 		actions: Type.Array(SemanticStepSchema, { minItems: 1 }),
 		limits: ProcedureLimitsSchema,
@@ -42,6 +45,7 @@ export const ExecutionUnitSchema = Type.Object(
 
 export type ExecutionUnitKind = Static<typeof ExecutionUnitKindSchema>;
 export type ExecutionUnitPoint = Static<typeof ExecutionUnitPointSchema>;
+export type ExecutionUnitPositionRef = Static<typeof ExecutionUnitPositionRefSchema>;
 export type ArtifactScope = Static<typeof ArtifactScopeSchema>;
 export type ExecutionUnit = Static<typeof ExecutionUnitSchema>;
 

@@ -114,6 +114,10 @@ function positionFromActionResult(result: ActionResult): StagePosition | undefin
 	return { xUm, yUm, zUm };
 }
 
+function formatStagePosition(position: StagePosition): string {
+	return `X=${position.xUm} um, Y=${position.yUm} um, Z=${position.zUm} um`;
+}
+
 async function readStagePosition(runtime: RamanLiveRuntime, timeoutMs: number): Promise<ActionResult> {
 	return runtime.stage.getPosition({
 		action: "stage.get_position",
@@ -226,7 +230,7 @@ export const ramanGetHardwareStatusTool = {
 		if (!preflight.preflightReady || !preflight.controlAvailable) {
 			return warning("Raman runtime is registered but not ready for live controlled execution.", stateAfter);
 		}
-		return success("Raman hardware status is ready and stage position was read.", stateAfter);
+		return success(`Raman hardware status is ready. Stage position: ${formatStagePosition(position)}.`, stateAfter);
 	},
 } satisfies ToolDefinition<typeof EmptyParamsSchema, OperatorToolDetails>;
 
@@ -264,7 +268,7 @@ export const ramanGetStagePositionTool = {
 			}, false);
 		}
 
-		return success("Stage position read.", {
+		return success(`Stage position read: ${formatStagePosition(position)}.`, {
 			stageResourceId: runtime.stage.resource.resourceId,
 			position,
 		});
@@ -327,7 +331,10 @@ export const ramanStageMoveRelativeTool = {
 			confirmed: params.confirmed === true,
 		};
 		if (params.confirmed !== true) {
-			return warning("Stage relative move requires explicit confirmation before execution.", proposalState);
+			return warning(
+				`Stage relative move requires explicit confirmation before execution. Current: ${formatStagePosition(current)}. Target: ${formatStagePosition(target)}.`,
+				proposalState,
+			);
 		}
 
 		const moveResult = await runtime.stage.moveAbsoluteAndWait({
@@ -344,7 +351,7 @@ export const ramanStageMoveRelativeTool = {
 			}, moveResult.retrySafe);
 		}
 
-		return success("Stage relative move completed.", {
+		return success(`Stage relative move completed. Target: ${formatStagePosition(target)}.`, {
 			...proposalState,
 			payload: moveResult.payload ?? {},
 		});
