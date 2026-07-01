@@ -21,8 +21,55 @@ const StageRelativeMoveParamsSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+const SmokeSpectrumParamsSchema = Type.Object(
+	{
+		confirmed: Type.Optional(Type.Boolean()),
+		integrationTimeMs: Type.Optional(Type.Integer({ minimum: 1 })),
+		laserPowerMw: Type.Optional(Type.Number({ minimum: 0 })),
+		accumulations: Type.Optional(Type.Integer({ minimum: 1 })),
+		saveFormat: Type.Optional(Type.Union([Type.Literal("txt"), Type.Literal("csv")])),
+		timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
+	},
+	{ additionalProperties: false },
+);
+
+const AutofocusParamsSchema = Type.Object(
+	{
+		confirmed: Type.Optional(Type.Boolean()),
+		roi: Type.Optional(
+			Type.Object(
+				{
+					x: Type.Integer({ minimum: 0 }),
+					y: Type.Integer({ minimum: 0 }),
+					width: Type.Integer({ minimum: 1 }),
+					height: Type.Integer({ minimum: 1 }),
+				},
+				{ additionalProperties: false },
+			),
+		),
+		coarseRangeUm: Type.Optional(Type.Number({ minimum: 0 })),
+		coarseStepUm: Type.Optional(Type.Number({ minimum: 0 })),
+		fineRangeUm: Type.Optional(Type.Number({ minimum: 0 })),
+		fineStepUm: Type.Optional(Type.Number({ minimum: 0 })),
+		timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
+		minObjectiveClearanceUm: Type.Optional(Type.Number({ minimum: 0 })),
+	},
+	{ additionalProperties: false },
+);
+
 type StageRelativeMoveParams = Static<typeof StageRelativeMoveParamsSchema>;
+type SmokeSpectrumParams = Static<typeof SmokeSpectrumParamsSchema>;
+type OperatorAutofocusParams = Static<typeof AutofocusParamsSchema>;
 type StageAxis = Static<typeof StageAxisSchema>;
+
+const DEFAULT_SMOKE_SPECTRUM_INTEGRATION_TIME_MS = 1000;
+const DEFAULT_SMOKE_SPECTRUM_LASER_POWER_MW = 0.5;
+const DEFAULT_SMOKE_SPECTRUM_ACCUMULATIONS = 1;
+const DEFAULT_SMOKE_SPECTRUM_TIMEOUT_MS = 10_000;
+const MAX_SMOKE_SPECTRUM_LASER_POWER_MW = 0.5;
+const DEFAULT_AUTOFOCUS_TIMEOUT_MS = 30_000;
+const DEFAULT_AUTOFOCUS_MIN_OBJECTIVE_CLEARANCE_UM = 200;
+const DEFAULT_AUTOFOCUS_ROI = { x: 100, y: 100, width: 64, height: 64 };
 
 interface OperatorToolDetails {
 	status: "success" | "warning" | "error";
@@ -112,6 +159,11 @@ function positionFromActionResult(result: ActionResult): StagePosition | undefin
 		return undefined;
 	}
 	return { xUm, yUm, zUm };
+}
+
+function readString(record: Record<string, unknown>, key: string): string | undefined {
+	const value = record[key];
+	return typeof value === "string" ? value : undefined;
 }
 
 function formatStagePosition(position: StagePosition): string {
@@ -274,6 +326,217 @@ export const ramanGetStagePositionTool = {
 		});
 	},
 } satisfies ToolDefinition<typeof EmptyParamsSchema, OperatorToolDetails>;
+
+export const ramanCaptureFrameTool = {
+	name: "raman_capture_frame",
+	label: "Raman Capture Frame",
+	description: "Capture the latest microscope/frame-provider image through the registered live Raman runtime.",
+	promptSnippet: "Capture the current microscope/frame-provider image as a frame artifact",
+	promptGuidelines: [
+		"Use this for operator requests to view, capture, or record the current microscope/sample image.",
+		"Do not construct a Raman acquisition ProcedureSpec just to capture a frame.",
+		"Return the frame artifact/path from the tool result when capture succeeds.",
+	],
+	parameters: EmptyParamsSchema,
+	executionMode: "sequential",
+	async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+		const runtime = getRamanLiveRuntime(ctx.cwd);
+		if (!runtime) {
+			return runtimeUnavailableState();
+		}
+
+		const frameResult = await runtime.frame.captureLatest({
+			action: "frame.capture_latest",
+			resourceId: runtime.frame.resource.resourceId,
+			timeoutMs: 10_000,
+		});
+		const payload = isRecord(frameResult.payload) ? frameResult.payload : {};
+		const framePath = readString(payload, "framePath");
+		const stateAfter: Record<string, unknown> = {
+			frameProviderResourceId: runtime.frame.resource.resourceId,
+			actionStatus: frameResult.status,
+			payload,
+			artifactRefs: frameResult.artifacts,
+		};
+
+		if (frameResult.status !== "success") {
+			return error(frameResult.summary, frameResult.errorCode ?? "frame_capture_failed", stateAfter, frameResult.retrySafe);
+		}
+
+		const summary = framePath ? `Frame captured: ${framePath}.` : "Frame captured.";
+		return success(summary, stateAfter);
+	},
+} satisfies ToolDefinition<typeof EmptyParamsSchema, OperatorToolDetails>;
+
+export const ramanAcquireSmokeSpectrumTool = {
+	name: "raman_acquire_smoke_spectrum",
+	label: "Raman Smoke Spectrum",
+	description: "Acquire one minimal operator-confirmed Raman smoke spectrum through the registered live runtime.",
+	promptSnippet: "Acquire one low-power smoke spectrum for hardware/debug observation after explicit operator confirmation",
+	promptGuidelines: [
+		"Use this only for operator debug requests such as checking whether spectrum acquisition works at the current point.",
+		"Call first without confirmed=true to present the acquisition settings and laser exposure warning.",
+		"Call with confirmed=true only after explicit operator confirmation.",
+		"Use bounded ProcedureSpec runs for real experimental acquisition, parameter search, or mapping.",
+	],
+	parameters: SmokeSpectrumParamsSchema,
+	executionMode: "sequential",
+	async execute(_toolCallId, params: SmokeSpectrumParams, _signal, _onUpdate, ctx) {
+		const runtime = getRamanLiveRuntime(ctx.cwd);
+		if (!runtime) {
+			return runtimeUnavailableState();
+		}
+
+		const acquisition = {
+			integrationTimeMs: params.integrationTimeMs ?? DEFAULT_SMOKE_SPECTRUM_INTEGRATION_TIME_MS,
+			laserPowerMw: params.laserPowerMw ?? DEFAULT_SMOKE_SPECTRUM_LASER_POWER_MW,
+			accumulations: params.accumulations ?? DEFAULT_SMOKE_SPECTRUM_ACCUMULATIONS,
+			saveFormat: params.saveFormat ?? "txt",
+		};
+		const timeoutMs = params.timeoutMs ?? DEFAULT_SMOKE_SPECTRUM_TIMEOUT_MS;
+		const proposalState: Record<string, unknown> = {
+			spectrometerResourceId: runtime.spectrometer.resource.resourceId,
+			acquisition,
+			timeoutMs,
+			maxLaserPowerMw: MAX_SMOKE_SPECTRUM_LASER_POWER_MW,
+			requiresConfirmation: true,
+			confirmed: params.confirmed === true,
+		};
+
+		if (acquisition.laserPowerMw > MAX_SMOKE_SPECTRUM_LASER_POWER_MW) {
+			return error(
+				`Smoke spectrum laser power ${acquisition.laserPowerMw} mW exceeds operator debug limit ${MAX_SMOKE_SPECTRUM_LASER_POWER_MW} mW.`,
+				"laser_power_limit_exceeded",
+				proposalState,
+				false,
+			);
+		}
+
+		if (params.confirmed !== true) {
+			return warning(
+				`Smoke spectrum requires explicit confirmation before laser exposure. Settings: ${acquisition.integrationTimeMs} ms, ${acquisition.laserPowerMw} mW, ${acquisition.accumulations} accumulation(s).`,
+				proposalState,
+			);
+		}
+
+		const spectrumResult = await runtime.spectrometer.acquireSpectrum({
+			action: "spectrometer.acquire_spectrum",
+			resourceId: runtime.spectrometer.resource.resourceId,
+			acquisition,
+			timeoutMs,
+		});
+		const payload = isRecord(spectrumResult.payload) ? spectrumResult.payload : {};
+		const outputPath = readString(payload, "outputPath");
+		const stateAfter: Record<string, unknown> = {
+			...proposalState,
+			actionStatus: spectrumResult.status,
+			payload,
+			artifactRefs: spectrumResult.artifacts,
+		};
+
+		if (spectrumResult.status !== "success") {
+			return error(spectrumResult.summary, spectrumResult.errorCode ?? "spectrum_acquisition_failed", stateAfter, spectrumResult.retrySafe);
+		}
+
+		const summary = outputPath ? `Smoke spectrum acquired: ${outputPath}.` : "Smoke spectrum acquired.";
+		return success(summary, stateAfter);
+	},
+} satisfies ToolDefinition<typeof SmokeSpectrumParamsSchema, OperatorToolDetails>;
+
+export const ramanRunAutofocusTool = {
+	name: "raman_run_autofocus",
+	label: "Raman Autofocus",
+	description: "Run a confirmed Z autofocus at the current XY position through the registered live Raman runtime.",
+	promptSnippet: "Run autofocus before frame capture or point observation after explicit operator confirmation",
+	promptGuidelines: [
+		"Use this for operator requests to focus the current view or prepare a frame capture at the current XY position.",
+		"Call first without confirmed=true to present the autofocus ROI, Z range, and motion warning.",
+		"Call with confirmed=true only after explicit operator confirmation.",
+		"Use bounded ProcedureSpec runs when autofocus is part of a real Raman acquisition, parameter search, or mapping.",
+	],
+	parameters: AutofocusParamsSchema,
+	executionMode: "sequential",
+	async execute(_toolCallId, params: OperatorAutofocusParams, _signal, _onUpdate, ctx) {
+		const runtime = getRamanLiveRuntime(ctx.cwd);
+		if (!runtime) {
+			return runtimeUnavailableState();
+		}
+
+		const stageZRange = runtime.stage.resource.limits.zRangeUm;
+		const minObjectiveClearanceUm = params.minObjectiveClearanceUm ?? DEFAULT_AUTOFOCUS_MIN_OBJECTIVE_CLEARANCE_UM;
+		const zMinUm = Math.max(stageZRange[0], minObjectiveClearanceUm);
+		const zMaxUm = stageZRange[1];
+		const roi = params.roi ?? DEFAULT_AUTOFOCUS_ROI;
+		const autofocusParams = {
+			zMinUm,
+			zMaxUm,
+			coarseRangeUm: params.coarseRangeUm,
+			coarseStepUm: params.coarseStepUm,
+			fineRangeUm: params.fineRangeUm,
+			fineStepUm: params.fineStepUm,
+		};
+		const timeoutMs = params.timeoutMs ?? DEFAULT_AUTOFOCUS_TIMEOUT_MS;
+		const proposalState: Record<string, unknown> = {
+			stageResourceId: runtime.stage.resource.resourceId,
+			frameProviderResourceId: runtime.frame.resource.resourceId,
+			roi,
+			params: autofocusParams,
+			timeoutMs,
+			stageZRangeUm: stageZRange,
+			minObjectiveClearanceUm,
+			requiresConfirmation: true,
+			confirmed: params.confirmed === true,
+		};
+
+		if (zMinUm >= zMaxUm) {
+			return error(
+				`Autofocus zMinUm ${zMinUm} um must be below zMaxUm ${zMaxUm} um.`,
+				"autofocus_invalid_z_range",
+				proposalState,
+				false,
+			);
+		}
+
+		if (params.confirmed !== true) {
+			return warning(
+				`Autofocus requires explicit confirmation before Z motion. ROI: x=${roi.x}, y=${roi.y}, width=${roi.width}, height=${roi.height}; allowed Z range: ${zMinUm}-${zMaxUm} um.`,
+				proposalState,
+			);
+		}
+
+		const autofocusResult = await runtime.autofocus.runSingle({
+			action: "autofocus.run_single",
+			stageResourceId: runtime.stage.resource.resourceId,
+			frameProviderResourceId: runtime.frame.resource.resourceId,
+			roi,
+			params: autofocusParams,
+			timeoutMs,
+		});
+		const payload = isRecord(autofocusResult.payload) ? autofocusResult.payload : {};
+		const zBestUm = readNumber(payload, "zBestUm");
+		const stateAfter: Record<string, unknown> = {
+			...proposalState,
+			actionStatus: autofocusResult.status,
+			payload,
+			artifactRefs: autofocusResult.artifacts,
+		};
+
+		if (autofocusResult.status !== "success") {
+			return error(autofocusResult.summary, autofocusResult.errorCode ?? "autofocus_failed", stateAfter, autofocusResult.retrySafe);
+		}
+		if (zBestUm !== undefined && (zBestUm < zMinUm || zBestUm > zMaxUm)) {
+			return error(
+				`Autofocus settled at Z=${zBestUm} um outside allowed Z range ${zMinUm}-${zMaxUm} um.`,
+				"motion_out_of_bounds",
+				stateAfter,
+				false,
+			);
+		}
+
+		const summary = zBestUm === undefined ? "Autofocus completed." : `Autofocus completed at Z=${zBestUm} um.`;
+		return success(summary, stateAfter);
+	},
+} satisfies ToolDefinition<typeof AutofocusParamsSchema, OperatorToolDetails>;
 
 export const ramanStageMoveRelativeTool = {
 	name: "raman_stage_move_relative",

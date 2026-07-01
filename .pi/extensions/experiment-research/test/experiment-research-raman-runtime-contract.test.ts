@@ -93,6 +93,8 @@ describe("experiment research Raman runtime contract", () => {
 				coarseStepUm: 10,
 				fineRangeUm: 15,
 				fineStepUm: 2,
+				zMinUm: 200,
+				zMaxUm: 5000,
 			},
 			timeoutMs: 15_000,
 		};

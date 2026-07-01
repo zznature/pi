@@ -8,7 +8,6 @@ Implementation should always follow `docs/design-ideas/core-ideas.md`, which is 
 - Agent can only edit it with user's direct order.
 - The tech plans are also in `docs/design-ideas/`. Tech docs should be updated with the actual implementing and reflect the actual code.
 
-`.pi/extensions/experiment-research-legacy` is reference-only and soon to be deprecated.
 
 ## Thinking from First Principles
 

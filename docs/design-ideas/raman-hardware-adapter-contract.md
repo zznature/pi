@@ -340,6 +340,9 @@ operator 需要的不是完整实验入口，而是现场维护与证据链工�
 - `abort_run`
 - `raman_get_hardware_status`
 - `raman_get_stage_position`
+- `raman_capture_frame`
+- `raman_run_autofocus`
+- `raman_acquire_smoke_spectrum`
 - `raman_stage_move_relative`
 - `raman_active_probe`
 - `raman_record_xy_calibration`（MVP 不实现，随 XY correction 一并推迟）
@@ -350,6 +353,15 @@ operator 需要的不是完整实验入口，而是现场维护与证据链工�
 其中 `raman_stage_move_relative` 属于 operator 确认后的 stage-only nudge：
 它应读取当前位置、计算目标、用 runtime stage resource limits 做硬边界校验；
 它不应为了单轴移动构造 Raman 采谱 `ProcedureSpec`，也不应要求 frame provider / spectrometer 参与。
+其中 `raman_capture_frame` 属于 operator 的现场观察能力：
+它应通过 runtime 的 `frame.capture_latest` 复合 action 返回 frame artifact/path，
+不应暴露 `start_video_session`、文件夹 glob 或相机底层驱动细节。
+其中 `raman_run_autofocus` 属于 operator 的受控对焦能力：
+它会产生真实 Z motion，必须显式确认，并应把 `minObjectiveClearanceUm` 合入 autofocus 的允许 Z 范围；
+如果 autofocus 是正式 Raman run 的一部分，仍应由 bounded `ProcedureSpec` 执行。
+其中 `raman_acquire_smoke_spectrum` 属于 operator 的 active probe / debug 能力：
+它只用于确认当前采谱链路是否可用，必须显式确认激光曝光，并受固定低功率 debug 上限约束；
+正式实验采集、参数搜索和 mapping 仍应走 bounded `ProcedureSpec`。
 
 ### 6.3 明确不暴露为 Planner Tool 的能力
 

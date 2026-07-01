@@ -80,6 +80,8 @@ export const AutofocusRunSingleActionSchema = Type.Object(
 					coarseStepUm: Type.Optional(Type.Number({ minimum: 0 })),
 					fineRangeUm: Type.Optional(Type.Number({ minimum: 0 })),
 					fineStepUm: Type.Optional(Type.Number({ minimum: 0 })),
+					zMinUm: Type.Optional(Type.Number()),
+					zMaxUm: Type.Optional(Type.Number()),
 				},
 				{ additionalProperties: false },
 			),

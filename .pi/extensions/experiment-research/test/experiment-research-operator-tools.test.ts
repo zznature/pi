@@ -64,7 +64,7 @@ function loadExperimentExtension(): CapturedExtension {
 	return { tools, handlers };
 }
 
-function createOperatorRuntime(position: MutablePosition): RamanLiveRuntime {
+function createOperatorRuntime(position: MutablePosition, options: { autofocusZBestUm?: number } = {}): RamanLiveRuntime {
 	return {
 		preflight() {
 			return {
@@ -112,7 +112,24 @@ function createOperatorRuntime(position: MutablePosition): RamanLiveRuntime {
 		},
 		autofocus: {
 			runSingle() {
-				return successActionResult("not used");
+				const zBestUm = options.autofocusZBestUm ?? 320;
+				position.zUm = zBestUm;
+				return successActionResult(
+					"Autofocus completed.",
+					{
+						zBestUm,
+						confidence: 0.9,
+						finalScore: 1.2,
+					},
+					[
+						{
+							artifactId: "autofocus-curve",
+							kind: "autofocus",
+							path: "D:/RamanLab/SpecBridge/autofocus/curve.json",
+							label: "Autofocus curve",
+						},
+					],
+				);
 			},
 		},
 		frame: {
@@ -130,7 +147,21 @@ function createOperatorRuntime(position: MutablePosition): RamanLiveRuntime {
 				simulationAvailable: false,
 			},
 			captureLatest() {
-				return successActionResult("not used");
+				return successActionResult(
+					"Frame captured.",
+					{
+						framePath: "D:\\RamanLab\\SpecBridge\\frames\\frame_1.tif",
+						shape: [512, 512],
+					},
+					[
+						{
+							artifactId: "frame-latest",
+							kind: "frame",
+							path: "D:/RamanLab/SpecBridge/frames/frame_1.tif",
+							label: "LabSpec frame",
+						},
+					],
+				);
 			},
 		},
 		spectrometer: {
@@ -148,7 +179,21 @@ function createOperatorRuntime(position: MutablePosition): RamanLiveRuntime {
 				simulationAvailable: false,
 			},
 			acquireSpectrum() {
-				return successActionResult("not used");
+				return successActionResult(
+					"Spectrum acquired.",
+					{
+						outputPath: "D:\\RamanLab\\SpecBridge\\spectra\\smoke.txt",
+						snr: 12,
+					},
+					[
+						{
+							artifactId: "spectrum-smoke",
+							kind: "spectrum",
+							path: "D:/RamanLab/SpecBridge/spectra/smoke.txt",
+							label: "Smoke spectrum",
+						},
+					],
+				);
 			},
 		},
 	};
@@ -230,6 +275,120 @@ describe("experiment research operator tools", () => {
 		]);
 		expect(moveState.target).toEqual({ xUm: 150, yUm: 200, zUm: 300 });
 		expect(position.xUm).toBe(150);
+	});
+
+	it("captures the current microscope frame through the registered runtime", async () => {
+		const cwd = createTempCwd();
+		const extension = loadExperimentExtension();
+		registerRamanLiveRuntime(cwd, createOperatorRuntime({ xUm: 100, yUm: 200, zUm: 300 }));
+		const context = { cwd } as ExtensionContext;
+
+		const frameResult = await extension.tools
+			.get("raman_capture_frame")
+			?.execute("frame", {}, undefined, undefined, context);
+		const frameDetails = asRecord(frameResult?.details);
+		const frameState = asRecord(frameDetails.stateAfter);
+
+		expect(frameDetails.status).toBe("success");
+		expect(asRecord(frameResult).content).toEqual([
+			{ type: "text", text: "Frame captured: D:\\RamanLab\\SpecBridge\\frames\\frame_1.tif." },
+		]);
+		expect(frameState.frameProviderResourceId).toBe("frame-main");
+		expect(frameState.artifactRefs).toEqual([
+			{
+				artifactId: "frame-latest",
+				kind: "frame",
+				path: "D:/RamanLab/SpecBridge/frames/frame_1.tif",
+				label: "LabSpec frame",
+			},
+		]);
+	});
+
+	it("requires confirmation for autofocus and rejects an unsafe autofocus result", async () => {
+		const cwd = createTempCwd();
+		const extension = loadExperimentExtension();
+		const position = { xUm: 100, yUm: 200, zUm: 300 };
+		registerRamanLiveRuntime(cwd, createOperatorRuntime(position));
+		const context = { cwd } as ExtensionContext;
+
+		const proposalResult = await extension.tools
+			.get("raman_run_autofocus")
+			?.execute("autofocus-proposal", {}, undefined, undefined, context);
+		const proposalDetails = asRecord(proposalResult?.details);
+		const proposalState = asRecord(proposalDetails.stateAfter);
+
+		expect(proposalDetails.status).toBe("warning");
+		expect(proposalState.requiresConfirmation).toBe(true);
+		expect(proposalState.confirmed).toBe(false);
+		expect(asRecord(proposalState.roi)).toEqual({ x: 100, y: 100, width: 64, height: 64 });
+		expect(asRecord(proposalState.params).zMinUm).toBe(200);
+
+		const autofocusResult = await extension.tools
+			.get("raman_run_autofocus")
+			?.execute("autofocus-confirmed", { confirmed: true }, undefined, undefined, context);
+		const autofocusDetails = asRecord(autofocusResult?.details);
+		const autofocusState = asRecord(autofocusDetails.stateAfter);
+
+		expect(autofocusDetails.status).toBe("success");
+		expect(asRecord(autofocusResult).content).toEqual([{ type: "text", text: "Autofocus completed at Z=320 um." }]);
+		expect(asRecord(autofocusState.payload).zBestUm).toBe(320);
+		expect(position.zUm).toBe(320);
+
+		const unsafeCwd = createTempCwd();
+		const unsafePosition = { xUm: 100, yUm: 200, zUm: 300 };
+		registerRamanLiveRuntime(unsafeCwd, createOperatorRuntime(unsafePosition, { autofocusZBestUm: 100 }));
+		const unsafeContext = { cwd: unsafeCwd } as ExtensionContext;
+		const unsafeResult = await extension.tools
+			.get("raman_run_autofocus")
+			?.execute("autofocus-unsafe", { confirmed: true }, undefined, undefined, unsafeContext);
+		const unsafeDetails = asRecord(unsafeResult?.details);
+
+		expect(unsafeDetails.status).toBe("error");
+		expect(unsafeDetails.errorCode).toBe("motion_out_of_bounds");
+	});
+
+	it("requires confirmation for a low-power smoke spectrum and then returns spectrum artifacts", async () => {
+		const cwd = createTempCwd();
+		const extension = loadExperimentExtension();
+		registerRamanLiveRuntime(cwd, createOperatorRuntime({ xUm: 100, yUm: 200, zUm: 300 }));
+		const context = { cwd } as ExtensionContext;
+
+		const proposalResult = await extension.tools
+			.get("raman_acquire_smoke_spectrum")
+			?.execute("smoke-proposal", {}, undefined, undefined, context);
+		const proposalDetails = asRecord(proposalResult?.details);
+		const proposalState = asRecord(proposalDetails.stateAfter);
+
+		expect(proposalDetails.status).toBe("warning");
+		expect(proposalState.requiresConfirmation).toBe(true);
+		expect(proposalState.confirmed).toBe(false);
+		expect(asRecord(proposalState.acquisition).laserPowerMw).toBe(0.5);
+
+		const highPowerResult = await extension.tools
+			.get("raman_acquire_smoke_spectrum")
+			?.execute("smoke-high-power", { laserPowerMw: 2, confirmed: true }, undefined, undefined, context);
+		const highPowerDetails = asRecord(highPowerResult?.details);
+		expect(highPowerDetails.status).toBe("error");
+		expect(highPowerDetails.errorCode).toBe("laser_power_limit_exceeded");
+
+		const spectrumResult = await extension.tools
+			.get("raman_acquire_smoke_spectrum")
+			?.execute("smoke-confirmed", { confirmed: true }, undefined, undefined, context);
+		const spectrumDetails = asRecord(spectrumResult?.details);
+		const spectrumState = asRecord(spectrumDetails.stateAfter);
+
+		expect(spectrumDetails.status).toBe("success");
+		expect(asRecord(spectrumResult).content).toEqual([
+			{ type: "text", text: "Smoke spectrum acquired: D:\\RamanLab\\SpecBridge\\spectra\\smoke.txt." },
+		]);
+		expect(spectrumState.artifactRefs).toEqual([
+			{
+				artifactId: "spectrum-smoke",
+				kind: "spectrum",
+				path: "D:/RamanLab/SpecBridge/spectra/smoke.txt",
+				label: "Smoke spectrum",
+			},
+		]);
 	});
 
 	it("rejects stage relative motion outside runtime resource limits", async () => {

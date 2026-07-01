@@ -26,7 +26,7 @@ docs freeze
 
 1. 每个 goal 都必须形成一个可验证增量，不做只铺结构不形成闭环的空转开发。
 2. 优先做纵向切片，不做大面积横向重构。
-3. `.pi/extensions/experiment-research-legacy` 仅作为 reference implementation，不作为默认继承基线。
+3. `.pi/extensions/experiment-research` 是唯一 MVP implementation baseline；旧 reference implementation 已删除。
 4. 新实现必须以 `docs/design-ideas/` 为权威设计来源。
 5. 所有真实硬件执行都必须服从 supervised bounded run 边界。
 
@@ -34,7 +34,7 @@ docs freeze
 
 满足以下条件时，可以认为 MVP rebuild 基本完成：
 
-- `experiment-research` extension 存在并可加载（旧实现已移到 `experiment-research-legacy/`）。
+- `experiment-research` extension 存在并可加载。
 - 新架构不再以旧 extension 的 `ExperimentSpec` 体系为中心。
 - 核心对象固定为三层：
   - `ExperimentIntent`
@@ -86,7 +86,7 @@ docs freeze
   - [x] agent cannot expand search unboundedly
   - [x] "good enough conditions" use explicit rules
 - [x] `product_usage_example.md` 反映 phase-based supervised workflow
-- [x] `AGENTS.md` 明确旧 extension 仅作 reference
+- [x] `AGENTS.md` 明确当前 extension 是唯一 MVP implementation baseline
 - [x] 明确 MVP 暂不做：
   - [x] full watchdog policy
   - [x] generalized multi-device platform
@@ -106,18 +106,18 @@ docs freeze
 
 ### Objective
 
-创建 `.pi/extensions/experiment-research` 的最小扩展骨架，并保证能被加载。旧实现先移到 `.pi/extensions/experiment-research-legacy/`，仅作 reference。
+创建 `.pi/extensions/experiment-research` 的最小扩展骨架，并保证能被加载。旧实现曾短期保留为 reference，现已删除。
 
 ### Scope
 
-- 旧 extension 重命名为 `experiment-research-legacy`
+- 删除旧 reference implementation
 - 新 extension 目录创建
 - 最小入口文件
 - 最小 tool registration wiring
 
 ### Checklist
 
-- [x] 将旧 `.pi/extensions/experiment-research` 移到 `experiment-research-legacy/`
+- [x] 删除旧 reference implementation
 - [x] 新建 `.pi/extensions/experiment-research/`
 - [x] 添加最小文件：
   - [x] `package.json`
@@ -142,7 +142,7 @@ docs freeze
 
 ### Suggested Codex Goal
 
-`Scaffold the experiment-research extension with minimal loading and tool registration, moving the old implementation to experiment-research-legacy.`
+`Scaffold the experiment-research extension with minimal loading and tool registration.`
 
 ## Phase 2: Define The Core Objects
 
@@ -566,6 +566,9 @@ docs freeze
 
 - read-only hardware status
 - read-only stage position
+- active frame capture
+- confirmed operator autofocus
+- confirmed low-power smoke spectrum
 - confirmed stage-only relative motion
 - runtime config example
 
@@ -576,7 +579,13 @@ docs freeze
 - [x] 新增 operator-facing tools：
   - [x] `raman_get_hardware_status`
   - [x] `raman_get_stage_position`
+  - [x] `raman_capture_frame`
+  - [x] `raman_run_autofocus`
+  - [x] `raman_acquire_smoke_spectrum`
   - [x] `raman_stage_move_relative`
+- [x] active frame capture 不要求构造 Raman `ProcedureSpec`
+- [x] operator autofocus 需要显式确认并受 Z range / minObjectiveClearanceUm 约束
+- [x] smoke spectrum 需要显式确认并受低功率 debug 上限约束
 - [x] stage-only relative move 不要求 frame provider / spectrometer 资源
 - [x] stage-only relative move 通过 runtime stage resource limits 做边界拒绝
 - [x] stage-only relative move 在未显式确认时只返回 proposal，不执行 motion
@@ -592,7 +601,7 @@ docs freeze
 
 - 用户询问连接状态或当前位置时，agent 直接走 read-only operator tool。
 - 用户要求小幅 stage nudge 时，agent 不再构造 `raman_single_point_probe`。
-- legacy extension 不再是 MVP 现场操作的必要路径。
+- legacy extension 已删除，不再是 MVP 现场操作路径。
 - LabAgent 初始化时可把稳定实验室设备资源加载进上下文，本地临时改动不会污染 lab default。
 
 ### Suggested Codex Goal

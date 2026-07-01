@@ -303,8 +303,8 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
         result = controller.run_single(
             ROI(**payload["roi"]),
             AutofocusParams(
-                z_min_um=z_range[0],
-                z_max_um=z_range[1],
+                z_min_um=params.get("zMinUm", z_range[0]),
+                z_max_um=params.get("zMaxUm", z_range[1]),
                 coarse_range_um=params.get("coarseRangeUm", 80.0),
                 coarse_step_um=params.get("coarseStepUm", 10.0),
                 fine_range_um=params.get("fineRangeUm", 15.0),

@@ -64,9 +64,9 @@ Current status:
   - `index.ts`
 - the live Python hardware driver entrypoint lives at
   `.pi/raman-lab-config/hardware-python-driver/raman_runtime_daemon.py`
-- stage-only operator reads and nudges use the registered Raman live runtime directly.
-  They do not require a Raman `ProcedureSpec`, frame provider, or spectrometer
-  resource unless the operation itself needs those devices.
+- operator reads, active probes, and stage nudges use the registered Raman live
+  runtime directly. They do not require a Raman `ProcedureSpec`; each tool only
+  touches the resource it needs.
 
 ## Live Raman Runtime Configuration
 
@@ -206,8 +206,4 @@ Run them with:
 npm --prefix .pi/extensions/experiment-research test
 ```
 
-The previous implementation has been moved to:
-
-- `.pi/extensions/experiment-research-legacy`
-
-That legacy directory remains available as a reference-only implementation during the rebuild.
+The previous reference implementation has been deleted. This extension is the sole MVP implementation baseline.
