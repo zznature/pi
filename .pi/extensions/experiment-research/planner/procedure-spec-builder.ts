@@ -59,6 +59,19 @@ interface AutofocusInput {
 		coarseStepUm?: number;
 		fineRangeUm?: number;
 		fineStepUm?: number;
+		zStartUm?: number;
+		zEndUm?: number;
+		pointCount?: number;
+		minPoints?: number;
+		maxPoints?: number;
+		targetSpacingUm?: number;
+		framesPerZ?: number;
+		targetToleranceUm?: number;
+		finalToleranceUm?: number;
+		finalApproachOffsetUm?: number;
+		interpolatePeak?: boolean;
+		finalVerificationFramesPerZ?: number;
+		metricName?: string;
 	};
 }
 

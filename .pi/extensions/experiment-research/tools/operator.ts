@@ -51,6 +51,19 @@ const AutofocusParamsSchema = Type.Object(
 		coarseStepUm: Type.Optional(Type.Number({ minimum: 0 })),
 		fineRangeUm: Type.Optional(Type.Number({ minimum: 0 })),
 		fineStepUm: Type.Optional(Type.Number({ minimum: 0 })),
+		zStartUm: Type.Optional(Type.Number()),
+		zEndUm: Type.Optional(Type.Number()),
+		pointCount: Type.Optional(Type.Integer({ minimum: 3 })),
+		minPoints: Type.Optional(Type.Integer({ minimum: 3 })),
+		maxPoints: Type.Optional(Type.Integer({ minimum: 3 })),
+		targetSpacingUm: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		framesPerZ: Type.Optional(Type.Integer({ minimum: 1 })),
+		targetToleranceUm: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		finalToleranceUm: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+		finalApproachOffsetUm: Type.Optional(Type.Number({ minimum: 0 })),
+		interpolatePeak: Type.Optional(Type.Boolean()),
+		finalVerificationFramesPerZ: Type.Optional(Type.Integer({ minimum: 1 })),
+		metricName: Type.Optional(Type.String({ minLength: 1 })),
 		timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
 		minObjectiveClearanceUm: Type.Optional(Type.Number({ minimum: 0 })),
 	},
@@ -474,6 +487,19 @@ export const ramanRunAutofocusTool = {
 			coarseStepUm: params.coarseStepUm,
 			fineRangeUm: params.fineRangeUm,
 			fineStepUm: params.fineStepUm,
+			zStartUm: params.zStartUm,
+			zEndUm: params.zEndUm,
+			pointCount: params.pointCount,
+			minPoints: params.minPoints,
+			maxPoints: params.maxPoints,
+			targetSpacingUm: params.targetSpacingUm,
+			framesPerZ: params.framesPerZ,
+			targetToleranceUm: params.targetToleranceUm,
+			finalToleranceUm: params.finalToleranceUm,
+			finalApproachOffsetUm: params.finalApproachOffsetUm,
+			interpolatePeak: params.interpolatePeak,
+			finalVerificationFramesPerZ: params.finalVerificationFramesPerZ,
+			metricName: params.metricName,
 		};
 		const timeoutMs = params.timeoutMs ?? DEFAULT_AUTOFOCUS_TIMEOUT_MS;
 		const proposalState: Record<string, unknown> = {
@@ -491,6 +517,26 @@ export const ramanRunAutofocusTool = {
 		if (zMinUm >= zMaxUm) {
 			return error(
 				`Autofocus zMinUm ${zMinUm} um must be below zMaxUm ${zMaxUm} um.`,
+				"autofocus_invalid_z_range",
+				proposalState,
+				false,
+			);
+		}
+		if ((params.zStartUm === undefined) !== (params.zEndUm === undefined)) {
+			return error(
+				"Fixed-range autofocus requires both zStartUm and zEndUm when either is provided.",
+				"autofocus_invalid_z_range",
+				proposalState,
+				false,
+			);
+		}
+		if (
+			params.zStartUm !== undefined &&
+			params.zEndUm !== undefined &&
+			(params.zStartUm < zMinUm || params.zStartUm > zMaxUm || params.zEndUm < zMinUm || params.zEndUm > zMaxUm)
+		) {
+			return error(
+				`Fixed-range autofocus bounds ${params.zStartUm}-${params.zEndUm} um must stay within allowed Z range ${zMinUm}-${zMaxUm} um.`,
 				"autofocus_invalid_z_range",
 				proposalState,
 				false,

@@ -5,13 +5,16 @@ import statistics
 from typing import Callable, Optional
 from autofocus.models import (
     ROI, FrameProvider, ZStage, FocusStrategy,
-    AutofocusParams, FocusPoint, ScanCurve, FocusStatus, FocusResult,
+    AutofocusParams, FixedRangeAutofocusParams, FixedRangeAutofocusResult,
+    FocusPoint, ScanCurve, FocusStatus, FocusResult, ScoredZPoint,
 )
 from autofocus.exceptions import (
     OutOfRangeError, StageTimeoutError, FrameTimeoutError,
 )
 from autofocus.scanner import ZScanner
 from autofocus.metrics import MetricStrategy
+from autofocus.peak_locator import PeakLocator
+from autofocus.range_scanner import FixedRangeScanner
 from stage.exceptions import StageError
 
 log = logging.getLogger(__name__)
@@ -202,4 +205,94 @@ class AutofocusController:
             coarse=coarse,
             fine=fine,
             message=message,
+        )
+
+    def run_fixed_range(
+        self,
+        roi: ROI,
+        params: FixedRangeAutofocusParams,
+        on_progress: Optional[Callable[[ScoredZPoint], None]] = None,
+    ) -> FocusResult:
+        """Run the lab-optimized fixed-range autofocus and adapt it to FocusResult."""
+        controller = FixedRangeAutofocusController(self.stage, self.frames, self._strategy)
+        try:
+            result = controller.run(roi, params, on_progress=on_progress)
+        except FrameTimeoutError as e:
+            return self._result_error(FocusStatus.FRAME_ERROR, f"Fixed-range scan: {e}")
+        except (StageTimeoutError, StageError) as e:
+            return self._result_error(FocusStatus.STAGE_ERROR, f"Fixed-range scan: {e}")
+        except Exception as e:
+            return self._result_error(FocusStatus.NO_PEAK, f"Fixed-range scan: {e}")
+
+        confidence = self._fixed_range_confidence(result)
+        status = FocusStatus.OK if confidence >= 0.2 else FocusStatus.LOW_CONFIDENCE
+        message = "" if status == FocusStatus.OK else f"Fixed-range confidence {confidence:.2f} below threshold 0.20"
+        curve = ScanCurve(
+            phase="coarse",
+            points=[
+                FocusPoint(z_um=point.actual_z_um, score=point.score, saturation_ratio=0.0)
+                for point in result.points
+            ],
+        )
+        return FocusResult(
+            status=status,
+            z_best_um=result.final_z_um,
+            final_score=result.final_verification.score,
+            confidence=confidence,
+            coarse=curve,
+            fine=None,
+            message=message,
+        )
+
+    @staticmethod
+    def _fixed_range_confidence(result: FixedRangeAutofocusResult) -> float:
+        scores = [point.score for point in result.points]
+        if len(scores) < 3:
+            return 0.0
+        median_score = statistics.median(scores)
+        prominence = (result.best.score - median_score) / (median_score + 1e-9)
+        verification_ratio = result.final_verification.score / (result.best.score + 1e-9)
+        return max(0.0, min(1.0, prominence, verification_ratio))
+
+
+class FixedRangeAutofocusController:
+    """Scan a known Z range, estimate the focus peak, then move to it."""
+
+    def __init__(
+        self,
+        stage: ZStage,
+        frames: FrameProvider,
+        strategy: Optional[FocusStrategy] = None,
+        metric_name: str = "labspec_spot_compactness",
+    ) -> None:
+        self.stage = stage
+        self.frames = frames
+        self.strategy = strategy or MetricStrategy(metric_name)
+        self.peak_locator = PeakLocator()
+
+    def run(
+        self,
+        roi: ROI,
+        params: FixedRangeAutofocusParams,
+        on_progress: Optional[Callable[[ScoredZPoint], None]] = None,
+    ) -> FixedRangeAutofocusResult:
+        scanner = FixedRangeScanner(self.stage, self.frames, self.strategy, params)
+        points = scanner.scan(roi, on_progress=on_progress)
+        if not points:
+            raise RuntimeError("fixed-range autofocus produced no scan points.")
+        peak = self.peak_locator.locate(points, interpolate=params.interpolate_peak)
+        final_z_um = scanner.move_to_z(peak.z_um)
+        final_verification = scanner.sample(
+            peak.z_um,
+            roi,
+            frames_per_z=params.final_verification_frames_per_z,
+            tolerance_um=params.final_tolerance_um,
+        )
+        return FixedRangeAutofocusResult(
+            best=peak.sampled_best,
+            peak=peak,
+            final_z_um=final_z_um,
+            final_verification=final_verification,
+            final_error_um=float(final_z_um - peak.z_um),
+            points=points,
         )

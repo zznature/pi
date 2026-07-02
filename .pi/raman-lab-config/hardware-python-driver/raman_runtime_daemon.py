@@ -290,7 +290,7 @@ def _handle_frame_capture(session: HardwareSession, request: dict, payload: dict
 
 def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) -> dict:
     from autofocus.controller import AutofocusController
-    from autofocus.models import AutofocusParams, ROI
+    from autofocus.models import AutofocusParams, FixedRangeAutofocusParams, ROI
 
     stage_cfg = request["stage"]
     z_range = stage_cfg["limits"]["zRangeUm"]
@@ -300,17 +300,41 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
     provider = session.frame(request["frameProvider"], timeout_ms)
     controller = AutofocusController(stage, provider)
     try:
-        result = controller.run_single(
-            ROI(**payload["roi"]),
-            AutofocusParams(
-                z_min_um=params.get("zMinUm", z_range[0]),
-                z_max_um=params.get("zMaxUm", z_range[1]),
-                coarse_range_um=params.get("coarseRangeUm", 80.0),
-                coarse_step_um=params.get("coarseStepUm", 10.0),
-                fine_range_um=params.get("fineRangeUm", 15.0),
-                fine_step_um=params.get("fineStepUm", 2.0),
-            ),
-        )
+        roi = ROI(**payload["roi"])
+        if "zStartUm" in params and "zEndUm" in params:
+            result = controller.run_fixed_range(
+                roi,
+                FixedRangeAutofocusParams(
+                    z_start_um=params["zStartUm"],
+                    z_end_um=params["zEndUm"],
+                    point_count=params.get("pointCount"),
+                    min_points=params.get("minPoints", 5),
+                    max_points=params.get("maxPoints", 10),
+                    target_spacing_um=params.get("targetSpacingUm", 5.0),
+                    stage_timeout_ms=params.get("stageTimeoutMs", 3000),
+                    frame_timeout_ms=params.get("frameTimeoutMs", 500),
+                    settle_ms=params.get("settleMs", 100),
+                    frames_per_z=params.get("framesPerZ", 1),
+                    target_tolerance_um=params.get("targetToleranceUm", 5.0),
+                    final_tolerance_um=params.get("finalToleranceUm", 5.0),
+                    final_approach_offset_um=params.get("finalApproachOffsetUm", 3.0),
+                    interpolate_peak=params.get("interpolatePeak", True),
+                    final_verification_frames_per_z=params.get("finalVerificationFramesPerZ", 1),
+                    metric_name=params.get("metricName", "labspec_spot_compactness"),
+                ),
+            )
+        else:
+            result = controller.run_single(
+                roi,
+                AutofocusParams(
+                    z_min_um=params.get("zMinUm", z_range[0]),
+                    z_max_um=params.get("zMaxUm", z_range[1]),
+                    coarse_range_um=params.get("coarseRangeUm", 80.0),
+                    coarse_step_um=params.get("coarseStepUm", 10.0),
+                    fine_range_um=params.get("fineRangeUm", 15.0),
+                    fine_step_um=params.get("fineStepUm", 2.0),
+                ),
+            )
     finally:
         session.disable_stage_axes()
     response_payload = {

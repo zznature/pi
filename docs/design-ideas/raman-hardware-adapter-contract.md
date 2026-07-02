@@ -455,10 +455,14 @@ domain:
       enabled: true
       roi: { x: 200, y: 120, width: 180, height: 180 }
       params:
-        coarseRangeUm: 80
-        coarseStepUm: 10
-        fineRangeUm: 15
-        fineStepUm: 2
+        # Raman lab optimized fixed-range autofocus path.
+        zStartUm: 340
+        zEndUm: 260
+        targetSpacingUm: 5
+        minPoints: 5
+        maxPoints: 10
+        framesPerZ: 1
+        finalVerificationFramesPerZ: 1
     acquisition:
       integrationTimeS: 10
       accumulations: 1
@@ -474,6 +478,7 @@ domain:
 - `laserPowerPercent` 是请求的 LabSpec 激光功率百分比档位
 - `limits.maxLaserPowerPercent` 是本次 run 的安全上界
 - Raman lab 的实际硬件功率不是连续值，spectrometer resource config 应声明允许的固定档位，例如 `0.01 / 0.1 / 1 / 3.2 / 5 / 10 / 25 / 50 / 100`
+- `autofocus.params.zStartUm/zEndUm` 表示实验室优化过的固定 Z range autofocus；旧的 `coarseRangeUm/fineRangeUm` coarse/fine path 仍作为兼容路径保留。
 
 ## 9. 预检与维护工具如何接 Raman
 
