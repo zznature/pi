@@ -192,10 +192,10 @@ function deriveParameterSearchAcquisition(
 
 	const acquisition: RamanAcquisition = {
 		...base,
-		laserPowerMw:
-			envelope.laserPowerMw === undefined
-				? base.laserPowerMw
-				: interpolateNumber(envelope.laserPowerMw.min, envelope.laserPowerMw.max, attemptIndex, attemptCount),
+		laserPowerPercent:
+			envelope.laserPowerPercentValues === undefined
+				? base.laserPowerPercent
+				: envelope.laserPowerPercentValues[Math.min(attemptIndex, envelope.laserPowerPercentValues.length - 1)],
 		integrationTimeMs:
 			envelope.integrationTimeMs === undefined
 				? base.integrationTimeMs
@@ -211,11 +211,8 @@ function deriveParameterSearchAcquisition(
 				: envelope.accumulations[Math.min(attemptIndex, envelope.accumulations.length - 1)],
 	};
 
-	if (
-		envelope.laserPowerMw &&
-		(acquisition.laserPowerMw < envelope.laserPowerMw.min || acquisition.laserPowerMw > envelope.laserPowerMw.max)
-	) {
-		throw new Error(`parameter search attempted laserPowerMw outside approved envelope at attempt ${attemptIndex + 1}`);
+	if (envelope.laserPowerPercentValues && !envelope.laserPowerPercentValues.includes(acquisition.laserPowerPercent)) {
+		throw new Error(`parameter search attempted laserPowerPercent outside approved values at attempt ${attemptIndex + 1}`);
 	}
 	if (
 		envelope.integrationTimeMs &&

@@ -46,7 +46,7 @@ MVP 阶段不追求完整实验室控制台，而是先把操作过程中最影�
 ```text
 Raman: ready | control available | 12:03:41
 Stage: ready  X=120.0um Y=35.0um Z=410.0um
-Laser: off    Power=0.0mW
+Laser: off    Power=0%
 Camera: ready frame-provider:labspec_frame_main
 ```
 

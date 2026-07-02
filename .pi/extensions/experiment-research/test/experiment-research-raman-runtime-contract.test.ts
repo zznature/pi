@@ -108,7 +108,7 @@ describe("experiment research Raman runtime contract", () => {
 			resourceId: "labspec_main",
 			acquisition: {
 				integrationTimeMs: 10_000,
-				laserPowerMw: 0.5,
+				laserPowerPercent: 0.1,
 				accumulations: 1,
 				saveFormat: "txt",
 			},

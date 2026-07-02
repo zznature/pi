@@ -55,7 +55,7 @@ function commonBuilderInput() {
 			spectrometerResourceId: "spectrometer-main",
 		},
 		limits: {
-			maxLaserPowerMw: 1,
+			maxLaserPowerPercent: 1,
 			minObjectiveClearanceUm: 200,
 			xRangeUm: { minUm: 0, maxUm: 50_000 },
 			yRangeUm: { minUm: 0, maxUm: 50_000 },
@@ -66,7 +66,7 @@ function commonBuilderInput() {
 		},
 		acquisition: {
 			integrationTimeMs: 5_000,
-			laserPowerMw: 0.5,
+			laserPowerPercent: 0.1,
 			accumulations: 1,
 		},
 	};
@@ -94,7 +94,7 @@ describe("experiment research planner proposal flow", () => {
 			point: { xUm: 1_000, yUm: 2_000 },
 			parameterSearch: {
 				maxAttempts: 3,
-				laserPowerMw: { min: 0.2, max: 0.8 },
+				laserPowerPercentValues: [0.01, 0.1, 1],
 				integrationTimeMs: { min: 1_000, max: 5_000 },
 				accumulations: [1, 2],
 			},
@@ -186,7 +186,7 @@ describe("experiment research planner proposal flow", () => {
 			procedureId: "raman_single_point_probe",
 			acquisition: {
 				integrationTimeMs: 5_000,
-				laserPowerMw: 2,
+				laserPowerPercent: 2,
 				accumulations: 1,
 			},
 			point: { xUm: 1_000, yUm: 2_000 },

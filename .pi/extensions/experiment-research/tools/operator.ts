@@ -25,7 +25,7 @@ const SmokeSpectrumParamsSchema = Type.Object(
 	{
 		confirmed: Type.Optional(Type.Boolean()),
 		integrationTimeMs: Type.Optional(Type.Integer({ minimum: 1 })),
-		laserPowerMw: Type.Optional(Type.Number({ minimum: 0 })),
+		laserPowerPercent: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
 		accumulations: Type.Optional(Type.Integer({ minimum: 1 })),
 		saveFormat: Type.Optional(Type.Union([Type.Literal("txt"), Type.Literal("csv")])),
 		timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
@@ -63,10 +63,10 @@ type OperatorAutofocusParams = Static<typeof AutofocusParamsSchema>;
 type StageAxis = Static<typeof StageAxisSchema>;
 
 const DEFAULT_SMOKE_SPECTRUM_INTEGRATION_TIME_MS = 1000;
-const DEFAULT_SMOKE_SPECTRUM_LASER_POWER_MW = 0.5;
+const DEFAULT_SMOKE_SPECTRUM_LASER_POWER_PERCENT = 0.1;
 const DEFAULT_SMOKE_SPECTRUM_ACCUMULATIONS = 1;
 const DEFAULT_SMOKE_SPECTRUM_TIMEOUT_MS = 10_000;
-const MAX_SMOKE_SPECTRUM_LASER_POWER_MW = 0.5;
+const MAX_SMOKE_SPECTRUM_LASER_POWER_PERCENT = 0.1;
 const DEFAULT_AUTOFOCUS_TIMEOUT_MS = 30_000;
 const DEFAULT_AUTOFOCUS_MIN_OBJECTIVE_CLEARANCE_UM = 200;
 const DEFAULT_AUTOFOCUS_ROI = { x: 100, y: 100, width: 64, height: 64 };
@@ -389,7 +389,7 @@ export const ramanAcquireSmokeSpectrumTool = {
 
 		const acquisition = {
 			integrationTimeMs: params.integrationTimeMs ?? DEFAULT_SMOKE_SPECTRUM_INTEGRATION_TIME_MS,
-			laserPowerMw: params.laserPowerMw ?? DEFAULT_SMOKE_SPECTRUM_LASER_POWER_MW,
+			laserPowerPercent: params.laserPowerPercent ?? DEFAULT_SMOKE_SPECTRUM_LASER_POWER_PERCENT,
 			accumulations: params.accumulations ?? DEFAULT_SMOKE_SPECTRUM_ACCUMULATIONS,
 			saveFormat: params.saveFormat ?? "txt",
 		};
@@ -398,14 +398,14 @@ export const ramanAcquireSmokeSpectrumTool = {
 			spectrometerResourceId: runtime.spectrometer.resource.resourceId,
 			acquisition,
 			timeoutMs,
-			maxLaserPowerMw: MAX_SMOKE_SPECTRUM_LASER_POWER_MW,
+			maxLaserPowerPercent: MAX_SMOKE_SPECTRUM_LASER_POWER_PERCENT,
 			requiresConfirmation: true,
 			confirmed: params.confirmed === true,
 		};
 
-		if (acquisition.laserPowerMw > MAX_SMOKE_SPECTRUM_LASER_POWER_MW) {
+		if (acquisition.laserPowerPercent > MAX_SMOKE_SPECTRUM_LASER_POWER_PERCENT) {
 			return error(
-				`Smoke spectrum laser power ${acquisition.laserPowerMw} mW exceeds operator debug limit ${MAX_SMOKE_SPECTRUM_LASER_POWER_MW} mW.`,
+				`Smoke spectrum laser power ${acquisition.laserPowerPercent}% exceeds operator debug limit ${MAX_SMOKE_SPECTRUM_LASER_POWER_PERCENT}%.`,
 				"laser_power_limit_exceeded",
 				proposalState,
 				false,
@@ -414,7 +414,7 @@ export const ramanAcquireSmokeSpectrumTool = {
 
 		if (params.confirmed !== true) {
 			return warning(
-				`Smoke spectrum requires explicit confirmation before laser exposure. Settings: ${acquisition.integrationTimeMs} ms, ${acquisition.laserPowerMw} mW, ${acquisition.accumulations} accumulation(s).`,
+				`Smoke spectrum requires explicit confirmation before laser exposure. Settings: ${acquisition.integrationTimeMs} ms, ${acquisition.laserPowerPercent}%, ${acquisition.accumulations} accumulation(s).`,
 				proposalState,
 			);
 		}

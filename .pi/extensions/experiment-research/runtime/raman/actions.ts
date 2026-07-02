@@ -107,7 +107,7 @@ export const SpectrometerAcquireSpectrumActionSchema = Type.Object(
 		acquisition: Type.Object(
 			{
 				integrationTimeMs: Type.Integer({ minimum: 1 }),
-				laserPowerMw: Type.Number({ minimum: 0 }),
+				laserPowerPercent: Type.Number({ minimum: 0, maximum: 100 }),
 				accumulations: Type.Integer({ minimum: 1 }),
 				saveFormat: Type.Optional(Type.Union([Type.Literal("txt"), Type.Literal("csv")])),
 			},

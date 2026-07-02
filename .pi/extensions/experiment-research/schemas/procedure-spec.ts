@@ -43,7 +43,7 @@ export const MotionAxisRangeSchema = Type.Object(
 
 export const ProcedureLimitsSchema = Type.Object(
 	{
-		maxLaserPowerMw: Type.Optional(Type.Number({ minimum: 0 })),
+		maxLaserPowerPercent: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
 		minObjectiveClearanceUm: Type.Optional(Type.Number({ minimum: 0 })),
 		xRangeUm: Type.Optional(MotionAxisRangeSchema),
 		yRangeUm: Type.Optional(MotionAxisRangeSchema),
@@ -92,7 +92,7 @@ export const RamanAutofocusSchema = Type.Object(
 export const RamanAcquisitionSchema = Type.Object(
 	{
 		integrationTimeMs: Type.Integer({ minimum: 1 }),
-		laserPowerMw: Type.Number({ minimum: 0 }),
+		laserPowerPercent: Type.Number({ minimum: 0, maximum: 100 }),
 		accumulations: Type.Integer({ minimum: 1 }),
 		saveFormat: Type.Optional(Type.Union([Type.Literal("txt"), Type.Literal("csv")])),
 		timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
@@ -111,7 +111,7 @@ export const RamanNumericRangeSchema = Type.Object(
 export const RamanParameterSearchSchema = Type.Object(
 	{
 		maxAttempts: Type.Integer({ minimum: 1 }),
-		laserPowerMw: Type.Optional(RamanNumericRangeSchema),
+		laserPowerPercentValues: Type.Optional(Type.Array(Type.Number({ minimum: 0, maximum: 100 }), { minItems: 1 })),
 		integrationTimeMs: Type.Optional(
 			Type.Object(
 				{

@@ -178,7 +178,7 @@ docs freeze
   - [x] `capture_frame`
   - [x] `acquire_spectrum`
 - [x] `domain.raman` typed block 承载 Raman 专有参数：
-  - [x] `acquisition`（integrationTimeMs / laserPowerMw / accumulations 等）
+  - [x] `acquisition`（integrationTimeMs / laserPowerPercent / accumulations 等）
   - [x] `autofocus`（ROI / strategy params）
 - [x] `limits` 与 `stoppingRules` 有最小结构
 
@@ -500,7 +500,7 @@ docs freeze
   - [x] control available
 - [x] Enforce both hard hazards in runtime/driver with hard clamp + reject:
   - [x] motion / objective collision via `minObjectiveClearanceUm` and motion bounds
-  - [x] laser power ceiling via `limits.maxLaserPowerMw`
+  - [x] laser power ceiling via `limits.maxLaserPowerPercent`
 - [x] Risk classification is effective:
   - [x] `notice`
   - [x] `confirm_required`

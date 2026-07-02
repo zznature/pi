@@ -61,7 +61,7 @@ describe("experiment research good-enough Raman rules", () => {
 	it("returns continue_search_within_envelope when checks fail but search budget remains", () => {
 		const envelope = createSearchEnvelopeFromParameterSearch({
 			maxAttempts: 4,
-			laserPowerMw: { min: 0.2, max: 0.8 },
+			laserPowerPercentValues: [0.01, 0.1, 1],
 			integrationTimeMs: { min: 1_000, max: 5_000 },
 			accumulations: [1, 2],
 		});
@@ -95,7 +95,7 @@ describe("experiment research good-enough Raman rules", () => {
 	it("returns stop_and_request_user_decision when the search budget is exhausted", () => {
 		const envelope = createSearchEnvelopeFromParameterSearch({
 			maxAttempts: 2,
-			laserPowerMw: { min: 0.2, max: 0.8 },
+			laserPowerPercentValues: [0.01, 0.1, 1],
 		});
 
 		const decision = evaluateRamanGoodEnough(

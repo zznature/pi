@@ -255,15 +255,44 @@ function enforceMotionHardLimits(spec: ProcedureSpec, position: StagePosition, r
 	return undefined;
 }
 
-function enforceLaserHardLimit(spec: ProcedureSpec, acquisition: RamanAcquisition): ActionResult | undefined {
-	const requestedPower = acquisition.laserPowerMw;
-	const maxPower = spec.limits.maxLaserPowerMw;
+function enforceLaserHardLimit(
+	spec: ProcedureSpec,
+	acquisition: RamanAcquisition,
+	spectrometer: SpectrometerResource,
+): ActionResult | undefined {
+	const requestedPower = acquisition.laserPowerPercent;
+	const maxPower = spec.limits.maxLaserPowerPercent;
 	if (maxPower !== undefined && requestedPower > maxPower) {
 		return failedActionResult(
-			`Requested laser power ${requestedPower} mW exceeds maxLaserPowerMw ${maxPower} mW.`,
+			`Requested laser power ${requestedPower}% exceeds maxLaserPowerPercent ${maxPower}%.`,
 			{
 				errorCode: "laser_power_limit_exceeded",
 				message: "Requested laser power exceeds the approved safety ceiling.",
+				retrySafe: false,
+				needsOperator: true,
+				safeToResume: false,
+			},
+		);
+	}
+	const configuredPower = spectrometer.config.laserPower;
+	if (configuredPower?.maxAllowedPercent !== undefined && requestedPower > configuredPower.maxAllowedPercent) {
+		return failedActionResult(
+			`Requested laser power ${requestedPower}% exceeds spectrometer maxAllowedPercent ${configuredPower.maxAllowedPercent}%.`,
+			{
+				errorCode: "laser_power_limit_exceeded",
+				message: "Requested laser power exceeds the spectrometer lab configuration.",
+				retrySafe: false,
+				needsOperator: true,
+				safeToResume: false,
+			},
+		);
+	}
+	if (configuredPower && !configuredPower.allowedPercentValues.includes(requestedPower)) {
+		return failedActionResult(
+			`Requested laser power ${requestedPower}% is not one of the configured Raman laser power presets: ${configuredPower.allowedPercentValues.join(", ")}.`,
+			{
+				errorCode: "laser_power_preset_unavailable",
+				message: "Requested laser power is not a configured spectrometer preset.",
 				retrySafe: false,
 				needsOperator: true,
 				safeToResume: false,
@@ -519,7 +548,7 @@ export async function runLiveRamanUnit(
 		}
 
 		if (action.kind === "acquire_spectrum") {
-			const laserGuard = enforceLaserHardLimit(spec, acquisition);
+			const laserGuard = enforceLaserHardLimit(spec, acquisition, runtime.spectrometer.resource);
 			if (laserGuard) {
 				return {
 					status: "failed",

@@ -347,7 +347,7 @@ def _handle_spectrum(request: dict, payload: dict) -> dict:
         save_format=acquisition.get("saveFormat") or "txt",
         request_filename=spectrometer_cfg["config"]["requestFilename"],
         result_filename=spectrometer_cfg["config"]["resultFilename"],
-        laser_power_percent=acquisition.get("laserPowerMw"),
+        laser_power_percent=acquisition.get("laserPowerPercent"),
     )
     acquirer = LabSpecFileBridgeRamanAcquirer(config)
     result = acquirer.acquire_point(payload["pointId"], payload.get("metadata") or {})

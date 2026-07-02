@@ -180,7 +180,7 @@ describe("experiment research Raman Python daemon transport", () => {
 		const spectrum = await runtime.spectrometer.acquireSpectrum({
 			action: "spectrometer.acquire_spectrum",
 			resourceId: "spectrometer-main",
-			acquisition: { integrationTimeMs: 1_000, laserPowerMw: 0.5, accumulations: 1, saveFormat: "txt" },
+			acquisition: { integrationTimeMs: 1_000, laserPowerPercent: 0.1, accumulations: 1, saveFormat: "txt" },
 			timeoutMs: 5_000,
 		});
 		expect(spectrum.status).toBe("success");

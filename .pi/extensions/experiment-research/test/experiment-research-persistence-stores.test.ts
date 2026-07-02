@@ -73,7 +73,7 @@ describe("experiment research persistence stores", () => {
 			procedureId: "raman_single_point_probe",
 			procedureVersion: "0.1.0",
 			resources: [{ resourceId: "stage-main", role: "stage" }],
-			limits: { maxLaserPowerMw: 0.5 },
+			limits: { maxLaserPowerPercent: 1 },
 			plan: {
 				kind: "point_list",
 				points: [{ xUm: 1000, yUm: 2000 }],
@@ -87,7 +87,7 @@ describe("experiment research persistence stores", () => {
 					},
 					acquisition: {
 						integrationTimeMs: 1000,
-						laserPowerMw: 0.5,
+						laserPowerPercent: 0.1,
 						accumulations: 1,
 					},
 				},

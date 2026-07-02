@@ -68,6 +68,17 @@ export const SpectrometerResourceConfigSchema = Type.Object(
 		bridgeDir: Type.String({ minLength: 1 }),
 		requestFilename: Type.String({ minLength: 1 }),
 		resultFilename: Type.String({ minLength: 1 }),
+		laserPower: Type.Optional(
+			Type.Object(
+				{
+					unit: Type.Literal("percent"),
+					allowedPercentValues: Type.Array(Type.Number({ minimum: 0, maximum: 100 }), { minItems: 1 }),
+					defaultPercent: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
+					maxAllowedPercent: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
+				},
+				{ additionalProperties: false },
+			),
+		),
 	},
 	{ additionalProperties: false },
 );

@@ -67,7 +67,7 @@ function createProcedureSpec(pointCount = 3) {
 			{ resourceId: "spectrometer-main", role: "spectrometer" },
 		],
 		limits: {
-			maxLaserPowerMw: 0.5,
+			maxLaserPowerPercent: 1,
 			minObjectiveClearanceUm: 200,
 		},
 		plan: {
@@ -96,7 +96,7 @@ function createProcedureSpec(pointCount = 3) {
 				},
 				acquisition: {
 					integrationTimeMs: 1000,
-					laserPowerMw: 0.5,
+					laserPowerPercent: 0.1,
 					accumulations: 1,
 				},
 			},
@@ -117,7 +117,7 @@ function createParameterSearchSpec(maxAttempts = 3) {
 			{ resourceId: "spectrometer-main", role: "spectrometer" },
 		],
 		limits: {
-			maxLaserPowerMw: 0.6,
+			maxLaserPowerPercent: 1,
 			minObjectiveClearanceUm: 200,
 		},
 		plan: {
@@ -146,12 +146,12 @@ function createParameterSearchSpec(maxAttempts = 3) {
 				},
 				acquisition: {
 					integrationTimeMs: 1500,
-					laserPowerMw: 0.4,
+					laserPowerPercent: 0.1,
 					accumulations: 1,
 				},
 				parameterSearch: {
 					maxAttempts,
-					laserPowerMw: { min: 0.2, max: 0.6 },
+					laserPowerPercentValues: [0.01, 0.1, 1],
 					integrationTimeMs: { min: 1000, max: 3000 },
 					accumulations: [1, 2],
 				},
@@ -318,9 +318,9 @@ describe("experiment research simulation runtime", () => {
 			(event) => (event.payload as Record<string, unknown>).acquisition as Record<string, unknown>,
 		);
 		expect(acquisitions).toEqual([
-			expect.objectContaining({ laserPowerMw: 0.2, integrationTimeMs: 1000, accumulations: 1 }),
-			expect.objectContaining({ laserPowerMw: 0.4, integrationTimeMs: 2000, accumulations: 2 }),
-			expect.objectContaining({ laserPowerMw: 0.6, integrationTimeMs: 3000, accumulations: 2 }),
+			expect.objectContaining({ laserPowerPercent: 0.01, integrationTimeMs: 1000, accumulations: 1 }),
+			expect.objectContaining({ laserPowerPercent: 0.1, integrationTimeMs: 2000, accumulations: 2 }),
+			expect.objectContaining({ laserPowerPercent: 1, integrationTimeMs: 3000, accumulations: 2 }),
 		]);
 	});
 
@@ -420,7 +420,7 @@ describe("experiment research simulation runtime", () => {
 					...spec.domain.raman,
 					acquisition: {
 						...spec.domain.raman.acquisition,
-						laserPowerMw: 0.4,
+						laserPowerPercent: 1,
 					},
 				},
 			},

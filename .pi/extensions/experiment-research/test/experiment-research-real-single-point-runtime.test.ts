@@ -60,7 +60,7 @@ function loadExperimentExtension(): CapturedExtension {
 }
 
 function createSinglePointSpec(overrides?: {
-	laserPowerMw?: number;
+	laserPowerPercent?: number;
 	pointZUm?: number;
 	currentPosition?: boolean;
 	procedureId?: "raman_single_point_probe" | "raman_parameter_search" | "raman_grid_mapping";
@@ -91,7 +91,7 @@ function createSinglePointSpec(overrides?: {
 			{ resourceId: "spectrometer-main", role: "spectrometer" },
 		],
 		limits: {
-			maxLaserPowerMw: 0.5,
+			maxLaserPowerPercent: 1,
 			minObjectiveClearanceUm: 200,
 			xRangeUm: { minUm: 0, maxUm: 50_000 },
 			yRangeUm: { minUm: 0, maxUm: 50_000 },
@@ -131,7 +131,7 @@ function createSinglePointSpec(overrides?: {
 				},
 				acquisition: {
 					integrationTimeMs: 1000,
-					laserPowerMw: overrides?.laserPowerMw ?? 0.5,
+					laserPowerPercent: overrides?.laserPowerPercent ?? 0.1,
 					accumulations: 1,
 					saveFormat: "txt",
 				},
@@ -139,7 +139,7 @@ function createSinglePointSpec(overrides?: {
 					? {
 							parameterSearch: {
 								maxAttempts: overrides.maxAttempts ?? 3,
-								laserPowerMw: { min: 0.2, max: 0.5 },
+								laserPowerPercentValues: [0.01, 0.1, 1],
 								integrationTimeMs: { min: 1000, max: 3000 },
 								accumulations: [1, 2],
 							},
@@ -264,6 +264,12 @@ function createLiveRuntime(
 					bridgeDir: "D:\\RamanLab\\SpecBridge",
 					requestFilename: "spectrum_request.ini",
 					resultFilename: "spectrum_result.ini",
+					laserPower: {
+						unit: "percent",
+						allowedPercentValues: [0.01, 0.1, 1, 3.2, 5, 10, 25, 50, 100],
+						defaultPercent: 0.1,
+						maxAllowedPercent: 100,
+					},
 				},
 				leasePolicy: "exclusive",
 				simulationAvailable: false,
@@ -494,8 +500,8 @@ describe("experiment research real supervised single-point runtime", () => {
 				(event) => ((event.payload as Record<string, unknown>).acquisition ?? {}) as Record<string, unknown>,
 			),
 		).toEqual([
-			expect.objectContaining({ laserPowerMw: 0.2, integrationTimeMs: 1000, accumulations: 1 }),
-			expect.objectContaining({ laserPowerMw: 0.35, integrationTimeMs: 2000, accumulations: 2 }),
+			expect.objectContaining({ laserPowerPercent: 0.01, integrationTimeMs: 1000, accumulations: 1 }),
+			expect.objectContaining({ laserPowerPercent: 0.1, integrationTimeMs: 2000, accumulations: 2 }),
 		]);
 	});
 
@@ -527,7 +533,7 @@ describe("experiment research real supervised single-point runtime", () => {
 
 		registerRamanLiveRuntime(cwd, createLiveRuntime(true, true));
 
-		const highPowerSpec = createSinglePointSpec({ laserPowerMw: 0.7 });
+		const highPowerSpec = createSinglePointSpec({ laserPowerPercent: 3.2 });
 		const highPowerProposalId = await proposeRun(extension, highPowerSpec, context);
 		const highPowerStarted = await extension.tools.get("approve_and_start_run")?.execute(
 			"approve-live-power",

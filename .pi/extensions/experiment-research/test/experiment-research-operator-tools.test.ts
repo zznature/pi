@@ -362,11 +362,11 @@ describe("experiment research operator tools", () => {
 		expect(proposalDetails.status).toBe("warning");
 		expect(proposalState.requiresConfirmation).toBe(true);
 		expect(proposalState.confirmed).toBe(false);
-		expect(asRecord(proposalState.acquisition).laserPowerMw).toBe(0.5);
+		expect(asRecord(proposalState.acquisition).laserPowerPercent).toBe(0.1);
 
 		const highPowerResult = await extension.tools
 			.get("raman_acquire_smoke_spectrum")
-			?.execute("smoke-high-power", { laserPowerMw: 2, confirmed: true }, undefined, undefined, context);
+			?.execute("smoke-high-power", { laserPowerPercent: 2, confirmed: true }, undefined, undefined, context);
 		const highPowerDetails = asRecord(highPowerResult?.details);
 		expect(highPowerDetails.status).toBe("error");
 		expect(highPowerDetails.errorCode).toBe("laser_power_limit_exceeded");

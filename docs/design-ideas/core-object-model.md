@@ -319,7 +319,7 @@ type SemanticStep =
   | { kind: "autofocus"; strategy?: string }
   | {
       kind: "acquire_spectrum"
-      laserPowerMw: number
+      laserPowerPercent: number
       integrationTimeMs: number
     }
   | { kind: "capture_frame" }

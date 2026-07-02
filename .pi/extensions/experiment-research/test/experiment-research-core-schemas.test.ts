@@ -43,7 +43,7 @@ describe("experiment research core schemas", () => {
 				{ resourceId: "spectrometer-main", role: "spectrometer" },
 			],
 			limits: {
-				maxLaserPowerMw: 0.5,
+				maxLaserPowerPercent: 1,
 				minObjectiveClearanceUm: 200,
 			},
 			plan: {
@@ -75,7 +75,7 @@ describe("experiment research core schemas", () => {
 					},
 					acquisition: {
 						integrationTimeMs: 1000,
-						laserPowerMw: 0.5,
+						laserPowerPercent: 0.1,
 						accumulations: 1,
 						timeoutMs: 30000,
 						saveFormat: "txt",
@@ -142,7 +142,7 @@ describe("experiment research core schemas", () => {
 					},
 					acquisition: {
 						integrationTimeMs: 500,
-						laserPowerMw: 0.2,
+						laserPowerPercent: 0.01,
 						accumulations: 1,
 					},
 					xyCorrection: {
@@ -169,7 +169,7 @@ describe("experiment research core schemas", () => {
 			},
 			actions: [{ kind: "move_to_point" }, { kind: "autofocus" }, { kind: "acquire_spectrum" }],
 			limits: {
-				maxLaserPowerMw: 0.5,
+				maxLaserPowerPercent: 1,
 				minObjectiveClearanceUm: 200,
 			},
 			resumeKey: "run-001/unit-001",

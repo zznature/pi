@@ -174,13 +174,13 @@ export function evaluateRamanGoodEnough(
 export function createSearchEnvelopeFromParameterSearch(
 	parameterSearch: {
 		maxAttempts: number;
-		laserPowerMw?: { min: number; max: number };
+		laserPowerPercentValues?: number[];
 		integrationTimeMs?: { min: number; max: number };
 		accumulations?: number[];
 	},
 ): RamanSearchEnvelope {
 	const allowedParameters = [
-		parameterSearch.laserPowerMw ? "laserPowerMw" : undefined,
+		parameterSearch.laserPowerPercentValues ? "laserPowerPercent" : undefined,
 		parameterSearch.integrationTimeMs ? "integrationTimeMs" : undefined,
 		parameterSearch.accumulations ? "accumulations" : undefined,
 	].filter((value): value is RamanSearchEnvelope["allowedParameters"][number] => value !== undefined);

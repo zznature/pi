@@ -16,7 +16,7 @@ function createBaseProcedureSpec() {
 			{ resourceId: "spectrometer-main", role: "spectrometer" },
 		],
 		limits: {
-			maxLaserPowerMw: 0.5,
+			maxLaserPowerPercent: 1,
 			minObjectiveClearanceUm: 200,
 		},
 		stoppingRules: {
@@ -32,7 +32,7 @@ function createBaseProcedureSpec() {
 				},
 				acquisition: {
 					integrationTimeMs: 1000,
-					laserPowerMw: 0.5,
+					laserPowerPercent: 0.1,
 					accumulations: 1,
 				},
 			},

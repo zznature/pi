@@ -40,7 +40,7 @@ interface RamanResourceBindings {
 
 interface RamanAcquisitionInput {
 	integrationTimeMs: number;
-	laserPowerMw: number;
+	laserPowerPercent: number;
 	accumulations: number;
 	timeoutMs?: number;
 	saveFormat?: "txt" | "csv";
@@ -197,13 +197,13 @@ function actionRuntimeMs(spec: ProcedureSpec, actionKind: SemanticStep["kind"]):
 }
 
 function classifyLaserRisk(spec: ProcedureSpec): ProposalRisk | undefined {
-	const requestedPower = spec.domain.raman.acquisition.laserPowerMw;
-	const maxPower = spec.limits.maxLaserPowerMw;
+	const requestedPower = spec.domain.raman.acquisition.laserPowerPercent;
+	const maxPower = spec.limits.maxLaserPowerPercent;
 	if (maxPower !== undefined && requestedPower > maxPower) {
 		return {
 			level: "forbidden",
 			code: "laser_power_limit_exceeded",
-			message: `Requested laser power ${requestedPower} mW exceeds maxLaserPowerMw ${maxPower} mW.`,
+			message: `Requested laser power ${requestedPower}% exceeds maxLaserPowerPercent ${maxPower}%.`,
 		};
 	}
 	if (requestedPower > 0) {

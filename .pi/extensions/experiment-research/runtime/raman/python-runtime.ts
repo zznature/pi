@@ -54,6 +54,7 @@ export interface RamanPythonRuntimeConfigInfo {
 			resourceId: string;
 			driver: string;
 			bridgeDir: string;
+			laserPower?: SpectrometerResource["config"]["laserPower"];
 		};
 	};
 }
@@ -541,6 +542,7 @@ export function getRamanPythonRuntimeConfigInfo(cwd: string): RamanPythonRuntime
 				resourceId: config.spectrometer.resourceId,
 				driver: config.spectrometer.driver,
 				bridgeDir: config.spectrometer.config.bridgeDir,
+				laserPower: config.spectrometer.config.laserPower,
 			},
 		},
 	};

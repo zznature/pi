@@ -2,7 +2,7 @@ import { Type, type Static } from "typebox";
 import { compileSchema } from "./validation.ts";
 
 export const RamanEvaluationParameterSchema = Type.Union([
-	Type.Literal("laserPowerMw"),
+	Type.Literal("laserPowerPercent"),
 	Type.Literal("integrationTimeMs"),
 	Type.Literal("accumulations"),
 ]);

@@ -432,7 +432,7 @@ resources:
   spectrometer: labspec_main
   frameProvider: labspec_frame_main
 limits:
-  maxLaserPowerMw: 1.0
+  maxLaserPowerPercent: 1
   minObjectiveClearanceUm: 200.0
   # maxXyCorrectionUm: 5.0  # MVP 不实现，随 XY correction 一并推迟
 plan:
@@ -464,15 +464,16 @@ domain:
       accumulations: 1
       saveFormat: txt
       timeoutS: 30
-      laserPowerMw: 0.5
+      laserPowerPercent: 0.1
 ```
 
 关键边界：
 
 - `domain.raman` 承载 Raman 特有参数
 - resource config 不由 planner 自由填写
-- `laserPowerMw` 是请求值
-- `limits.maxLaserPowerMw` 是安全上界
+- `laserPowerPercent` 是请求的 LabSpec 激光功率百分比档位
+- `limits.maxLaserPowerPercent` 是本次 run 的安全上界
+- Raman lab 的实际硬件功率不是连续值，spectrometer resource config 应声明允许的固定档位，例如 `0.01 / 0.1 / 1 / 3.2 / 5 / 10 / 25 / 50 / 100`
 
 ## 9. 预检与维护工具如何接 Raman
 
