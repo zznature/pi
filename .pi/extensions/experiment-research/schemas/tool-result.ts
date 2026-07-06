@@ -26,6 +26,7 @@ export const RuntimeErrorSchema = Type.Object(
 		needsOperator: Type.Boolean(),
 		safeToResume: Type.Boolean(),
 		scope: Type.Optional(RuntimeErrorScopeSchema),
+		payload: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 	},
 	{ additionalProperties: false },
 );

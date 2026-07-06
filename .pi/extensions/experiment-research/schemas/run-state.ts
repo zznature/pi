@@ -41,6 +41,7 @@ export const RunStateSchema = Type.Object(
 		pauseReason: Type.Optional(Type.String({ minLength: 1 })),
 		abortReason: Type.Optional(Type.String({ minLength: 1 })),
 		errorState: Type.Optional(RuntimeErrorSchema),
+		qualityState: Type.Optional(Type.String({ minLength: 1 })),
 		artifactRefs: Type.Array(ArtifactRefSchema),
 		startedAt: Type.String({ minLength: 1 }),
 		updatedAt: Type.String({ minLength: 1 }),

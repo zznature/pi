@@ -155,6 +155,48 @@ describe("experiment research core schemas", () => {
 		expect(ProcedureSpecValidator.Check(invalidSpec)).toBe(false);
 	});
 
+	it("rejects autofocus tolerances tighter than the MVP hardware profile", () => {
+		const spec = {
+			procedureSpecId: "proc-spec-tight-tolerance",
+			experimentId: "exp-001",
+			intentId: "intent-001",
+			procedureId: "raman_single_point_probe",
+			procedureVersion: "0.1.0",
+			resources: [
+				{ resourceId: "stage-main", role: "stage" },
+				{ resourceId: "frame-main", role: "frame_provider" },
+				{ resourceId: "spectrometer-main", role: "spectrometer" },
+			],
+			limits: {},
+			plan: {
+				kind: "point_list",
+				points: [{ xUm: 1000, yUm: 2000, zUm: 1540 }],
+				perPoint: [{ kind: "move_to_point" }, { kind: "autofocus" }, { kind: "acquire_spectrum" }],
+			},
+			domain: {
+				raman: {
+					autofocus: {
+						enabled: true,
+						roi: { x: 0, y: 0, width: 50, height: 50 },
+						params: {
+							zStartUm: 1500,
+							zEndUm: 1580,
+							targetToleranceUm: 1,
+							finalToleranceUm: 1,
+						},
+					},
+					acquisition: {
+						integrationTimeMs: 500,
+						laserPowerPercent: 0.01,
+						accumulations: 1,
+					},
+				},
+			},
+		};
+
+		expect(ProcedureSpecValidator.Check(spec)).toBe(false);
+	});
+
 	it("accepts execution units derived from semantic steps", () => {
 		const unit = {
 			unitId: "unit-001",

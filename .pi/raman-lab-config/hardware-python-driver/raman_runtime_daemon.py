@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import statistics
 import sys
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -299,40 +300,67 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
     stage = _ZOnlyStageAdapter(session.stage(stage_cfg))
     provider = session.frame(request["frameProvider"], timeout_ms)
     controller = AutofocusController(stage, provider)
+    resolved_params: dict[str, Any] = {}
     try:
         roi = ROI(**payload["roi"])
         if "zStartUm" in params and "zEndUm" in params:
+            resolved_params = {
+                "zStartUm": params["zStartUm"],
+                "zEndUm": params["zEndUm"],
+                "pointCount": params.get("pointCount"),
+                "minPoints": params.get("minPoints", 5),
+                "maxPoints": params.get("maxPoints", 10),
+                "targetSpacingUm": params.get("targetSpacingUm", 5.0),
+                "stageTimeoutMs": params.get("stageTimeoutMs", 3000),
+                "frameTimeoutMs": params.get("frameTimeoutMs", 500),
+                "settleMs": params.get("settleMs", 100),
+                "framesPerZ": params.get("framesPerZ", 1),
+                "targetToleranceUm": params.get("targetToleranceUm", 5.0),
+                "finalToleranceUm": params.get("finalToleranceUm", 5.0),
+                "finalApproachOffsetUm": params.get("finalApproachOffsetUm", 3.0),
+                "interpolatePeak": params.get("interpolatePeak", True),
+                "finalVerificationFramesPerZ": params.get("finalVerificationFramesPerZ", 1),
+                "metricName": params.get("metricName", "labspec_spot_compactness"),
+            }
             result = controller.run_fixed_range(
                 roi,
                 FixedRangeAutofocusParams(
-                    z_start_um=params["zStartUm"],
-                    z_end_um=params["zEndUm"],
-                    point_count=params.get("pointCount"),
-                    min_points=params.get("minPoints", 5),
-                    max_points=params.get("maxPoints", 10),
-                    target_spacing_um=params.get("targetSpacingUm", 5.0),
-                    stage_timeout_ms=params.get("stageTimeoutMs", 3000),
-                    frame_timeout_ms=params.get("frameTimeoutMs", 500),
-                    settle_ms=params.get("settleMs", 100),
-                    frames_per_z=params.get("framesPerZ", 1),
-                    target_tolerance_um=params.get("targetToleranceUm", 5.0),
-                    final_tolerance_um=params.get("finalToleranceUm", 5.0),
-                    final_approach_offset_um=params.get("finalApproachOffsetUm", 3.0),
-                    interpolate_peak=params.get("interpolatePeak", True),
-                    final_verification_frames_per_z=params.get("finalVerificationFramesPerZ", 1),
-                    metric_name=params.get("metricName", "labspec_spot_compactness"),
+                    z_start_um=resolved_params["zStartUm"],
+                    z_end_um=resolved_params["zEndUm"],
+                    point_count=resolved_params["pointCount"],
+                    min_points=resolved_params["minPoints"],
+                    max_points=resolved_params["maxPoints"],
+                    target_spacing_um=resolved_params["targetSpacingUm"],
+                    stage_timeout_ms=resolved_params["stageTimeoutMs"],
+                    frame_timeout_ms=resolved_params["frameTimeoutMs"],
+                    settle_ms=resolved_params["settleMs"],
+                    frames_per_z=resolved_params["framesPerZ"],
+                    target_tolerance_um=resolved_params["targetToleranceUm"],
+                    final_tolerance_um=resolved_params["finalToleranceUm"],
+                    final_approach_offset_um=resolved_params["finalApproachOffsetUm"],
+                    interpolate_peak=resolved_params["interpolatePeak"],
+                    final_verification_frames_per_z=resolved_params["finalVerificationFramesPerZ"],
+                    metric_name=resolved_params["metricName"],
                 ),
             )
         else:
+            resolved_params = {
+                "zMinUm": params.get("zMinUm", z_range[0]),
+                "zMaxUm": params.get("zMaxUm", z_range[1]),
+                "coarseRangeUm": params.get("coarseRangeUm", 80.0),
+                "coarseStepUm": params.get("coarseStepUm", 10.0),
+                "fineRangeUm": params.get("fineRangeUm", 15.0),
+                "fineStepUm": params.get("fineStepUm", 2.0),
+            }
             result = controller.run_single(
                 roi,
                 AutofocusParams(
-                    z_min_um=params.get("zMinUm", z_range[0]),
-                    z_max_um=params.get("zMaxUm", z_range[1]),
-                    coarse_range_um=params.get("coarseRangeUm", 80.0),
-                    coarse_step_um=params.get("coarseStepUm", 10.0),
-                    fine_range_um=params.get("fineRangeUm", 15.0),
-                    fine_step_um=params.get("fineStepUm", 2.0),
+                    z_min_um=resolved_params["zMinUm"],
+                    z_max_um=resolved_params["zMaxUm"],
+                    coarse_range_um=resolved_params["coarseRangeUm"],
+                    coarse_step_um=resolved_params["coarseStepUm"],
+                    fine_range_um=resolved_params["fineRangeUm"],
+                    fine_step_um=resolved_params["fineStepUm"],
                 ),
             )
     finally:
@@ -343,7 +371,14 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
         "finalScore": result.final_score,
         "confidence": result.confidence,
         "message": result.message,
+        "roi": {"x": roi.x, "y": roi.y, "width": roi.width, "height": roi.height},
+        "params": resolved_params,
     }
+    if result.coarse is not None:
+        response_payload["scanPoints"] = [
+            {"zUm": point.z_um, "score": point.score, "saturationRatio": point.saturation_ratio}
+            for point in result.coarse.points
+        ]
     if str(result.status.value) == "ok":
         return _success("Autofocus completed.", response_payload)
     return _fail(
@@ -445,7 +480,15 @@ def main() -> int:
             try:
                 result = handle(session, request)
             except Exception as exc:
-                result = _fail("python_runtime_error", str(exc))
+                result = _fail(
+                    "python_runtime_error",
+                    str(exc),
+                    payload={
+                        "action": action,
+                        "exceptionType": type(exc).__name__,
+                        "traceback": traceback.format_exc(),
+                    },
+                )
             emit({"requestId": request_id, **result})
     finally:
         session.close()

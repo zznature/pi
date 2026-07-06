@@ -106,6 +106,7 @@ function toRuntimeError(actionResult: ActionResult, fallbackCode: string, scope:
 		needsOperator: actionResult.needsOperator,
 		safeToResume: actionResult.safeToResume,
 		scope,
+		payload: actionResult.payload,
 	};
 }
 
@@ -336,6 +337,43 @@ function persistEvaluationArtifact(
 	};
 }
 
+function persistAutofocusArtifact(
+	cwd: string,
+	runId: string,
+	unit: ExecutionUnit,
+	autofocusResult: ActionResult,
+): ArtifactRef {
+	const relativePath = `${unit.artifactScope.artifactPathPrefix.replace(/^records\//u, "")}-autofocus.json`;
+	const absolutePath = join(runRoot(cwd, runId), relativePath);
+	mkdirSync(dirname(absolutePath), { recursive: true });
+	writeFileSync(
+		absolutePath,
+		`${JSON.stringify(
+			{
+				unitId: unit.unitId,
+				status: autofocusResult.status,
+				summary: autofocusResult.summary,
+				errorCode: autofocusResult.errorCode,
+				payload: autofocusResult.payload ?? {},
+			},
+			null,
+			2,
+		)}\n`,
+		"utf-8",
+	);
+	return {
+		artifactId: `${runId}-autofocus-${unit.index}`,
+		kind: "raman-autofocus",
+		path: relativePath.replace(/\\/gu, "/"),
+		label: "Raman autofocus result",
+		metadata: {
+			status: autofocusResult.status,
+			confidence: autofocusResult.payload?.confidence,
+			zBestUm: autofocusResult.payload?.zBestUm,
+		},
+	};
+}
+
 function buildObservationMetrics(autofocusResult: ActionResult, spectrumResult: ActionResult): RamanObservationMetrics | RuntimeError {
 	const autofocusPayload = autofocusResult.payload ?? {};
 	const spectrumPayload = spectrumResult.payload ?? {};
@@ -398,6 +436,105 @@ function normalizeAutofocusResult(spec: ProcedureSpec, runtime: RamanLiveRuntime
 	}
 
 	return result;
+}
+
+function autofocusRange(spec: ProcedureSpec): { zStartUm: number; zEndUm: number } | undefined {
+	const params = spec.domain.raman.autofocus.params;
+	const zStartUm = params?.zStartUm;
+	const zEndUm = params?.zEndUm;
+	if (typeof zStartUm !== "number" || typeof zEndUm !== "number") {
+		return undefined;
+	}
+	return { zStartUm, zEndUm };
+}
+
+function zAnchorFromSpec(spec: ProcedureSpec): number | undefined {
+	const plan = spec.plan;
+	if (plan.kind === "point_list") {
+		return plan.points.find((point) => typeof point.zUm === "number")?.zUm;
+	}
+	return undefined;
+}
+
+export async function validateRuntimeAnchorState(
+	spec: ProcedureSpec,
+	runtime: RamanLiveRuntime,
+): Promise<{ valid: boolean; details: Record<string, unknown> }> {
+	const stageResource = spec.resources.find((resource) => resource.role === "stage");
+	if (!stageResource) {
+		return {
+			valid: false,
+			details: {
+				errorCode: "preflight_missing_stage_resource",
+				message: "Live preflight requires a stage resource.",
+			},
+		};
+	}
+
+	const positionResult = await runtime.stage.getPosition({
+		action: "stage.get_position",
+		resourceId: stageResource.resourceId,
+		timeoutMs: 10_000,
+	});
+	if (positionResult.status !== "success") {
+		return {
+			valid: false,
+			details: {
+				errorCode: positionResult.errorCode ?? "preflight_stage_position_failed",
+				message: positionResult.summary,
+				payload: positionResult.payload,
+			},
+		};
+	}
+	const position = stagePositionFromActionResult(positionResult);
+	if (!position) {
+		return {
+			valid: false,
+			details: {
+				errorCode: "preflight_stage_position_invalid",
+				message: "Stage position preflight did not return xUm, yUm, and zUm.",
+				payload: positionResult.payload,
+			},
+		};
+	}
+
+	const range = autofocusRange(spec);
+	const zAnchorUm = zAnchorFromSpec(spec);
+	const allowedDriftUm = Math.max(spec.domain.raman.autofocus.params?.targetSpacingUm ?? 5, 5);
+	const details: Record<string, unknown> = {
+		stagePosition: position,
+		autofocusRange: range,
+		zAnchorUm,
+		allowedDriftUm,
+	};
+
+	if (range) {
+		const zMin = Math.min(range.zStartUm, range.zEndUm);
+		const zMax = Math.max(range.zStartUm, range.zEndUm);
+		if (position.zUm < zMin - allowedDriftUm || position.zUm > zMax + allowedDriftUm) {
+			return {
+				valid: false,
+				details: {
+					...details,
+					errorCode: "preflight_stage_outside_autofocus_range",
+					message: `Current Z=${position.zUm} um is outside autofocus range [${zMin}, ${zMax}] um with ${allowedDriftUm} um drift allowance.`,
+				},
+			};
+		}
+	}
+
+	if (zAnchorUm !== undefined && Math.abs(position.zUm - zAnchorUm) > allowedDriftUm) {
+		return {
+			valid: false,
+			details: {
+				...details,
+				errorCode: "preflight_stage_anchor_drift",
+				message: `Current Z=${position.zUm} um differs from spec anchor Z=${zAnchorUm} um by more than ${allowedDriftUm} um.`,
+			},
+		};
+	}
+
+	return { valid: true, details };
 }
 
 export function registerRamanLiveRuntime(cwd: string, runtime: RamanLiveRuntime): void {
@@ -497,6 +634,9 @@ export async function runLiveRamanUnit(
 					timeoutMs: 30_000,
 				}),
 			);
+			const autofocusArtifact = persistAutofocusArtifact(cwd, runId, unit, autofocusResult);
+			persistArtifactRecord(cwd, runId, autofocusArtifact);
+			artifactRefs.push(autofocusArtifact);
 			if (autofocusResult.status !== "success") {
 				const autofocusArtifacts = artifactRefs.concat(autofocusResult.artifacts);
 				if (autofocusResult.status === "paused") {

@@ -4,7 +4,7 @@ import type { ProcedureSpec } from "../schemas/index.ts";
 import { ProcedureSpecValidator, formatValidationErrors } from "../schemas/index.ts";
 import { summarizeProcedureProposal } from "../planner/procedure-spec-builder.ts";
 import { compileProcedureSpec } from "../kernel/compile-units.ts";
-import { getRamanLiveRuntime, getRamanPythonRuntimeConfigInfo } from "../runtime/raman/index.ts";
+import { getRamanLiveRuntime, getRamanPythonRuntimeConfigInfo, validateRuntimeAnchorState } from "../runtime/raman/index.ts";
 
 const EmptyParamsSchema = Type.Object({}, { additionalProperties: false });
 
@@ -190,6 +190,9 @@ async function buildPreflightState(
 	}
 
 	const livePreflight = await runtime.preflight();
+	const anchorValidation = livePreflight.preflightReady && livePreflight.controlAvailable
+		? await validateRuntimeAnchorState(spec, runtime)
+		: { valid: false, details: { skipped: true, reason: "runtime_preflight_not_ready" } };
 	return {
 		mode: executionMode,
 		procedureSpecId: spec.procedureSpecId,
@@ -202,7 +205,8 @@ async function buildPreflightState(
 			requiredRolesPresent &&
 			requestedModeSupported &&
 			livePreflight.preflightReady &&
-			livePreflight.controlAvailable,
+			livePreflight.controlAvailable &&
+			anchorValidation.valid,
 		preflightReady: livePreflight.preflightReady,
 		controlAvailable: livePreflight.controlAvailable,
 		requiresConfirmation: preview.requiresConfirmation,
@@ -213,6 +217,8 @@ async function buildPreflightState(
 		requestedModeSupported,
 		realRuntimeRegistered: true,
 		livePreflightDetails: livePreflight.details ?? {},
+		stageAnchorValid: anchorValidation.valid,
+		stageAnchorDetails: anchorValidation.details,
 		canProposeRun: true,
 	};
 }
@@ -368,6 +374,10 @@ export const runPreflightTool = {
 
 		if (state.preflightReady !== true || state.controlAvailable !== true) {
 			return warning("ProcedureSpec preflight is waiting on live runtime readiness or control availability.", state);
+		}
+
+		if (state.stageAnchorValid === false) {
+			return warning("ProcedureSpec preflight found current stage position inconsistent with the approved autofocus envelope.", state);
 		}
 
 		return success("ProcedureSpec preflight is ready for supervised proposal approval.", state);

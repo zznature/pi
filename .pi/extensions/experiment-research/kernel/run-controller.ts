@@ -320,7 +320,18 @@ function appendUnitFailedEvent(activeRun: ActiveRun, unit: ExecutionUnit, failur
 		payload: {
 			unitId: unit.unitId,
 			index: unit.index,
+			unitKind: unit.unitKind,
+			positionRef: unit.positionRef,
+			point: unit.point,
+			actions: unit.actions,
 			errorCode: failure.errorCode,
+			message: failure.message,
+			retrySafe: failure.retrySafe,
+			needsOperator: failure.needsOperator,
+			safeToResume: failure.safeToResume,
+			scope: failure.scope,
+			error: failure,
+			diagnostics: failure.payload ?? {},
 			artifacts: artifacts.map((artifact) => artifact.artifactId),
 		},
 	});
@@ -371,6 +382,7 @@ function completeActiveRun(activeRun: ActiveRun): void {
 	updateRunState(activeRun.cwd, activeRun.runId, (current) => ({
 		...current,
 		status: "completed",
+		qualityState: (current.progress.failedUnits ?? 0) > 0 ? "completed_with_failures" : "completed",
 		currentUnit: undefined,
 		updatedAt: timestamp(),
 		endedAt: timestamp(),
@@ -383,6 +395,8 @@ function completeActiveRun(activeRun: ActiveRun): void {
 		timestamp: timestamp(),
 		payload: {
 			completedUnits: readRunStateSnapshot(activeRun.cwd, activeRun.runId)?.progress.completedUnits ?? activeRun.units.length,
+			failedUnits: readRunStateSnapshot(activeRun.cwd, activeRun.runId)?.progress.failedUnits ?? 0,
+			qualityState: readRunStateSnapshot(activeRun.cwd, activeRun.runId)?.qualityState ?? "completed",
 		},
 	});
 	activeRuns.delete(activeRun.runId);

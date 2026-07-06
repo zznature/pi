@@ -20,10 +20,13 @@ __pycache__/
 # Experiment research runtime records (per-run artifacts, not source)
 .pi/raman-lab-config/raman-runtime.local.json
 .pi/raman-lab-config/raman-runtime.json
-assets/agent_sessions/session2html
+.pi/experiment-runs/
+assets/agent_sessions/
+assets/ppt/
 artifacts/*
 
 # Editor files
+.agents/
 .vscode/
 .zed/
 .idea/

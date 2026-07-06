@@ -137,6 +137,9 @@ describe("experiment research Raman runtime contract", () => {
 			retrySafe: true,
 			needsOperator: true,
 			safeToResume: true,
+		}, {
+			confidence: 0.01,
+			zBestUm: 1540,
 		});
 		const paused = pausedActionResult("Spectrum acquisition paused for operator review.", {
 			checkpoint: "before_acquire_spectrum",
@@ -147,6 +150,7 @@ describe("experiment research Raman runtime contract", () => {
 		expect(ActionResultValidator.Check(paused)).toBe(true);
 		expect(success.status).toBe("success");
 		expect(failure.errorCode).toBe("autofocus_low_confidence");
+		expect(failure.payload?.confidence).toBe(0.01);
 		expect(paused.needsOperator).toBe(true);
 		expect(paused.safeToResume).toBe(true);
 	});
