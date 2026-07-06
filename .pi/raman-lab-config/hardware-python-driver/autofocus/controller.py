@@ -1,6 +1,7 @@
 """AutofocusController - top-level orchestrator for single-point autofocus."""
 
 import logging
+import math
 import statistics
 from typing import Callable, Optional
 from autofocus.models import (
@@ -45,6 +46,7 @@ class AutofocusController:
         return FocusResult(
             status=status, z_best_um=None, final_score=None,
             confidence=0.0, coarse=coarse, fine=fine, message=message,
+            quality="bad", recommendation="operator_review",
         )
 
     def run_single(
@@ -224,9 +226,10 @@ class AutofocusController:
         except Exception as e:
             return self._result_error(FocusStatus.NO_PEAK, f"Fixed-range scan: {e}")
 
-        confidence = self._fixed_range_confidence(result)
-        status = FocusStatus.OK if confidence >= 0.2 else FocusStatus.LOW_CONFIDENCE
-        message = "" if status == FocusStatus.OK else f"Fixed-range confidence {confidence:.2f} below threshold 0.20"
+        confidence, diagnostics = self._fixed_range_confidence(result)
+        quality = self._quality_from_confidence(confidence)
+        recommendation = self._recommendation_from_diagnostics(diagnostics)
+        message = "" if quality == "good" else f"Fixed-range focus quality is {quality} (confidence {confidence:.2f})."
         curve = ScanCurve(
             phase="coarse",
             points=[
@@ -235,24 +238,97 @@ class AutofocusController:
             ],
         )
         return FocusResult(
-            status=status,
+            status=FocusStatus.OK,
             z_best_um=result.final_z_um,
             final_score=result.final_verification.score,
             confidence=confidence,
             coarse=curve,
             fine=None,
             message=message,
+            quality=quality,
+            recommendation=recommendation,
+            diagnostics=diagnostics,
         )
 
     @staticmethod
-    def _fixed_range_confidence(result: FixedRangeAutofocusResult) -> float:
+    def _fixed_range_confidence(result: FixedRangeAutofocusResult) -> tuple[float, dict[str, float | str]]:
         scores = [point.score for point in result.points]
         if len(scores) < 3:
-            return 0.0
+            return 0.0, {"reason": "too_few_points", "pointCount": float(len(scores))}
         median_score = statistics.median(scores)
-        prominence = (result.best.score - median_score) / (median_score + 1e-9)
-        verification_ratio = result.final_verification.score / (result.best.score + 1e-9)
-        return max(0.0, min(1.0, prominence, verification_ratio))
+        prominence_raw = (result.best.score - median_score) / (abs(median_score) + 1e-9)
+        peak_prominence = max(0.0, min(1.0, prominence_raw))
+
+        ordered = sorted(result.points, key=lambda point: point.actual_z_um)
+        best_index = max(range(len(ordered)), key=lambda index: ordered[index].score)
+        edge_distance = min(best_index, len(ordered) - 1 - best_index)
+        center_distance = abs(best_index - (len(ordered) - 1) / 2.0)
+        max_center_distance = max((len(ordered) - 1) / 2.0, 1.0)
+        peak_centeredness = 0.0 if edge_distance == 0 else max(0.0, 1.0 - center_distance / max_center_distance)
+
+        sorted_scores = sorted(scores, reverse=True)
+        top_separation_raw = (sorted_scores[0] - sorted_scores[1]) / (abs(sorted_scores[0]) + 1e-9)
+        curve_unimodality = max(0.0, min(1.0, top_separation_raw * 5.0))
+
+        final_reproducibility = max(0.0, min(1.0, result.final_verification.score / (result.best.score + 1e-9)))
+        sampled_spacing = AutofocusController._median_spacing_um(ordered)
+        stage_accuracy = max(0.0, min(1.0, 1.0 - abs(result.final_error_um) / max(sampled_spacing, 1.0)))
+
+        confidence = max(
+            0.0,
+            min(
+                1.0,
+                peak_prominence,
+                peak_centeredness,
+                curve_unimodality,
+                final_reproducibility,
+                stage_accuracy,
+            ),
+        )
+        return confidence, {
+            "peakProminence": peak_prominence,
+            "peakProminenceRaw": prominence_raw,
+            "peakCenteredness": peak_centeredness,
+            "curveUnimodality": curve_unimodality,
+            "topSeparationRaw": top_separation_raw,
+            "finalReproducibility": final_reproducibility,
+            "stageAccuracy": stage_accuracy,
+            "finalErrorUm": result.final_error_um,
+            "sampledSpacingUm": sampled_spacing,
+            "bestIndex": float(best_index),
+            "pointCount": float(len(ordered)),
+        }
+
+    @staticmethod
+    def _median_spacing_um(points: list[ScoredZPoint]) -> float:
+        spacings = [
+            abs(points[index].actual_z_um - points[index - 1].actual_z_um)
+            for index in range(1, len(points))
+            if math.isfinite(points[index].actual_z_um) and math.isfinite(points[index - 1].actual_z_um)
+        ]
+        if not spacings:
+            return 1.0
+        return float(statistics.median(spacings))
+
+    @staticmethod
+    def _quality_from_confidence(confidence: float) -> str:
+        if confidence >= 0.6:
+            return "good"
+        if confidence >= 0.3:
+            return "weak"
+        return "bad"
+
+    @staticmethod
+    def _recommendation_from_diagnostics(diagnostics: dict[str, float | str]) -> str:
+        if diagnostics.get("peakCenteredness") == 0.0:
+            return "expand_range"
+        if diagnostics.get("curveUnimodality", 1.0) < 0.3:
+            return "change_roi"
+        if diagnostics.get("finalReproducibility", 1.0) < 0.5 or diagnostics.get("stageAccuracy", 1.0) < 0.5:
+            return "retry"
+        if diagnostics.get("peakProminence", 1.0) < 0.3:
+            return "change_roi"
+        return "accept"
 
 
 class FixedRangeAutofocusController:

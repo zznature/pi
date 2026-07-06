@@ -263,7 +263,7 @@ describe("experiment research simulation runtime", () => {
 		expect(abortedState.status).toBe("aborted");
 	});
 
-	it("surfaces simulated autofocus, spectrum timeout, and operator-pause scenarios", async () => {
+	it("treats simulated low-confidence autofocus as a quality signal while preserving hard failures", async () => {
 		const cwd = createTempCwd();
 		tempRoots.push(cwd);
 		const extension = loadExperimentExtension();
@@ -273,8 +273,9 @@ describe("experiment research simulation runtime", () => {
 			autofocusLowConfidenceAtUnit: 0,
 			perUnitDelayMs: 5,
 		});
-		const autofocusState = await pollUntilTerminal(extension, autofocusRunId, context, ["failed"]);
-		expect((autofocusState.errorState as Record<string, unknown>).errorCode).toBe("autofocus_low_confidence");
+		const autofocusState = await pollUntilTerminal(extension, autofocusRunId, context, ["completed"]);
+		expect(autofocusState.status).toBe("completed");
+		expect(autofocusState.errorState).toBeUndefined();
 
 		const spectrumRunId = await proposeAndStart(extension, createProcedureSpec(2), context, {
 			spectrumTimeoutAtUnit: 1,
@@ -371,8 +372,8 @@ describe("experiment research simulation runtime", () => {
 		});
 		const resilientState = await pollUntilTerminal(extension, resilientRunId, context, ["completed"]);
 		expect(resilientState.status).toBe("completed");
-		expect((resilientState.progress as Record<string, unknown>).completedUnits).toBe(3);
-		expect((resilientState.progress as Record<string, unknown>).failedUnits).toBe(1);
+		expect((resilientState.progress as Record<string, unknown>).completedUnits).toBe(4);
+		expect((resilientState.progress as Record<string, unknown>).failedUnits).toBe(0);
 
 		const failingSpec = {
 			...createProcedureSpec(4),
@@ -386,7 +387,7 @@ describe("experiment research simulation runtime", () => {
 		};
 		const failingRunId = await proposeAndStart(extension, failingSpec, context, {
 			perUnitDelayMs: 5,
-			autofocusLowConfidenceAtUnits: [1, 2],
+			spectrumTimeoutAtUnits: [1, 2],
 		});
 		const failingState = await pollUntilTerminal(extension, failingRunId, context, ["failed"]);
 		expect((failingState.progress as Record<string, unknown>).failedUnits).toBe(2);

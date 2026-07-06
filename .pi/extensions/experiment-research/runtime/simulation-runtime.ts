@@ -129,13 +129,14 @@ export async function runSimulationUnit(
 		includesUnit(controls.autofocusLowConfidenceAtUnits, unit.index)
 	) {
 		return {
-			status: "failed",
-			error: createRuntimeError(
-				"autofocus_low_confidence",
-				`Simulated autofocus confidence fell below threshold at unit ${unit.index}.`,
-				true,
-			),
-			artifactRefs: [],
+			status: "completed",
+			artifactRefs: createUnitArtifacts(cwd, runId, unit),
+			observationMetrics: {
+				autofocusConfidence: 0.1,
+				saturated: false,
+				snr: 5,
+				targetPeakBaselineRatio: 1,
+			},
 		};
 	}
 

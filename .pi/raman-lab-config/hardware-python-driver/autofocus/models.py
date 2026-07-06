@@ -4,7 +4,7 @@ Pure dataclasses and Protocol interfaces for the autofocus module.
 
 import numpy as np
 from dataclasses import dataclass
-from typing import Protocol, Literal, Optional
+from typing import Any, Protocol, Literal, Optional
 from enum import Enum
 
 from autofocus.exceptions import FrameTimeoutError
@@ -274,3 +274,6 @@ class FocusResult:
     coarse: Optional[ScanCurve]
     fine: Optional[ScanCurve]
     message: str = ""
+    quality: Literal["good", "weak", "bad"] = "bad"
+    recommendation: Literal["accept", "retry", "change_roi", "expand_range", "operator_review"] = "operator_review"
+    diagnostics: Optional[dict[str, Any]] = None
