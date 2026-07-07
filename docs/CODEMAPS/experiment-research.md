@@ -8,7 +8,7 @@ Scope: `.pi/extensions/experiment-research`, the current LabAgents MVP rebuild f
 pi extension
   index.ts
     registers planner/operator/runtime tools
-    injects EXPERIMENT_RESEARCH_PROMPT
+    injects Raman extension prompt, then optional .pi/raman-lab-config/user-prompts.md
     registers configured Raman Python runtime on session_start
       |
       v
@@ -38,6 +38,8 @@ pi extension
   - registers operator tools: `raman_get_hardware_status`, `raman_get_stage_position`, `raman_capture_frame`, `raman_run_autofocus`, `raman_acquire_smoke_spectrum`, `raman_stage_move_relative`
   - registers runtime tools: `propose_run`, `approve_and_start_run`, blocked `run_procedure`, `poll_run`, `pause_run`, `abort_run`
   - activates the tool surface and calls `registerConfiguredRamanPythonRuntime(ctx.cwd)` on `session_start`
+  - appends prompt layers after the base/core prompt in this order:
+    Raman extension prompt, then `.pi/raman-lab-config/user-prompts.md` when present
 - `.pi/extensions/experiment-research/package.json`
   - test command: `npm --prefix .pi/extensions/experiment-research test`
 

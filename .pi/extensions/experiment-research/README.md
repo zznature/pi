@@ -4,6 +4,8 @@ This directory is the canonical path for the LabAgents MVP rebuild.
 
 Current status:
 
+- prompt layering is fixed as:
+  `core lab agent prompt -> Raman extension prompt -> lab-local user prompts`
 - Phase 10 bounded Raman parameter search and bounded Raman mapping execution are implemented on top of the planner proposal flow, explicit evaluation rules, simulation runtime, registered live runtime contract, and approval gate
 - planner-facing tools:
   - `get_lab_capabilities`
@@ -67,6 +69,30 @@ Current status:
 - operator reads, active probes, and stage nudges use the registered Raman live
   runtime directly. They do not require a Raman `ProcedureSpec`; each tool only
   touches the resource it needs.
+
+## Prompt Layers
+
+The current LabAgents prompt surface is intentionally three layers:
+
+```text
+core lab agent prompt
+  -> .pi/extensions/experiment-research/prompt.ts
+  -> .pi/raman-lab-config/user-prompts.md
+```
+
+- `.pi/APPEND_SYSTEM.md` is the core Lab Agent prompt selected by `run-pi.sh`.
+  It owns the general lab identity, startup behavior, and non-domain execution
+  boundary.
+- `.pi/extensions/experiment-research/prompt.ts` is the Raman extension prompt.
+  It owns Raman-specific tool routing, bounded `ProcedureSpec` workflow, and
+  Raman run constraints.
+- `.pi/raman-lab-config/user-prompts.md` is the lab-local prompt. It lives with
+  the lab-specific Raman configuration and owns local operating defaults such as
+  the active lab domain, configured runtime path, and record traceability
+  expectations.
+
+Keep hard execution boundaries out of `user-prompts.md`; they belong in the core
+or Raman extension prompt so local notes cannot dilute them.
 
 ## Live Raman Runtime Configuration
 

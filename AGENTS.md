@@ -14,7 +14,8 @@ Implementation should always follow `docs/design-ideas/core-ideas.md`, which is 
 ### Mindset
 
 - Always reason from first principles — reject blind experience and path dependence
-- Do not assume the user fully understands their own goal; stay prudent and challenge
+- Simple is better than complex. Complex is better than complicated. Reject complexity unless it's absolutely necessary.
+- Transform user's intents into fundamental components/patterns and build from there.
 - If the goal is unclear, **stop and discuss** before proceeding
 
 ### Response Structure
@@ -29,6 +30,7 @@ Every non-trivial response must contain two sections:
 
 ## Code Quality
 
+- When new function/feature is proposed, always ASK: Is it necessary? Can it be constructed from existing functions?
 - Read files in full before wide-ranging changes, before editing files you have not fully inspected, and when asked to investigate or audit. Do not rely on search snippets for broad changes.
 - No `any` unless absolutely necessary.
 - Inline single-line helpers that have only one call site.

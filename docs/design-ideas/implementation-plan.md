@@ -133,6 +133,10 @@ docs freeze
   - [x] `store/`
   - [x] `test/`
 - [x] `index.ts` 能注册最小 tool surface
+- [x] prompt 分层固定为 `core lab agent prompt -> Raman extension prompt -> lab-local user prompts`
+- [x] `.pi/APPEND_SYSTEM.md` 承载 core lab agent prompt
+- [x] `.pi/extensions/experiment-research/prompt.ts` 承载 Raman extension prompt
+- [x] `.pi/raman-lab-config/user-prompts.md` 承载 lab-local prompt，并在 extension prompt 后追加
 - [x] 不复制旧 extension 的 dispatch / schema / kernel 结构
 
 ### Exit Criteria
@@ -301,8 +305,11 @@ docs freeze
 - [x] 提供最小 tool：
   - [x] `run_procedure`（Phase 5.5 会把它收敛到 approval gate 之后）
   - [x] `poll_run`
+  - [x] `summarize_run`
   - [x] `pause_run`
   - [x] `abort_run`
+- [x] `poll_run` 的文本摘要直接包含 completed / total / failed / current unit / artifacts，避免 agent 只看到 `running`
+- [x] `summarize_run` 基于现有 `RunState` 汇总 progress、artifact counts、pause/abort/error，不引入新的核心对象
 
 ### Exit Criteria
 
@@ -368,8 +375,12 @@ docs freeze
 - [x] 实现最小工具：
   - [x] `get_lab_capabilities`
   - [x] `get_lab_state`
+  - [x] `record_experiment_intent`
+  - [x] `get_procedure_spec_template`
   - [x] `validate_procedure_spec`
   - [x] `run_preflight`
+- [x] `record_experiment_intent` 将结构化研究意图写入既有 intent store，供后续 `ProcedureSpec.intentId` 引用
+- [x] `get_procedure_spec_template` 暴露当前 canonical `ProcedureSpec` 形状，减少 agent 临场猜 schema
 - [x] 支持的 procedure：
   - [x] `raman_single_point_probe`
   - [x] `raman_parameter_search`
@@ -589,6 +600,7 @@ docs freeze
 - [x] stage-only relative move 不要求 frame provider / spectrometer 资源
 - [x] stage-only relative move 通过 runtime stage resource limits 做边界拒绝
 - [x] stage-only relative move 在未显式确认时只返回 proposal，不执行 motion
+- [x] 大距离 stage-only move 由 agent 编排多次 bounded relative move、出错后重读位置并询问是否继续；不新增 `MotionPlan` 对象，也不把维护移动伪装成 `ProcedureSpec`
 - [x] 提供可提交的实验室默认配置 `.pi/raman-lab-config/raman-runtime.lab.json`
 - [x] 支持 git-ignored 本地覆盖 `.pi/raman-lab-config/raman-runtime.local.json`
 - [x] runtime 配置加载优先级固定为 `local > lab > none`

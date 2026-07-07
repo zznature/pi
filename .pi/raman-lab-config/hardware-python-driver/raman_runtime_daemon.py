@@ -12,8 +12,7 @@ Protocol (one JSON object per line):
              "payload": {...}}
   response: {"requestId": str, "ok": bool, ...}
 
-This module is the live runtime import surface. ``docs/Raman`` stays
-reference-only and must not be imported here.
+This module is the live runtime import surface.
 """
 
 from __future__ import annotations
@@ -122,7 +121,10 @@ def parse_spectrum_metrics(
     snr = (peak - baseline) / noise if noise > 0 else 0.0
     denominator = abs(baseline) if abs(baseline) > 1e-9 else 1.0
     return {
-        "saturated": bool(saturation_intensity is not None and max(intensities) >= saturation_intensity),
+        "saturated": bool(
+            saturation_intensity is not None
+            and max(intensities) >= saturation_intensity
+        ),
         "snr": float(max(0.0, snr)),
         "targetPeakBaselineRatio": float(peak / denominator),
     }
@@ -228,19 +230,33 @@ def _handle_preflight(session: HardwareSession, request: dict, payload: dict) ->
     details = {
         "pythonRootExists": python_root.exists(),
         "frameBridgeDirExists": Path(frame_cfg["config"]["bridgeDir"]).exists(),
-        "spectrumBridgeDirExists": Path(spectrometer_cfg["config"]["bridgeDir"]).exists(),
+        "spectrumBridgeDirExists": Path(
+            spectrometer_cfg["config"]["bridgeDir"]
+        ).exists(),
     }
     if payload.get("requirePythonRoot", True) and not details["pythonRootExists"]:
-        return _fail("python_root_missing", f"Python root does not exist: {python_root}", payload=details)
+        return _fail(
+            "python_root_missing",
+            f"Python root does not exist: {python_root}",
+            payload=details,
+        )
     if payload.get("requireBridgeDirs", False) and (
         not details["frameBridgeDirExists"] or not details["spectrumBridgeDirExists"]
     ):
-        return _fail("bridge_dir_missing", "One or more LabSpec bridge directories are missing.", payload=details)
+        return _fail(
+            "bridge_dir_missing",
+            "One or more LabSpec bridge directories are missing.",
+            payload=details,
+        )
     if payload.get("connectStage", False):
         stage = session.stage(request["stage"])
         position = stage.get_position_um()
         session.disable_stage_axes()
-        details["stagePosition"] = {"xUm": position.x_um, "yUm": position.y_um, "zUm": position.z_um}
+        details["stagePosition"] = {
+            "xUm": position.x_um,
+            "yUm": position.y_um,
+            "zUm": position.z_um,
+        }
     return _success("Python Raman preflight completed.", details)
 
 
@@ -250,7 +266,13 @@ def _handle_stage_position(session: HardwareSession, request: dict) -> dict:
     session.disable_stage_axes()
     return _success(
         "Stage position read.",
-        {"position": {"xUm": position.x_um, "yUm": position.y_um, "zUm": position.z_um}},
+        {
+            "position": {
+                "xUm": position.x_um,
+                "yUm": position.y_um,
+                "zUm": position.z_um,
+            }
+        },
     )
 
 
@@ -267,11 +289,19 @@ def _handle_stage_move(session: HardwareSession, request: dict, payload: dict) -
     session.disable_stage_axes()
     return _success(
         "Stage moved to requested point.",
-        {"finalPosition": {"xUm": position.x_um, "yUm": position.y_um, "zUm": position.z_um}},
+        {
+            "finalPosition": {
+                "xUm": position.x_um,
+                "yUm": position.y_um,
+                "zUm": position.z_um,
+            }
+        },
     )
 
 
-def _handle_frame_capture(session: HardwareSession, request: dict, payload: dict) -> dict:
+def _handle_frame_capture(
+    session: HardwareSession, request: dict, payload: dict
+) -> dict:
     frame_cfg = request["frameProvider"]
     bridge_dir = Path(frame_cfg["config"]["bridgeDir"])
     image_format = frame_cfg["config"]["imageFormat"]
@@ -291,7 +321,7 @@ def _handle_frame_capture(session: HardwareSession, request: dict, payload: dict
 
 def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) -> dict:
     from autofocus.controller import AutofocusController
-    from autofocus.models import AutofocusParams, FixedRangeAutofocusParams, ROI
+    from autofocus.models import ROI, AutofocusParams, FixedRangeAutofocusParams
 
     stage_cfg = request["stage"]
     z_range = stage_cfg["limits"]["zRangeUm"]
@@ -319,7 +349,9 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
                 "finalToleranceUm": params.get("finalToleranceUm", 5.0),
                 "finalApproachOffsetUm": params.get("finalApproachOffsetUm", 3.0),
                 "interpolatePeak": params.get("interpolatePeak", True),
-                "finalVerificationFramesPerZ": params.get("finalVerificationFramesPerZ", 1),
+                "finalVerificationFramesPerZ": params.get(
+                    "finalVerificationFramesPerZ", 1
+                ),
                 "metricName": params.get("metricName", "labspec_spot_compactness"),
             }
             result = controller.run_fixed_range(
@@ -339,7 +371,9 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
                     final_tolerance_um=resolved_params["finalToleranceUm"],
                     final_approach_offset_um=resolved_params["finalApproachOffsetUm"],
                     interpolate_peak=resolved_params["interpolatePeak"],
-                    final_verification_frames_per_z=resolved_params["finalVerificationFramesPerZ"],
+                    final_verification_frames_per_z=resolved_params[
+                        "finalVerificationFramesPerZ"
+                    ],
                     metric_name=resolved_params["metricName"],
                 ),
             )
@@ -379,7 +413,11 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
     }
     if result.coarse is not None:
         response_payload["scanPoints"] = [
-            {"zUm": point.z_um, "score": point.score, "saturationRatio": point.saturation_ratio}
+            {
+                "zUm": point.z_um,
+                "score": point.score,
+                "saturationRatio": point.saturation_ratio,
+            }
             for point in result.coarse.points
         ]
     if str(result.status.value) == "ok":
@@ -394,12 +432,20 @@ def _handle_autofocus(session: HardwareSession, request: dict, payload: dict) ->
 
 
 def _handle_spectrum(request: dict, payload: dict) -> dict:
-    from mapping.labspec import LabSpecFileBridgeRamanAcquirer, LabSpecWorkerAcquisitionConfig
+    from mapping.labspec import (
+        LabSpecFileBridgeRamanAcquirer,
+        LabSpecWorkerAcquisitionConfig,
+    )
 
     spectrometer_cfg = request["spectrometer"]
     acquisition = payload["acquisition"]
-    output_dir = payload.get("outputDir") or str(Path(spectrometer_cfg["config"]["bridgeDir"]) / "spectra")
-    output_path = Path(output_dir) / f"{payload['pointId']}.{acquisition.get('saveFormat') or 'txt'}"
+    output_dir = payload.get("outputDir") or str(
+        Path(spectrometer_cfg["config"]["bridgeDir"]) / "spectra"
+    )
+    output_path = (
+        Path(output_dir)
+        / f"{payload['pointId']}.{acquisition.get('saveFormat') or 'txt'}"
+    )
     config = LabSpecWorkerAcquisitionConfig(
         bridge_dir=spectrometer_cfg["config"]["bridgeDir"],
         integration_time_s=acquisition["integrationTimeMs"] / 1000.0,
@@ -478,7 +524,12 @@ def main() -> int:
             request_id = request.get("requestId", "")
             action = request.get("action")
             if action == "shutdown":
-                emit({"requestId": request_id, **_success("Raman runtime daemon shut down.")})
+                emit(
+                    {
+                        "requestId": request_id,
+                        **_success("Raman runtime daemon shut down."),
+                    }
+                )
                 break
             try:
                 result = handle(session, request)
