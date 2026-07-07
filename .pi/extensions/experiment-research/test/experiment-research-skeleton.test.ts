@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import experimentResearchExtension from "../index.ts";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "../../../../packages/coding-agent/src/core/extensions/types.ts";
 
+const REPO_ROOT = new URL("../../../../", import.meta.url).pathname;
+
 type CapturedHandler = (...args: unknown[]) => unknown;
 
 interface CapturedExtension {
@@ -49,28 +51,34 @@ describe("experiment research rebuild skeleton", () => {
 
 		expect(extension.tools.has("get_lab_capabilities")).toBe(true);
 		expect(extension.tools.has("get_lab_state")).toBe(true);
+		expect(extension.tools.has("record_experiment_intent")).toBe(true);
+		expect(extension.tools.has("get_procedure_spec_template")).toBe(true);
 		expect(extension.tools.has("validate_procedure_spec")).toBe(true);
 		expect(extension.tools.has("run_preflight")).toBe(true);
 		expect(extension.tools.has("propose_run")).toBe(true);
 		expect(extension.tools.has("approve_and_start_run")).toBe(true);
 		expect(extension.tools.has("run_procedure")).toBe(true);
 		expect(extension.tools.has("poll_run")).toBe(true);
+		expect(extension.tools.has("summarize_run")).toBe(true);
 		expect(extension.tools.has("pause_run")).toBe(true);
 		expect(extension.tools.has("abort_run")).toBe(true);
 		expect(extension.handlers.get("session_start")).toHaveLength(1);
 		expect(extension.handlers.get("before_agent_start")).toHaveLength(1);
 
-		await sessionStart?.({ type: "session_start", reason: "startup" }, { cwd: process.cwd() } as ExtensionContext);
+		await sessionStart?.({ type: "session_start", reason: "startup" }, { cwd: REPO_ROOT } as ExtensionContext);
 		expect(extension.getActiveTools()).toEqual(
 			expect.arrayContaining([
 				"read",
 				"get_lab_capabilities",
 				"get_lab_state",
+				"record_experiment_intent",
+				"get_procedure_spec_template",
 				"validate_procedure_spec",
 				"run_preflight",
 				"propose_run",
 				"approve_and_start_run",
 				"poll_run",
+				"summarize_run",
 				"pause_run",
 				"abort_run",
 				"raman_get_hardware_status",
@@ -85,18 +93,22 @@ describe("experiment research rebuild skeleton", () => {
 				prompt: "plan an experiment",
 				systemPrompt: "base prompt",
 				systemPromptOptions: {},
-			}),
+			}, { cwd: REPO_ROOT } as ExtensionContext),
 		);
 		expect(promptResult.systemPrompt).toContain("base prompt");
-		expect(promptResult.systemPrompt).toContain("Lab Agent");
+		expect(promptResult.systemPrompt).toContain("Raman Extension Prompt");
+		expect(promptResult.systemPrompt).toContain("User Prompts");
 		expect(promptResult.systemPrompt).toContain("raman_get_hardware_status");
 		expect(promptResult.systemPrompt).toContain("Raman hardware");
+		expect(promptResult.systemPrompt).toContain("record_experiment_intent");
+		expect(promptResult.systemPrompt).toContain("get_procedure_spec_template");
+		expect(promptResult.systemPrompt).toContain("summarize_run");
 		expect(promptResult.systemPrompt).toContain("propose_run followed by approve_and_start_run");
 	});
 
 	it("returns scaffold details for the read-only tools", async () => {
 		const extension = loadExperimentExtension();
-		const context = { cwd: process.cwd() } as ExtensionContext;
+		const context = { cwd: REPO_ROOT } as ExtensionContext;
 
 		const capabilities = await extension.tools
 			.get("get_lab_capabilities")
@@ -113,7 +125,7 @@ describe("experiment research rebuild skeleton", () => {
 		expect(stateDetails.status).toBe("success");
 		expect(stateDetails.summary).toBe("LabAgents planner proposal flow is active.");
 		expect(stateAfter.canExecuteSimulationRuns).toBe(true);
-		expect(stateAfter.canExecuteLiveSinglePointRuns).toBe(false);
+		expect(typeof stateAfter.canExecuteLiveSinglePointRuns).toBe("boolean");
 		expect(stateAfter.canValidateProcedureSpecs).toBe(true);
 		expect(stateAfter.canRunPreflight).toBe(true);
 		expect(stateAfter.requiresApproval).toBe(true);

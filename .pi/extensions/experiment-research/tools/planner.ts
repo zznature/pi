@@ -1,10 +1,11 @@
 import { Type, type Static } from "typebox";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { ProcedureSpec } from "../schemas/index.ts";
-import { ProcedureSpecValidator, formatValidationErrors } from "../schemas/index.ts";
+import type { ExperimentIntent, ProcedureId, ProcedureSpec } from "../schemas/index.ts";
+import { ExperimentIntentValidator, ProcedureSpecValidator, formatValidationErrors } from "../schemas/index.ts";
 import { summarizeProcedureProposal } from "../planner/procedure-spec-builder.ts";
 import { compileProcedureSpec } from "../kernel/compile-units.ts";
 import { getRamanLiveRuntime, getRamanPythonRuntimeConfigInfo, validateRuntimeAnchorState } from "../runtime/raman/index.ts";
+import { saveExperimentIntent } from "../store/index.ts";
 
 const EmptyParamsSchema = Type.Object({}, { additionalProperties: false });
 
@@ -49,6 +50,39 @@ const ProcedureSpecParamsSchema = Type.Object(
 	{ additionalProperties: false },
 );
 
+const ProcedureSpecTemplateParamsSchema = Type.Object(
+	{
+		procedureId: Type.Union([
+			Type.Literal("raman_single_point_probe"),
+			Type.Literal("raman_parameter_search"),
+			Type.Literal("raman_grid_mapping"),
+		]),
+	},
+	{ additionalProperties: false },
+);
+
+const ExperimentIntentInputSchema = Type.Object(
+	{
+		intentId: Type.String({ minLength: 1 }),
+		experimentId: Type.String({ minLength: 1 }),
+		objective: Type.String({ minLength: 1 }),
+		hypothesis: Type.Optional(Type.String({ minLength: 1 })),
+		question: Type.Optional(Type.String({ minLength: 1 })),
+		constraints: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+		successCriteria: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
+		evidenceRefs: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
+		notes: Type.Optional(Type.String({ minLength: 1 })),
+	},
+	{ additionalProperties: false },
+);
+
+const ExperimentIntentParamsSchema = Type.Object(
+	{
+		intent: ExperimentIntentInputSchema,
+	},
+	{ additionalProperties: false },
+);
+
 interface PlannerToolDetails {
 	status: "success" | "warning" | "error";
 	summary: string;
@@ -58,6 +92,8 @@ interface PlannerToolDetails {
 }
 
 type ProcedureSpecParams = Static<typeof ProcedureSpecParamsSchema>;
+type ProcedureSpecTemplateParams = Static<typeof ProcedureSpecTemplateParamsSchema>;
+type ExperimentIntentParams = Static<typeof ExperimentIntentParamsSchema>;
 type ExecutionMode = Static<typeof ExecutionModeSchema>;
 
 function success(summary: string, stateAfter: Record<string, unknown>): { content: [{ type: "text"; text: string }]; details: PlannerToolDetails } {
@@ -133,6 +169,134 @@ function hasRequiredRamanRoles(spec: ProcedureSpec): boolean {
 
 function resolveExecutionMode(params: ProcedureSpecParams): ExecutionMode {
 	return params.executionMode ?? "simulation";
+}
+
+function templateForProcedure(procedureId: ProcedureId): Record<string, unknown> {
+	const common = {
+		procedureSpecId: "replace-with-stable-procedure-spec-id",
+		experimentId: "replace-with-experiment-id",
+		intentId: "replace-with-recorded-intent-id",
+		procedureId,
+		procedureVersion: "0.1.0",
+		resources: [
+			{ resourceId: "stage-main", role: "stage" },
+			{ resourceId: "frame-main", role: "frame_provider" },
+			{ resourceId: "spectrometer-main", role: "spectrometer" },
+		],
+		limits: {
+			maxLaserPowerPercent: 25,
+			minObjectiveClearanceUm: 200,
+			xRangeUm: { minUm: 0, maxUm: 50_000 },
+			yRangeUm: { minUm: 0, maxUm: 50_000 },
+			zRangeUm: { minUm: 200, maxUm: 5_000 },
+		},
+		stoppingRules: {
+			maxRuntimeMinutes: 180,
+			maxUnits: 1,
+			stopOnError: true,
+			maxConsecutiveFailures: 1,
+		},
+		domain: {
+			raman: {
+				autofocus: {
+					enabled: true,
+					roi: { x: 492, y: 353, width: 225, height: 225 },
+					params: {
+						zStartUm: 1450,
+						zEndUm: 1550,
+						targetSpacingUm: 5,
+						minPoints: 5,
+						maxPoints: 25,
+						framesPerZ: 1,
+						finalVerificationFramesPerZ: 1,
+					},
+				},
+				acquisition: {
+					integrationTimeMs: 180_000,
+					laserPowerPercent: 25,
+					accumulations: 1,
+					saveFormat: "txt",
+					timeoutMs: 240_000,
+				},
+			},
+		},
+	};
+
+	if (procedureId === "raman_single_point_probe") {
+		return {
+			...common,
+			plan: {
+				kind: "current_position",
+				perPoint: [
+					{ kind: "move_to_point" },
+					{ kind: "autofocus" },
+					{ kind: "capture_frame" },
+					{ kind: "acquire_spectrum" },
+				],
+			},
+		};
+	}
+
+	if (procedureId === "raman_parameter_search") {
+		return {
+			...common,
+			stoppingRules: {
+				maxRuntimeMinutes: 60,
+				maxUnits: 3,
+				stopOnError: true,
+				maxConsecutiveFailures: 1,
+			},
+			plan: {
+				kind: "point_list",
+				points: [
+					{ xUm: 1_000, yUm: 2_000, zUm: 1_500 },
+					{ xUm: 1_000, yUm: 2_000, zUm: 1_500 },
+					{ xUm: 1_000, yUm: 2_000, zUm: 1_500 },
+				],
+				perPoint: [
+					{ kind: "move_to_point" },
+					{ kind: "autofocus" },
+					{ kind: "capture_frame" },
+					{ kind: "acquire_spectrum" },
+				],
+			},
+			domain: {
+				raman: {
+					...(common.domain.raman),
+					parameterSearch: {
+						maxAttempts: 3,
+						laserPowerPercentValues: [1, 5, 10],
+						integrationTimeMs: { min: 1_000, max: 10_000 },
+						accumulations: [1, 2],
+					},
+				},
+			},
+		};
+	}
+
+	return {
+		...common,
+		stoppingRules: {
+			maxRuntimeMinutes: 180,
+			maxUnits: 20,
+			stopOnError: false,
+			maxConsecutiveFailures: 20,
+		},
+		plan: {
+			kind: "point_list",
+			points: [
+				{ xUm: 2_375, yUm: 1_640, zUm: 1_510 },
+				{ xUm: 2_475, yUm: 1_640, zUm: 1_510 },
+				{ xUm: 2_575, yUm: 1_640, zUm: 1_510 },
+			],
+			perPoint: [
+				{ kind: "move_to_point" },
+				{ kind: "autofocus" },
+				{ kind: "capture_frame" },
+				{ kind: "acquire_spectrum" },
+			],
+		},
+	};
 }
 
 async function buildPreflightState(
@@ -250,6 +414,8 @@ export const getLabCapabilitiesTool = {
 			plannerTools: [
 				"get_lab_capabilities",
 				"get_lab_state",
+				"record_experiment_intent",
+				"get_procedure_spec_template",
 				"validate_procedure_spec",
 				"run_preflight",
 				"propose_run",
@@ -275,6 +441,71 @@ export const getLabCapabilitiesTool = {
 		});
 	},
 } satisfies ToolDefinition<typeof EmptyParamsSchema, PlannerToolDetails>;
+
+export const recordExperimentIntentTool = {
+	name: "record_experiment_intent",
+	label: "Record Experiment Intent",
+	description: "Persist the structured research intent before deriving bounded ProcedureSpecs.",
+	promptSnippet: "Record the user's structured ExperimentIntent before creating a bounded ProcedureSpec",
+	promptGuidelines: [
+		"Use this for non-trivial experiment requests before drafting a ProcedureSpec.",
+		"Store assumptions and constraints in the intent so the ProcedureSpec can reference intentId without carrying research memory.",
+	],
+	parameters: ExperimentIntentParamsSchema,
+	executionMode: "sequential",
+	async execute(_toolCallId, params: ExperimentIntentParams, _signal, _onUpdate, ctx) {
+		const intent = params.intent as ExperimentIntent;
+		if (!ExperimentIntentValidator.Check(intent)) {
+			return error("ExperimentIntent validation failed.", "invalid_experiment_intent", {
+				valid: false,
+				issues: formatValidationErrors(ExperimentIntentValidator, intent),
+			});
+		}
+		try {
+			const stored = saveExperimentIntent(ctx.cwd, intent);
+			return success(`ExperimentIntent ${intent.intentId} recorded for experiment ${intent.experimentId}.`, {
+				intentId: intent.intentId,
+				experimentId: intent.experimentId,
+				path: stored.path,
+				objective: intent.objective,
+				constraints: intent.constraints ?? {},
+				successCriteria: intent.successCriteria ?? [],
+			});
+		} catch (cause) {
+			const message = cause instanceof Error ? cause.message : String(cause);
+			return error(message, "experiment_intent_store_failed", {
+				intentId: intent.intentId,
+				experimentId: intent.experimentId,
+			});
+		}
+	},
+} satisfies ToolDefinition<typeof ExperimentIntentParamsSchema, PlannerToolDetails>;
+
+export const getProcedureSpecTemplateTool = {
+	name: "get_procedure_spec_template",
+	label: "Get Procedure Spec Template",
+	description: "Return the canonical minimal ProcedureSpec shape for a supported Raman procedure.",
+	promptSnippet: "Fetch the canonical ProcedureSpec template before drafting a bounded Raman run",
+	promptGuidelines: [
+		"Use this before manually drafting a ProcedureSpec for a Raman run.",
+		"Do not invent additional ProcedureSpec fields; adapt the returned template and then call validate_procedure_spec.",
+	],
+	parameters: ProcedureSpecTemplateParamsSchema,
+	executionMode: "sequential",
+	async execute(_toolCallId, params: ProcedureSpecTemplateParams) {
+		return success(`Canonical ProcedureSpec template loaded for ${params.procedureId}.`, {
+			procedureId: params.procedureId,
+			schemaVersion: "0.1.0",
+			template: templateForProcedure(params.procedureId),
+			notes: [
+				"ProcedureSpec supports plan.kind values current_position, point_list, and grid_scan.",
+				"Line scans should use point_list when one axis is fixed and pitchYUm would be zero.",
+				"Use limits only for maxLaserPowerPercent, minObjectiveClearanceUm, xRangeUm, yRangeUm, and zRangeUm.",
+				"Store the research goal with record_experiment_intent, then reference its intentId here.",
+			],
+		});
+	},
+} satisfies ToolDefinition<typeof ProcedureSpecTemplateParamsSchema, PlannerToolDetails>;
 
 export const getLabStateTool = {
 	name: "get_lab_state",

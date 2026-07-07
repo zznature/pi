@@ -147,6 +147,61 @@ function serializeRunState(runState: RunState): Record<string, unknown> {
 	};
 }
 
+function summarizeArtifacts(runState: RunState): Record<string, number> {
+	const counts: Record<string, number> = {};
+	for (const artifact of runState.artifactRefs) {
+		counts[artifact.kind] = (counts[artifact.kind] ?? 0) + 1;
+	}
+	return counts;
+}
+
+function progressSummary(runState: RunState): string {
+	const progress = runState.progress;
+	const total = progress.totalUnits;
+	const failed = progress.failedUnits ?? 0;
+	const unitKind = progress.unitKind ?? "unit";
+	const completedText =
+		total === undefined
+			? `${progress.completedUnits} ${unitKind} units completed`
+			: `${progress.completedUnits}/${total} ${unitKind} units completed`;
+	const currentText =
+		runState.currentUnit === undefined
+			? "no current unit"
+			: `current unit index ${runState.currentUnit.index}`;
+	return `${completedText}, ${failed} failed, ${currentText}`;
+}
+
+function runSummaryText(runState: RunState): string {
+	const artifacts = runState.artifactRefs;
+	const latestArtifact = artifacts.at(-1);
+	const artifactText =
+		latestArtifact === undefined
+			? "no artifacts yet"
+			: `${artifacts.length} artifacts, latest ${latestArtifact.kind}`;
+	const reasonText = runState.pauseReason
+		? `, pause reason: ${runState.pauseReason}`
+		: runState.abortReason
+			? `, abort reason: ${runState.abortReason}`
+			: "";
+	return `Run ${runState.runId} is ${runState.status}: ${progressSummary(runState)}, ${artifactText}${reasonText}.`;
+}
+
+function runSummaryState(runState: RunState): Record<string, unknown> {
+	return {
+		...serializeRunState(runState),
+		summary: {
+			status: runState.status,
+			progressText: progressSummary(runState),
+			artifactCount: runState.artifactRefs.length,
+			artifactCountsByKind: summarizeArtifacts(runState),
+			latestArtifact: runState.artifactRefs.at(-1),
+			errorState: runState.errorState,
+			pauseReason: runState.pauseReason,
+			abortReason: runState.abortReason,
+		},
+	};
+}
+
 function success(summary: string, runState: RunState): { content: [{ type: "text"; text: string }]; details: RuntimeToolDetails } {
 	return {
 		content: [{ type: "text", text: summary }],
@@ -330,7 +385,36 @@ export const pollRunTool = {
 		if (!runState) {
 			return error(`Run ${params.runId} was not found.`, "run_not_found");
 		}
-		return success(`Run ${params.runId} is ${runState.status}.`, runState);
+		return success(runSummaryText(runState), runState);
+	},
+} satisfies ToolDefinition<typeof RunIdParamsSchema, RuntimeToolDetails>;
+
+export const summarizeRunTool = {
+	name: "summarize_run",
+	label: "Summarize Run",
+	description: "Return a compact operator-facing summary of a bounded run snapshot.",
+	promptSnippet: "Summarize run progress, failures, pause/abort reason, and artifact counts",
+	promptGuidelines: [
+		"Use this when the user asks how many points finished, what failed, or where run outputs are.",
+		"Use poll_run for raw status checks and summarize_run for operator-facing progress summaries.",
+	],
+	parameters: RunIdParamsSchema,
+	executionMode: "sequential",
+	async execute(_toolCallId, params: RunIdParams, _signal, _onUpdate, ctx) {
+		const runState = pollRun(ctx.cwd, params.runId);
+		if (!runState) {
+			return error(`Run ${params.runId} was not found.`, "run_not_found");
+		}
+		const summary = runSummaryText(runState);
+		return {
+			content: [{ type: "text", text: summary }],
+			details: {
+				status: runState.status === "paused" ? "warning" : "success",
+				summary,
+				runId: runState.runId,
+				stateAfter: runSummaryState(runState),
+			},
+		};
 	},
 } satisfies ToolDefinition<typeof RunIdParamsSchema, RuntimeToolDetails>;
 

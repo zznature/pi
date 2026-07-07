@@ -239,6 +239,19 @@ describe("experiment research simulation runtime", () => {
 		expect((terminalState.progress as Record<string, unknown>).completedUnits).toBe(2);
 		expect((terminalState.artifactRefs as unknown[]).length).toBeGreaterThan(0);
 
+		const pollResult = await extension.tools.get("poll_run")?.execute("poll-summary", { runId }, undefined, undefined, context);
+		expect(pollResult?.content[0]?.text).toContain("2/2 point units completed");
+
+		const summaryResult = await extension.tools
+			.get("summarize_run")
+			?.execute("summarize", { runId }, undefined, undefined, context);
+		const summaryDetails = summaryResult?.details as Record<string, unknown>;
+		const summaryState = summaryDetails.stateAfter as Record<string, unknown>;
+		const summary = summaryState.summary as Record<string, unknown>;
+		expect(summaryResult?.content[0]?.text).toContain("2/2 point units completed");
+		expect(summary.artifactCount).toBeGreaterThan(0);
+		expect(summary.artifactCountsByKind).toBeTypeOf("object");
+
 		const events = readRunEvents(cwd, runId);
 		expect(events.map((event) => event.eventType)).toEqual(
 			expect.arrayContaining(["run_started", "unit_started", "unit_completed", "run_completed"]),

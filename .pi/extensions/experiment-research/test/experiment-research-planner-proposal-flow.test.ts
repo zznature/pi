@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import experimentResearchExtension from "../index.ts";
 import { buildExperimentIntent } from "../planner/intent-builder.ts";
 import { buildProcedureProposal } from "../planner/procedure-spec-builder.ts";
@@ -6,6 +9,7 @@ import {
 	ExperimentIntentValidator,
 	ProcedureSpecValidator,
 } from "../schemas/index.ts";
+import { readExperimentIntent } from "../store/index.ts";
 import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "../../../../packages/coding-agent/src/core/extensions/types.ts";
 
 type CapturedHandler = (...args: unknown[]) => unknown;
@@ -36,6 +40,21 @@ function loadExperimentExtension(): CapturedExtension {
 	experimentResearchExtension(api);
 	return { tools, handlers };
 }
+
+function createTempCwd(): string {
+	return mkdtempSync(join(tmpdir(), "pi-exp-planner-"));
+}
+
+const tempRoots: string[] = [];
+
+afterEach(() => {
+	while (tempRoots.length > 0) {
+		const path = tempRoots.pop();
+		if (path) {
+			rmSync(path, { recursive: true, force: true });
+		}
+	}
+});
 
 function buildIntent() {
 	return buildExperimentIntent({
@@ -176,6 +195,45 @@ describe("experiment research planner proposal flow", () => {
 		expect(preflightState.readyForApproval).toBe(true);
 		expect(preflightState.requiresConfirmation).toBe(true);
 		expect(preflightState.canProposeRun).toBe(true);
+	});
+
+	it("records ExperimentIntent and returns canonical ProcedureSpec templates", async () => {
+		const cwd = createTempCwd();
+		tempRoots.push(cwd);
+		const extension = loadExperimentExtension();
+		const context = { cwd } as ExtensionContext;
+		const intent = {
+			intentId: "intent-template-001",
+			experimentId: "exp-template-001",
+			objective: "Run a bounded Raman line scan from the current sample position.",
+			constraints: {
+				direction: "+x",
+				pointCount: 20,
+				spacingUm: 100,
+			},
+			successCriteria: ["Record spectra for each point", "Continue after non-safety point failures"],
+		};
+
+		const recordResult = await extension.tools
+			.get("record_experiment_intent")
+			?.execute("record-intent", { intent }, undefined, undefined, context);
+		const recordDetails = asRecord(recordResult?.details);
+		const recordState = asRecord(recordDetails.stateAfter);
+		expect(recordDetails.status).toBe("success");
+		expect(recordState.intentId).toBe(intent.intentId);
+		expect(readExperimentIntent(cwd, intent.experimentId, intent.intentId)).toEqual(intent);
+
+		const templateResult = await extension.tools
+			.get("get_procedure_spec_template")
+			?.execute("template", { procedureId: "raman_grid_mapping" }, undefined, undefined, context);
+		const templateDetails = asRecord(templateResult?.details);
+		const templateState = asRecord(templateDetails.stateAfter);
+		const template = asRecord(templateState.template);
+		const plan = asRecord(template.plan);
+		expect(templateDetails.status).toBe("success");
+		expect(template.procedureId).toBe("raman_grid_mapping");
+		expect(plan.kind).toBe("point_list");
+		expect(templateState.notes).toEqual(expect.arrayContaining([expect.stringContaining("Line scans should use point_list")]));
 	});
 
 	it("surfaces forbidden preflight risks when the proposed laser power exceeds limits", async () => {
