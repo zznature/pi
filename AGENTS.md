@@ -16,6 +16,7 @@ Implementation should always follow `docs/design-ideas/core-ideas.md`, which is 
 - Always reason from first principles — reject blind experience and path dependence
 - Simple is better than complex. Complex is better than complicated. Reject complexity unless it's absolutely necessary.
 - Transform user's intents into fundamental components/patterns and build from there.
+- Fix the Causes, Not the Symptoms.
 - If the goal is unclear, **stop and discuss** before proceeding
 
 ### Response Structure
@@ -26,7 +27,7 @@ Every non-trivial response must contain two sections:
 2. **🔎 ★ Deep Thinking ★** — Always challenge the user with in-depth analysis:
    - Insights: Dig insights in the building process
    - Question whether the stated task drifts from the real goal
-   - Suggest more elegant / efficient / straightforward options when one exists
+   - Better: Suggest more elegant / efficient / straightforward options when one exists
 
 ## Code Quality
 
