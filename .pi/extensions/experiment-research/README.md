@@ -1,235 +1,235 @@
 # Experiment Research Extension
 
-This project-local extension implements the bounded experiment loop described in
-`docs/pi_agent_experiment_research_adaptation.md`.
+This directory is the canonical path for the LabAgents MVP rebuild.
 
-The authoritative MVP Raman safety contract now lives in
-`docs/experiment_extension/mvp_safety_contract.md`.
+Current status:
 
-## Configuration
+- prompt layering is fixed as:
+  `core lab agent prompt -> Raman extension prompt -> lab-local user prompts`
+- Phase 10 bounded Raman parameter search and bounded Raman mapping execution are implemented on top of the planner proposal flow, explicit evaluation rules, simulation runtime, registered live runtime contract, and approval gate
+- planner-facing tools:
+  - `get_lab_capabilities`
+  - `get_lab_state`
+  - `validate_procedure_spec`
+  - `run_preflight`
+- operator-facing tools:
+  - `raman_get_hardware_status`
+  - `raman_get_stage_position`
+  - `raman_stage_move_relative`
+- core schema modules available under `schemas/`:
+  - `experiment-intent.ts`
+  - `procedure-spec.ts`
+  - `execution-unit.ts`
+  - `run-state.ts`
+  - `tool-result.ts`
+- persistence store modules available under `store/`:
+  - `intent-store.ts`
+  - `procedure-spec-store.ts`
+  - `run-store.ts`
+  - `event-store.ts`
+  - `artifact-store.ts`
+- kernel compile module available under `kernel/`:
+  - `compile-units.ts`
+- simulation runtime modules available under `kernel/` and `runtime/`:
+  - `run-controller.ts`
+  - `simulation-runtime.ts`
+- proposal + simulation tools available:
+  - `propose_run`
+  - `approve_and_start_run`
+  - `run_procedure`
+  - `poll_run`
+  - `pause_run`
+  - `abort_run`
+- `approve_and_start_run` can now execute:
+  - simulation bounded runs
+  - live-supervised Raman single-point bounded runs when a live runtime is registered
+  - live-supervised Raman parameter-search bounded runs when a live runtime is registered
+  - live-supervised Raman grid-mapping bounded runs when a live runtime is registered
+- bounded parameter search now enforces:
+  - approved search envelope only
+  - max attempts
+  - explicit rule-based early stop vs operator-decision pause
+- bounded mapping now supports:
+  - compiled `grid_scan` point execution
+  - progress with completed and failed point counts
+  - configurable consecutive-failure stop without auto-expanding the grid or auto-changing parameters
+- `run_procedure` remains registered as a deprecated blocked entrypoint that returns `approval_required`
+- planner builders available under `planner/`:
+  - `intent-builder.ts`
+  - `procedure-spec-builder.ts`
+  - `evaluate-good-enough.ts`
+- Raman runtime contract modules available under `runtime/raman/`:
+  - `resources.ts`
+  - `actions.ts`
+  - `live-runtime.ts`
+  - `python-runtime.ts` (persistent Python hardware daemon client)
+  - `index.ts`
+- the live Python hardware driver entrypoint lives at
+  `.pi/raman-lab-config/hardware-python-driver/raman_runtime_daemon.py`
+- operator reads, active probes, and stage nudges use the registered Raman live
+  runtime directly. They do not require a Raman `ProcedureSpec`; each tool only
+  touches the resource it needs.
 
-The extension is loaded from `.pi/extensions/experiment-research`. It registers
-planner macro tools only:
+## Prompt Layers
 
-- `get_lab_capabilities`
-- `get_lab_state`
-- `get_experiment_state`
-- `validate_experiment_spec`
-- `run_preflight`
-- `run_experiment`
-- `start_run`
-- `advance_run`
-- `analyze_run`
-- `plan_next_experiment`
-
-Operator tools are registered for out-of-band control and are not added to the
-planner default active set:
-
-- `pause_run`
-- `abort_run`
-- `poll_run`
-- `request_operator`
-- `record_hardware_coordinate_audit`
-- `raman_active_probe`
-- `raman_record_xy_calibration`
-- `raman_fit_xy_calibration`
-- `raman_auto_xy_calibration`
-- `raman_prepare_hardware_validation_payload`
-- `raman_record_hardware_validation`
-- `raman_check_hardware_validation`
-- `raman_prepare_validation_spec_pair`
-
-## Capabilities
-
-Capabilities are loaded from `capabilities.ts`.
-
-- `simulation` uses fake stage, camera, and acquisition resources.
-- `dry_run` probes gated hardware readiness without motion,
-  acquisition, or power writes.
-- `hardware` supports a constrained non-Raman MC.Newton XYZ stage path and typed
-  Raman specs when `domain.raman` is present.
-
-Raman readiness currently includes:
-
-- typed `domain.raman.operationIntent` plus semantic validation for acquisition,
-  autofocus windows, and XY correction margins;
-- `raman_bridge.py`, a JSON-lines Python bridge with read-only probe,
-  memory-stage `visit_point`, fake `run_unit` acquisition, and stderr-only
-  diagnostics;
-- `RamanBridgeClient` for long-lived stdio protocol tests;
-- dry-run `readOnlyProbe` reports written through the Python bridge for Raman
-  specs;
-- `active_probe` smoke checks for operator-approved frame capture and short
-  spectrum artifacts through the operator-only `raman_active_probe` tool, kept
-  separate from read-only dry runs;
-- operator-approved Raman XY calibration records through
-  `raman_record_xy_calibration`, persisted under
-  `.pi/experiment-runs/lab/calibrations` and referenced by
-  `domain.raman.xyCorrection.transformArtifactId`;
-- operator-approved Raman XY calibration fitting through
-  `raman_fit_xy_calibration`, which estimates `pixelPerUm` from non-collinear
-  stage shifts and reference/current frame pairs before writing the same
-  calibration artifact format;
-- operator-approved automatic Raman XY calibration sequencing through
-  `raman_auto_xy_calibration`, which can move a stage, capture frames, fit
-  `pixelPerUm`, and write the calibration artifact. The no-hardware path uses a
-  memory stage with synthetic frames; the real path uses MC.Newton plus the
-  LabSpec frame bridge and still requires supervised hardware validation;
-- operator-only Raman hardware validation draft preparation through
-  `raman_prepare_hardware_validation_payload`, which assembles a schema-valid
-  draft payload from evidence identifiers and instrument IDs while intentionally
-  leaving operator approval, real-hardware attestation, and checklist booleans
-  unset until the operator completes the final review. A copyable current
-  real-capable draft example lives at
-  `fixtures/raman/v2/real/payload.draft.json`;
-  matching operator input examples for dry-run preflight, active probe, and the
-  first bootstrap real V2 minimum run live at
-  `fixtures/raman/v2/real/preflight-input.json`,
-  `fixtures/raman/v2/real/active-probe-input.json`, and
-  `fixtures/raman/v2/real/bootstrap-run-input.json`;
-- operator-reviewed Raman hardware validation records through
-  `raman_record_hardware_validation`, collecting read-only preflight, active
-  smoke, minimum Raman run, optional calibration, safety checklist evidence,
-  explicit hardware observation metadata, and instrument IDs into
-  `.pi/experiment-runs/lab/validations`. Records only become
-  `productionReady` when the evidence is marked `hardware`, the operator
-  attests real hardware observation, and the referenced active probe/run records
-  do not use fake or memory backends. The minimum Raman run must also include a
-  completed unit with `labspec_file_bridge` spectrum metadata, while the active
-  probe must include both LabSpec frame capture and spectrum smoke artifacts.
-  When `evidence.workflowBackend === "v2_bridge"`, the minimum Raman run must
-  also carry matching V2 parity evidence for enabled capabilities: autofocus
-  requires `unit.autofocus`, XY correction requires `unit.xyCorrection`,
-  thermal waiting requires `unit.thermal`, and autofocus/XY runs require real
-  frame artifacts on disk.
-  The referenced read-only preflight and minimum Raman run must share the same
-  canonical `specHash`; the validation record stores an `evidenceDigest` with
-  SHA-256 hashes for the referenced preflight, active probe, run records, and
-  optional calibration artifact, plus the active probe frame/spectrum artifacts
-  and minimum-run spectrum artifacts. These validation records remain useful
-  for readiness review and traceability, but they are not the current MVP Raman
-  launch gate. Current real hardware execution still rejects
-  `thermal.waitBeforeAcquisition` because the thermal backend is fake-only; use
-  the current real-capable validation spec pair for production-ready V2
-  evidence, and treat thermal parity as a future full-surface target until a
-  real backend exists;
-- operator-only Raman validation readiness checks through
-  `raman_check_hardware_validation`, which can re-verify stored evidence and,
-  when given a candidate ExperimentSpec, also verify that the validation record
-  covers the requested Raman capability surface before real hardware execution;
-- MVP Raman hardware launch now uses a minimal deterministic safety gate only:
-  - `limits.motion.zUm.maxUm = Raman objective collision ceiling`
-  - `limits.powerEnergy.maxLaserPowerMw = laser ceiling`
-  Everything else is readiness, diagnostics, or optional audit metadata and no
-  longer blocks `run_experiment`;
-- bridge-backed Raman `run_experiment` execution for the minimal
-  `visit_point + acquire` path, returning immediately with a `runId` and
-  updating `poll_run` state through `resume.snapshot.json`;
-- selectable Raman acquisition backends: `fake` for no-hardware regression
-  tests and `labspec_file_bridge` for the LabSpec worker request/result
-  directory protocol;
-- bridge `autofocus` and `xy_correct` actions with fake/no-hardware backends
-  plus real-capable `labspec_file_bridge` autofocus and `phase_correlation`
-  XY correction backends, wired into Raman `run_unit` so focus confidence and
-  correction metadata flow into run records and analysis. Hardware execution
-  params can provide explicit phase-correlation frame paths, while the transform
-  is normally resolved from the referenced calibration artifact. For V2
-  autofocus moves, the TS orchestrator passes an explicit trusted Z window and
-  optional target tolerance into the bridge, and the Python bridge rejects any
-  settled readback outside that declared envelope before frame capture or
-  acquisition continues;
-- deterministic Raman analysis metrics for spectrum SNR, saturation, focus
-  confidence, and XY correction metadata.
-
-The `docs/Raman/mapping` LabSpec helper package is also present so the existing
-autofocus/microscope file bridge modules and `request_labspec_spectrum.py` can
-import in a no-hardware environment. The non-Raman hardware path remains
-synchronous and limited to MC.Newton stage movement.
-
-The next hardware milestone is validating the `labspec_file_bridge`
-acquisition/autofocus path and `phase_correlation` XY correction path against
-the real LabSpec worker, camera stream, stage, and operator safety workflow.
-
-For MVP Raman work, hardware execution is intentionally simple:
-
-- `run_preflight` remains useful for readiness checks, but it does not create a
-  launch approval gate;
-- `run_experiment` blocks only on backend executability plus the two bounded
-  safety limits above;
-- for `workflowBackend: "v2_bridge"`, autofocus motion also faces a bridge-side
-  settled-position assertion inside the declared trusted Z window;
-- coordinate audits, validation records, and operator approval payloads remain
-  available as optional maintenance or traceability tools and are no longer
-  required before launch.
-
-New `run_experiment` hardware calls should pass `hardwareExecution` parameters.
-The legacy `hardwarePilot` parameter remains accepted during migration, but a
-single call must not provide both aliases.
-
-## Operator Flow
-
-1. Compile a bounded `ExperimentSpec`.
-2. Run `validate_experiment_spec`.
-3. Run `run_preflight`.
-4. For Raman hardware, confirm:
-   - all planned Z stays below `limits.motion.zUm.maxUm`
-   - requested laser power stays below `limits.powerEnergy.maxLaserPowerMw`
-5. Run `run_experiment`.
-6. Run `analyze_run`.
-7. Run `plan_next_experiment`.
-8. Compile the returned strategy into the next bounded `ExperimentSpec`.
-
-The agent must not change run parameters while a run is active.
-
-## Records
-
-Each run writes:
-
-- `run.json`
-- `spec.json`
-- `events.jsonl`
-- `summary.json`
-- `analysis.json`
-- `resume.snapshot.json`
-- `artifacts.json`
-- `approvals.jsonl` for hardware
-
-Experiment-level history is stored in:
-
-- `experiment.json`
-- `lineage.jsonl`
-- `decisions.jsonl`
-
-## Fake Experiment
-
-Use `fixtures/sim/spec.json` for a complete simulation loop:
+The current LabAgents prompt surface is intentionally three layers:
 
 ```text
-validate_experiment_spec -> run_preflight -> run_experiment -> analyze_run -> plan_next_experiment
+core lab agent prompt
+  -> .pi/extensions/experiment-research/prompt.ts
+  -> .pi/raman-lab-config/user-prompts.md
 ```
 
-Use `fixtures/hw/dry-run-spec.json` and `fixtures/hw/spec.json` for
-the gated non-Raman stage hardware path.
+- `.pi/APPEND_SYSTEM.md` is the core Lab Agent prompt selected by `run-pi.sh`.
+  It owns the general lab identity, startup behavior, and non-domain execution
+  boundary.
+- `.pi/extensions/experiment-research/prompt.ts` is the Raman extension prompt.
+  It owns Raman-specific tool routing, bounded `ProcedureSpec` workflow, and
+  Raman run constraints.
+- `.pi/raman-lab-config/user-prompts.md` is the lab-local prompt. It lives with
+  the lab-specific Raman configuration and owns local operating defaults such as
+  the active lab domain, configured runtime path, and record traceability
+  expectations.
 
-Use `fixtures/raman/base/dry-run-spec.json` and `fixtures/raman/base/hardware-spec.json`
-for the minimal Raman acquisition contract path.
+Keep hard execution boundaries out of `user-prompts.md`; they belong in the core
+or Raman extension prompt so local notes cannot dilute them.
 
-## CI Checks
+## Live Raman Runtime Configuration
 
-Run focused tests after changing this extension:
+The rebuild loads stable lab hardware context at session start. Runtime config
+resolution is:
 
 ```text
+.pi/raman-lab-config/raman-runtime.local.json
+> .pi/raman-lab-config/raman-runtime.lab.json
+> no live runtime
+```
+
+`raman-runtime.lab.json` is the committed lab default. `raman-runtime.local.json`
+is a git-ignored local override for temporary port/path/enablement changes.
+
+Current lab default:
+
+```json
+{
+  "enabled": true,
+  "pythonExecutable": "python",
+  "pythonRoot": ".pi/raman-lab-config/hardware-python-driver",
+  "stage": {
+    "resourceId": "stage-main",
+    "kind": "stage",
+    "runtime": "raman_python",
+    "driver": "mc_newton_xyz",
+    "config": {
+      "port": "COM17",
+      "xChannel": 1,
+      "yChannel": 2,
+      "zChannel": 3,
+      "baudrate": 115200
+    },
+    "leasePolicy": "exclusive",
+    "simulationAvailable": true,
+    "limits": {
+      "xRangeUm": [0, 50000],
+      "yRangeUm": [0, 50000],
+      "zRangeUm": [0, 5000]
+    }
+  },
+  "frameProvider": {
+    "resourceId": "frame-main",
+    "kind": "frame_provider",
+    "runtime": "raman_python",
+    "driver": "labspec_file_bridge_frame",
+    "config": {
+      "bridgeDir": "D:\\RamanLab\\SpecBridge",
+      "imageFormat": "tif",
+      "minCaptureIntervalMs": 400
+    },
+    "leasePolicy": "shared-read",
+    "simulationAvailable": false
+  },
+  "spectrometer": {
+    "resourceId": "spectrometer-main",
+    "kind": "spectrometer",
+    "runtime": "raman_python",
+    "driver": "labspec_file_bridge_spectrum",
+    "config": {
+      "bridgeDir": "D:\\RamanLab\\SpecBridge",
+      "requestFilename": "spectrum_request.ini",
+      "resultFilename": "spectrum_result.ini"
+    },
+    "leasePolicy": "exclusive",
+    "simulationAvailable": false
+  },
+  "preflight": {
+    "requirePythonRoot": true,
+    "requireBridgeDirs": false,
+    "connectStage": true
+  }
+}
+```
+
+Set `"enabled": false` in `raman-runtime.local.json` to keep hardware disabled
+explicitly on one machine. Without an enabled registered runtime,
+live-supervised `approve_and_start_run` returns `live_runtime_unavailable`;
+simulation remains available.
+
+The committed lab default lives at:
+
+```text
+.pi/raman-lab-config/raman-runtime.lab.json
+```
+
+## Live Raman Runtime Transport (Persistent Daemon)
+
+The Python live runtime talks to one long-lived hardware daemon instead of
+spawning a fresh process per action:
+
+```text
+.pi/raman-lab-config/hardware-python-driver/raman_runtime_daemon.py
+```
+
+`createRamanPythonRuntime` spawns this script lazily on the first action and
+keeps it alive, so a multi-point mapping run connects to the stage and LabSpec
+frame bridge once instead of reconnecting on every move/autofocus/frame/spectrum
+action. Properties relevant to mapping reliability:
+
+- **One persistent session.** Stage and frame-provider sessions are opened on
+  first use and reused for the whole run. Stage channels are disabled after each
+  motion (no axis left energized between actions), but the serial connection
+  stays open.
+- **Serialized access.** All actions and operator tools share one daemon and are
+  queued one-at-a-time, so the single hardware session is never touched
+  concurrently. This is a transport-level correctness guarantee, not a policy
+  lease (multi-agent lease arbitration remains a target-state item).
+- **Timeout recovery.** A timed-out action kills and resets the daemon; the next
+  action respawns it. Hard safety limits (motion bounds, objective clearance,
+  laser power) are still enforced in TypeScript before each action regardless of
+  transport.
+- **Idle release.** After `daemon.idleShutdownMs` (default 30000 ms) with no
+  action, the daemon shuts down cleanly and releases the serial port so other
+  lab software can use it; the next action respawns it.
+
+Optional config (in `raman-runtime.lab.json` / `raman-runtime.local.json`):
+
+```json
+{
+  "daemon": { "idleShutdownMs": 30000 }
+}
+```
+
+## Tests
+
+Rebuild-specific tests live in:
+
+```text
+.pi/extensions/experiment-research/test/
+```
+
+Run them with:
+
+```bash
 npm --prefix .pi/extensions/experiment-research test
 ```
 
-Run an individual phase test when iterating on a narrow change:
-
-```text
-npm --prefix .pi/extensions/experiment-research run test:phase7
-```
-
-After code changes, run the repository check:
-
-```text
-npm run check
-```
+The previous reference implementation has been deleted. This extension is the sole MVP implementation baseline.

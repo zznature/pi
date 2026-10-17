@@ -1,17 +1,11 @@
-"""LabSpec bright-spot autofocus metric.
-
-This metric is tuned for LabSpec video frames where correct focus appears as a
-compact bright spot in the selected ROI. It intentionally does not reward raw
-edge/stripe energy, because defocused LabSpec frames can contain stronger
-fringes than focused frames.
-"""
+"""LabSpec bright-spot autofocus metric."""
 
 from __future__ import annotations
 
 import numpy as np
 
-from autofocus.models import ROI
-from autofocus.roi import prepare
+from autofocus_function.protocols import ROI
+from autofocus_function.roi import prepare
 
 
 def _robust_normalize(patch: np.ndarray) -> np.ndarray:
@@ -27,13 +21,7 @@ def _robust_normalize(patch: np.ndarray) -> np.ndarray:
 
 
 def labspec_spot_compactness(image: np.ndarray, roi: ROI) -> float:
-    """Score focus by compactness of the dominant LabSpec bright spot.
-
-    Higher score means the bright signal is concentrated into a smaller core.
-    This matches the observed LabSpec focus sequence where the best frames show
-    a small central bright spot and poorer frames expand into broad fringed
-    blobs.
-    """
+    """Score focus by compactness of the dominant LabSpec bright spot."""
     patch = prepare(image, roi, blur=False)
     normalized = _robust_normalize(patch)
 

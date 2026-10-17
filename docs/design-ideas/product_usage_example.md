@@ -112,7 +112,7 @@
 11. agent:
    - 我不能无界搜索，但可以提议一次受限 parameter search。
    - 可调参数仅限：
-     - `laserPowerMw`
+     - `laserPowerPercent`
      - `integrationTimeMs`
      - `accumulations`
    - 不会改变：

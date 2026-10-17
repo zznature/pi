@@ -1,15 +1,16 @@
-﻿"""ROI extraction and preprocessing for sharpness metrics."""
+"""ROI extraction and preprocessing for sharpness metrics."""
+
+from __future__ import annotations
 
 import numpy as np
-from autofocus.models import ROI
+
+from autofocus_function.protocols import ROI
 
 
 def crop(image: np.ndarray, roi: ROI) -> np.ndarray:
     """Return the ROI patch from image; raise ValueError if ROI is out of bounds."""
     if not roi.is_valid(image.shape[:2]):
-        raise ValueError(
-            f"ROI {roi} is invalid for image shape {image.shape[:2]}"
-        )
+        raise ValueError(f"ROI {roi} is invalid for image shape {image.shape[:2]}")
     return image[roi.slice()]
 
 
@@ -49,6 +50,7 @@ def saturation_ratio(image: np.ndarray, low: int = 2, high: int = 253) -> float:
 
 def gaussian_blur(image: np.ndarray, sigma: float = 0.8) -> np.ndarray:
     """Apply separable 5-tap Gaussian blur (fixed kernel; sigma parameter ignored)."""
+    _ = sigma
     kernel = np.array([1, 4, 6, 4, 1], dtype=np.float32) / 16.0
     img = image.astype(np.float32)
     padded = np.pad(img, ((0, 0), (2, 2)), mode="edge")
