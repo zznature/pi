@@ -1,11 +1,5 @@
 {
   "packages": [
-    {
-      "source": "npm:pi-web-access",
-      "extensions": [],
-      "skills": [],
-      "prompts": [],
-      "themes": []
-    }
+    "npm:pi-web-access"
   ]
 }

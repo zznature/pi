@@ -626,6 +626,9 @@
 			"cpu": [
 				"arm64"
 			],
+			"libc": [
+				"glibc"
+			],
 			"optional": true
 		},
 		"node_modules/@mariozechner/clipboard-linux-arm64-musl": {
@@ -641,6 +644,9 @@
 			],
 			"cpu": [
 				"arm64"
+			],
+			"libc": [
+				"musl"
 			],
 			"optional": true
 		},
@@ -658,6 +664,9 @@
 			"cpu": [
 				"riscv64"
 			],
+			"libc": [
+				"glibc"
+			],
 			"optional": true
 		},
 		"node_modules/@mariozechner/clipboard-linux-x64-gnu": {
@@ -674,6 +683,9 @@
 			"cpu": [
 				"x64"
 			],
+			"libc": [
+				"glibc"
+			],
 			"optional": true
 		},
 		"node_modules/@mariozechner/clipboard-linux-x64-musl": {
@@ -689,6 +701,9 @@
 			],
 			"cpu": [
 				"x64"
+			],
+			"libc": [
+				"musl"
 			],
 			"optional": true
 		},
@@ -1322,8 +1337,7 @@
 			"license": "MIT",
 			"bin": {
 				"jiti": "lib/jiti-cli.mjs"
-			},
-			"peer": true
+			}
 		},
 		"node_modules/json-bigint": {
 			"version": "1.0.0",
@@ -1776,8 +1790,7 @@
 			"license": "MIT",
 			"funding": {
 				"url": "https://github.com/sponsors/colinhacks"
-			},
-			"peer": true
+			}
 		},
 		"node_modules/zod-to-json-schema": {
 			"version": "3.25.2",

@@ -1,4 +1,4 @@
-﻿# Raman 硬件与 Tool 接入方案
+# Raman 硬件与 Tool 接入方案
 
 本文不讨论 kernel 的执行状态机。那部分已经在 `kernel-execution-model.md` 里定义。
 
@@ -6,7 +6,7 @@
 
 > 以 Raman 为例，一类真实硬件应该怎样接进系统，变成 runtime 可调用的 driver、composite action 和 tool surface？
 
-重点是：
+因此这里的重点是：
 
 - 真实硬件资源如何注册
 - Python 脚本如何收敛成 driver
@@ -16,22 +16,43 @@
 
 ## 1. Raman 在整个设计里的角色
 
-Raman 不是最终架构本身，而是第一块真实硬件样板。它的价值是：
+Raman 不是最终架构本身，而是第一块真实硬件样板。
+
+它的价值是：
 
 1. 有实验室里已经试过的 Python 硬件脚本
 2. 同时包含多类能力：
    - stage
    - frame capture
    - autofocus
-   - XY correction (future/reference only)
+   - XY correction
    - spectrum acquisition
 3. 足够复杂，能逼出一套通用硬件接入边界
 
-本文目标不是“把 Raman 做成特例系统”，而是：
+所以本文的正确目标不是“把 Raman 做成一个特例系统”，而是：
 
 > 用 Raman 逼出通用硬件接入方案中最难的那部分：真实设备、driver、runtime action、tool surface 的分层。
 
-## 2. 第一性原理
+## 2. 文档分工
+
+为了避免和 `kernel-execution-model.md` 重复，先明确两篇文档各自回答什么。
+
+### `kernel-execution-model.md` 回答
+
+- kernel 怎么编译 `ProcedureSpec`
+- `ExecutionUnit` 粒度怎么设计
+- run lifecycle 怎么设计
+- kernel 和 runtime contract 怎么定义
+
+### 本文回答
+
+- Raman 资源对象长什么样
+- `docs/Raman` 哪些脚本属于 driver，哪些属于 composite action
+- 哪些能力变成 runtime action
+- 哪些能力变成 tool
+- planner / operator 分别能看到什么
+
+## 3. 第一性原理
 
 真实硬件接入最容易犯的错误有两个：
 
@@ -40,9 +61,9 @@ Raman 不是最终架构本身，而是第一块真实硬件样板。它的价�
 
 这两条都不成立。
 
-正确拆分是：
+正确拆分应该是：
 
-- `.pi/raman-lab-config/hardware-python-driver` 提供 live runtime 的真实硬件 driver
+- `docs/Raman` 提供真实硬件控制能力
 - Hardware Runtime 持有 driver session 并调度 action
 - Tool surface 只暴露上层真正需要的入口
 
@@ -52,25 +73,27 @@ Raman 不是最终架构本身，而是第一块真实硬件样板。它的价�
 2. **Raman 的多点 workflow 不能直接当 kernel**
 3. **tool 暴露实验能力，不暴露驱动细节**
 
-## 3. Raman 能力来源
+## 4. Raman 现有能力盘点
 
-Raman MVP 的 live runtime 只从 `.pi/raman-lab-config/hardware-python-driver` 导入驱动。
-`docs/Raman` 是 legacy/reference source：可用于迁移算法和设备知识，但不进入运行时 import path。
+`docs/Raman` 当前已经有几类可复用能力：
 
-MVP 至少收敛这些能力：
+| 能力域 | 主要文件 | 当前性质 |
+| --- | --- | --- |
+| stage | `stage/models.py`, `stage/mc_newton_xyz_stage.py` | 真实 XYZ stage driver |
+| autofocus frame bridge | `autofocus/labspec_file_bridge.py` | LabSpec worker frame provider |
+| autofocus logic | `autofocus/models.py`, `autofocus/scanner.py`, `autofocus/controller.py` | 单点 autofocus 复合动作 |
+| XY correction | `calibration/xy_corrector.py`, `calibration/stage_adapter.py` | 图像配准与位移执行 |
+| spectrum acquisition | `mapping/labspec.py`, `acquire-spectrum/request_labspec_spectrum.py` | 单点采谱 |
+| mapping reference | `mapping/planner.py`, `mapping/runner.py` | 领域参考实现，不是最终 kernel |
 
-| 能力域 | 当前性质 |
-| --- | --- |
-| stage | 真实 XYZ stage driver |
-| frame provider | LabSpec worker frame provider |
-| autofocus | 单点 autofocus 复合动作 |
-| spectrum acquisition | 单点采谱 |
-| XY correction | future/reference only; not part of MVP runtime surface |
-| mapping reference | 参考点执行顺序与 record 结构，不是最终 kernel |
+这里最关键的判断是：
 
-关键判断：多点 workflow state 必须归 kernel/runtime contract 管，不能藏在 Python loop 里。
+- `mapping/runner.py` 有参考价值
+- 但它不是最终实验执行器
 
-## 4. Raman 资源注册
+因为它把 workflow state 藏在 Python 循环里，这和新的 kernel 分层冲突。
+
+## 5. Raman 资源注册
 
 Raman 接入的第一步不是写 tool，而是把真实硬件描述成稳定资源。
 
@@ -82,7 +105,7 @@ Raman 接入的第一步不是写 tool，而是把真实硬件描述成稳定资
 
 如果未来把 camera、temperature controller、laser interlock 单独抽出，也应继续沿用同样模式。
 
-### 4.1 示例：stage 资源
+### 5.1 示例：stage 资源
 
 ```yaml
 resourceId: mc_newton_xyz_main
@@ -103,7 +126,7 @@ limits:
   zRangeUm: [0, 5000]
 ```
 
-### 4.2 示例：frame provider 资源
+### 5.2 示例：frame provider 资源
 
 ```yaml
 resourceId: labspec_frame_main
@@ -118,7 +141,7 @@ leasePolicy: shared-read
 simulationAvailable: false
 ```
 
-### 4.3 示例：spectrometer 资源
+### 5.3 示例：spectrometer 资源
 
 ```yaml
 resourceId: labspec_main
@@ -139,77 +162,7 @@ simulationAvailable: false
 - `ProcedureSpec.resources` 只引用 `resourceId`
 - runtime 负责把 `resourceId` 解析成真实 driver session
 
-### 4.4 实验室默认配置与本地覆盖
-
-Raman MVP rebuild 将实验室稳定硬件事实固化在可提交配置中：
-
-```text
-.pi/raman-lab-config/raman-runtime.lab.json
-```
-
-该文件表达实验室默认资源、driver、端口、bridge 目录和 stage limits。
-LabAgent 初始化时加载它，把设备能力与边界带入上下文。
-
-如果某台机器需要临时覆盖端口、路径或启用状态，使用 git-ignored 本地文件：
-
-```text
-.pi/raman-lab-config/raman-runtime.local.json
-```
-
-加载优先级固定为：
-
-```text
-raman-runtime.local.json > raman-runtime.lab.json > no live runtime
-```
-
-这避免把临时现场调整写回实验室默认配置。
-
-Live runtime 使用的 Python 硬件驱动固定在：
-
-```text
-.pi/raman-lab-config/hardware-python-driver
-```
-
-`raman-runtime.lab.json` 的 `pythonRoot` 应指向该目录。
-该目录同时包含真实硬件 driver 所需的 vendor wheel：
-
-```text
-.pi/raman-lab-config/hardware-python-driver/vendor
-```
-
-`docs/Raman` 与 `assets/manuals` 均为 reference/archive，不应改变 LabAgent 的真实硬件行为。
-
-### 4.5 持久化 driver 会话（daemon 传输）
-
-为支撑多点 mapping（如 10×10），Python live runtime 不再「每个 action 拉起一个进程并重连硬件」，
-而是持有一个长生命周期的硬件 daemon：
-
-```text
-.pi/raman-lab-config/hardware-python-driver/raman_runtime_daemon.py
-```
-
-TS 侧 `createRamanPythonRuntime` 在首个 action 时惰性 spawn 该 daemon 并保持存活，
-stage 与 LabSpec frame 会话只在首次使用时连接、整个 run 复用；
-spectrometer 若没有独立长连接，也必须由 daemon 串行管理 request/result bridge 的互斥、超时和恢复边界。
-这把一次 N 点 mapping 的串口反复开关从 O(N) 级降到 session 级复用，
-直接消除真实硬件上最主要的不稳定来源之一（串口反复开关导致的 port-busy / 握手延迟）。
-
-该 daemon 传输固定遵循以下属性：
-
-- **单一会话**：stage / frame provider 会话惰性创建并复用；spectrometer acquisition
-  若按 action 创建，也必须挂在同一个 daemon 串行通道下。每次 stage 动作后 `disable_all_axes()`
-  （动作间不留带电轴），但不断开串口；disable axes 不等于释放 lease 或断开 driver session。
-- **串行访问**：所有 action 与 operator tool 共用同一 daemon，并在 TS 侧排队逐个执行，
-  单一硬件会话永不被并发触碰。这是**传输层正确性保证**，不是策略级 lease；
-  多 agent lease 仲裁仍属目标态（见 `implementation-plan.md` Open issues 4）。
-- **超时恢复**：单 action 超时即 kill 并重置 daemon，下一个 action 重新 spawn。
-  运动边界、物镜净空、激光功率等硬限制仍在 TS 侧每个 action 前强制校验，与传输方式无关。
-- **空闲释放**：`daemon.idleShutdownMs`（默认 30000ms）无请求后 daemon 干净退出并释放串口，
-  下个 action 再次 spawn。
-
-daemon 仅从 `hardware-python-driver` 下导入；`docs/Raman` 仍只作 legacy/reference。
-
-## 5. Raman Driver 分层
+## 6. Raman driver 分层
 
 本文把 Raman 接入分成三层：
 
@@ -217,11 +170,16 @@ daemon 仅从 `hardware-python-driver` 下导入；`docs/Raman` 仍只作 legacy
 2. `CompositeAction`
 3. `Tool Surface`
 
-### 5.1 `DeviceDriver`
+### 6.1 `DeviceDriver`
 
 贴近设备原语，不理解实验目标。
 
-#### Stage Driver
+#### Stage driver
+
+建议基于：
+
+- `docs/Raman/stage/models.py`
+- `docs/Raman/stage/mc_newton_xyz_stage.py`
 
 对外统一成少量稳定操作：
 
@@ -232,7 +190,11 @@ daemon 仅从 `hardware-python-driver` 下导入；`docs/Raman` 仍只作 legacy
 - `stop`
 - `disconnect`
 
-#### Frame Driver
+#### Frame driver
+
+建议基于：
+
+- `docs/Raman/autofocus/labspec_file_bridge.py`
 
 对外统一成：
 
@@ -242,7 +204,12 @@ daemon 仅从 `hardware-python-driver` 下导入；`docs/Raman` 仍只作 legacy
 
 不要把“启动 video session 后轮询 frame 文件夹”的细节泄漏给上层。
 
-#### Spectrum Driver
+#### Spectrum driver
+
+建议基于：
+
+- `docs/Raman/mapping/labspec.py`
+- `docs/Raman/acquire-spectrum/request_labspec_spectrum.py`
 
 对外统一成：
 
@@ -251,11 +218,17 @@ daemon 仅从 `hardware-python-driver` 下导入；`docs/Raman` 仍只作 legacy
 
 MVP 不必一开始拆到 `begin / poll / collect`。
 
-### 5.2 `CompositeAction`
+### 6.2 `CompositeAction`
 
 这是比 driver 更高一层的设备侧有界动作。
 
 #### Autofocus
+
+基于：
+
+- `autofocus/controller.py`
+- `autofocus/scanner.py`
+- `autofocus/models.py`
 
 建议暴露为一个动作：
 
@@ -271,11 +244,14 @@ MVP 不必一开始拆到 `begin / poll / collect`。
 - `fineCurveArtifact?`
 - `message`
 
-#### XY Correction（MVP 不实现，reference-only）
+#### XY correction
 
-> XY correction 在当前 MVP 不接入。本小节保留为 reference，用于未来 mapping 累积误差补偿增量。详见 `implementation-plan.md` 的 Open issues。
+基于：
 
-未来若启用，建议暴露为：
+- `calibration/xy_corrector.py`
+- `calibration/stage_adapter.py`
+
+建议暴露为：
 
 - `xy_correction.estimate_and_apply`
 
@@ -287,7 +263,11 @@ MVP 不必一开始拆到 `begin / poll / collect`。
 - `referenceFrameArtifact`
 - `currentFrameArtifact`
 
-#### Spectrum Acquisition Wrapper
+#### Spectrum acquisition wrapper
+
+基于：
+
+- `LabSpecFileBridgeRamanAcquirer.acquire_point()`
 
 建议暴露为：
 
@@ -302,20 +282,24 @@ MVP 不必一开始拆到 `begin / poll / collect`。
 - `durationS`
 - `plotArtifact?`
 
-### 5.3 `Tool Surface`
+### 6.3 `Tool Surface`
 
-tool 不是 driver API 的镜像，只回答：
+tool 不是 driver API 的镜像。
+
+tool 要回答的是：
 
 - planner 在实验层需要什么能力
 - operator 在维护层需要什么能力
 
-而不是“哪些 Python 函数存在”。
+而不是：
 
-## 6. Planner / Operator Tool 分工
+- 哪些 Python 函数存在
+
+## 7. Planner / Operator tool 分工
 
 Raman 接入至少应区分两类 tool surface。
 
-### 6.1 Planner-Facing Tools
+### 7.1 Planner-facing tools
 
 planner 只能看到实验管理和实验能力入口，例如：
 
@@ -331,39 +315,21 @@ planner 只能看到实验管理和实验能力入口，例如：
 - 让 planner 生成与发起 `ProcedureSpec`
 - 不让 planner 直接碰 Raman driver
 
-### 6.2 Operator / Maintenance Tools
+### 7.2 Operator / maintenance tools
 
 operator 需要的不是完整实验入口，而是现场维护与证据链工具，例如：
 
 - `poll_run`
 - `pause_run`
 - `abort_run`
-- `raman_get_hardware_status`
-- `raman_get_stage_position`
-- `raman_capture_frame`
-- `raman_run_autofocus`
-- `raman_acquire_smoke_spectrum`
-- `raman_stage_move_relative`
 - `raman_active_probe`
-- `raman_record_xy_calibration`（MVP 不实现，随 XY correction 一并推迟）
-- `raman_fit_xy_calibration`（MVP 不实现，随 XY correction 一并推迟）
+- `raman_record_xy_calibration`
+- `raman_fit_xy_calibration`
 - `raman_check_hardware_validation`
 
 这些 tool 可以有更明确的硬件意味，但仍然不应退化成裸驱动命令。
-其中 `raman_stage_move_relative` 属于 operator 确认后的 stage-only nudge：
-它应读取当前位置、计算目标、用 runtime stage resource limits 做硬边界校验；
-它不应为了单轴移动构造 Raman 采谱 `ProcedureSpec`，也不应要求 frame provider / spectrometer 参与。
-其中 `raman_capture_frame` 属于 operator 的现场观察能力：
-它应通过 runtime 的 `frame.capture_latest` 复合 action 返回 frame artifact/path，
-不应暴露 `start_video_session`、文件夹 glob 或相机底层驱动细节。
-其中 `raman_run_autofocus` 属于 operator 的受控对焦能力：
-它会产生真实 Z motion，必须显式确认，并应把 `minObjectiveClearanceUm` 合入 autofocus 的允许 Z 范围；
-如果 autofocus 是正式 Raman run 的一部分，仍应由 bounded `ProcedureSpec` 执行。
-其中 `raman_acquire_smoke_spectrum` 属于 operator 的 active probe / debug 能力：
-它只用于确认当前采谱链路是否可用，必须显式确认激光曝光，并受固定低功率 debug 上限约束；
-正式实验采集、参数搜索和 mapping 仍应走 bounded `ProcedureSpec`。
 
-### 6.3 明确不暴露为 Planner Tool 的能力
+### 7.3 明确不暴露为 planner tool 的能力
 
 下面这些不能直接给 planner：
 
@@ -377,7 +343,7 @@ operator 需要的不是完整实验入口，而是现场维护与证据链工�
 
 如果这些能力进了 planner surface，Agent 就会直接开始拼驱动调用。
 
-## 7. Raman Runtime Action 面
+## 8. Raman runtime action 面
 
 tool surface 之下，runtime 需要稳定 action contract。
 
@@ -404,7 +370,7 @@ frame.capture_latest
 autofocus.run_single
 ```
 
-### XY Correction（MVP 不实现，reference-only）
+### XY correction
 
 ```text
 xy_correction.estimate_and_apply
@@ -419,7 +385,7 @@ spectrometer.cancel_current
 
 这些 action 是 runtime contract，不是 planner tool 名称。
 
-## 8. Raman `ProcedureSpec` 里的领域参数应该怎样放
+## 9. Raman `ProcedureSpec` 里的领域参数应该怎样放
 
 Raman 的领域参数应收敛在 typed `domain` block 里，而不是散落在顶层或工具参数里。
 
@@ -432,9 +398,9 @@ resources:
   spectrometer: labspec_main
   frameProvider: labspec_frame_main
 limits:
-  maxLaserPowerPercent: 1
+  maxLaserPowerMw: 1.0
   minObjectiveClearanceUm: 200.0
-  # maxXyCorrectionUm: 5.0  # MVP 不实现，随 XY correction 一并推迟
+  maxXyCorrectionUm: 5.0
 plan:
   kind: grid_scan
   grid:
@@ -448,6 +414,7 @@ plan:
     - kind: move_to_point
     - kind: autofocus
     - kind: capture_frame
+    - kind: apply_xy_correction
     - kind: acquire_spectrum
 domain:
   raman:
@@ -455,65 +422,44 @@ domain:
       enabled: true
       roi: { x: 200, y: 120, width: 180, height: 180 }
       params:
-        # Raman lab optimized fixed-range autofocus path.
-        zStartUm: 340
-        zEndUm: 260
-        targetSpacingUm: 5
-        minPoints: 5
-        maxPoints: 10
-        framesPerZ: 1
-        finalVerificationFramesPerZ: 1
+        coarseRangeUm: 80
+        coarseStepUm: 10
+        fineRangeUm: 15
+        fineStepUm: 2
+    xyCorrection:
+      enabled: true
+      minConfidence: 0.4
+      maxCorrectionUm: 5.0
+      calibrationId: xy-calib-202606
     acquisition:
       integrationTimeS: 10
       accumulations: 1
       saveFormat: txt
       timeoutS: 30
-      laserPowerPercent: 0.1
+      laserPowerMw: 0.5
 ```
 
 关键边界：
 
 - `domain.raman` 承载 Raman 特有参数
 - resource config 不由 planner 自由填写
-- `laserPowerPercent` 是请求的 LabSpec 激光功率百分比档位
-- `limits.maxLaserPowerPercent` 是本次 run 的安全上界
-- Raman lab 的实际硬件功率不是连续值，spectrometer resource config 应声明允许的固定档位，例如 `0.01 / 0.1 / 1 / 3.2 / 5 / 10 / 25 / 50 / 100`
-- `autofocus.params.zStartUm/zEndUm` 表示实验室优化过的固定 Z range autofocus；旧的 `coarseRangeUm/fineRangeUm` coarse/fine path 仍作为兼容路径保留。
+- `laserPowerMw` 是请求值
+- `limits.maxLaserPowerMw` 是安全上界
 
-## 9. 预检与维护工具如何接 Raman
+## 10. 预检与维护工具如何接 Raman
 
-Raman 是真实硬件，因此只靠 `approve_and_start_run` 不够，还需要 operator-only 的维护入口。
+Raman 是真实硬件，因此只靠 `run_experiment` 不够，还需要 operator-only 的维护入口。
 
-### 9.1 Read-Only Preflight
+### 10.1 Read-only preflight
 
 应检查：
 
 - stage 能否连接并读位置
 - frame bridge 目录可用性
 - spectrum bridge 目录可用性
+- calibration artifact 是否存在
 
-MVP rebuild 中，普通状态读取应优先通过 operator tool 完成：
-
-- `raman_get_hardware_status` 返回 runtime 注册状态、preflight readiness、control availability、资源 id 和当前 stage position（若可读）。
-- `raman_get_stage_position` 只读取当前 X/Y/Z 坐标。
-
-这两类读取不应要求 agent 构造 `ProcedureSpec`，也不应退回 legacy bridge。
-
-### 9.1.1 Confirmed Stage Nudge
-
-实验现场常见的“小幅移动 stage”不是 Raman 采谱 run。
-MVP rebuild 应提供单独的 operator tool：
-
-- 输入：`axis`、`deltaUm`、可选 `timeoutMs`、确认标志
-- 读取当前 stage position
-- 计算目标 position
-- 校验 runtime stage resource limits
-- 未确认时只返回目标和风险，不执行移动
-- 确认后调用 runtime `stage.move_absolute_and_wait`
-
-该入口仍然是受控硬件动作，但不属于 `raman_single_point_probe`、`raman_parameter_search` 或 `raman_grid_mapping`。
-
-### 9.2 Active Probe
+### 10.2 Active probe
 
 应允许 operator 显式做：
 
@@ -522,31 +468,28 @@ MVP rebuild 应提供单独的 operator tool：
 
 但这类动作不能混入 planner 的 dry-run 语义。
 
-### 9.3 Calibration Tools（MVP 不实现，随 XY correction 一并推迟）
-
-> 标定工具链服务于 XY correction，当前 MVP 不接入。本小节保留为 reference。
+### 10.3 Calibration tools
 
 Raman 特有但很现实的一类维护操作是标定：
 
 - 记录 XY calibration
 - 拟合 calibration
-- calibration artifact review is future/reference only
+- 审核 calibration artifact
 
 这些操作不属于 planner 的日常实验策略，而属于 operator / maintenance surface。
 
-## 10. Artifact 策略
+## 11. Artifact 策略
 
 Raman 接入时，必须明确哪些产物由 runtime 产出并登记。
 
-MVP 最小必需产物应包括：
+至少应包括：
 
 - frame 原图
 - autofocus coarse/fine 曲线
+- XY correction reference/current frame
 - spectrum 原始 txt
 - spectrum plot
 - LabSpec request/result 文件
-
-> `XY correction reference/current frame` artifacts remain future/reference only and are outside the MVP artifact baseline.
 
 这里的原则是：
 
@@ -554,31 +497,22 @@ MVP 最小必需产物应包括：
 - 但必须通过结构化 artifact ref 回流
 - 不能靠 message 文本告诉上层“文件大概在某个目录里”
 
-## 11. 错误模型
+## 12. 错误模型
 
 Raman 接入必须把 Python 异常归一化成结构化错误码，而不是把 traceback 暴露给 kernel 或 Agent。
 
-MVP 最小错误模型建议至少区分：
+建议最少区分：
 
 - `stage_connection_error`
 - `stage_timeout`
 - `frame_timeout`
 - `autofocus_no_peak`
 - `autofocus_low_confidence`
+- `xy_correction_low_confidence`
 - `spectrum_request_pending`
 - `spectrum_timeout`
 - `worker_result_error`
 - `bridge_protocol_error`
-
-> `xy_correction_low_confidence` remains a future/reference error code and is outside the MVP error surface.
-
-除领域错误外，daemon 传输层（§4.5）还会归一化以下进程级错误码，同样带三个布尔标志：
-
-- `python_runtime_timeout`（单 action 超时，已 kill 并重置 daemon）
-- `python_runtime_spawn_failed`（daemon 进程无法启动）
-- `python_runtime_exit_failed`（daemon 进程异常退出）
-- `python_runtime_closed`（daemon 在 action 完成前被关闭）
-- `python_runtime_parse_failed` / `python_runtime_bad_request`（协议行无法解析）
 
 并且每个错误至少带：
 
@@ -586,21 +520,66 @@ MVP 最小错误模型建议至少区分：
 - `needsOperator`
 - `safeToResume`
 
-## 12. 为什么 mapping runner 只能作为参考
+## 13. 为什么 `mapping/runner.py` 只能作为参考
 
-legacy mapping runner 的点执行顺序、point record 和离线验证方式有参考价值，但它持有多点 workflow loop，
-缺少统一的 kernel-level pause / abort / resume 契约，也不是围绕 `ProcedureSpec -> ExecutionUnit[]` 设计。
-正确做法是借鉴 point sequencing / record，不直接把它当最终 runtime 或 kernel。
+这件事必须写清楚，否则后面很容易走回头路。
 
-## 13. 推荐实施顺序
+`docs/Raman/mapping/runner.py` 的优点是：
 
-1. 固定 stage / frame provider / spectrometer 资源。
-2. 收敛 stage / frame / spectrum drivers。
-3. 收敛 autofocus 与 single spectrum acquisition wrapper；XY correction 推迟。
-4. 整理 planner-facing experiment tools 与 operator-facing maintenance tools。
-5. 校验这套分层能否平移到温控台、电化学或别的仪器。
+- 点执行顺序明确
+- point record 结构清晰
+- 离线验证方便
 
-## 14. 结论
+但它仍然只能做参考实现，因为：
+
+1. 它持有多点 workflow loop
+2. 它没有统一的 kernel-level pause / abort / resume 契约
+3. 它不是围绕 `ProcedureSpec -> ExecutionUnit[]` 设计的
+
+因此正确做法是：
+
+- 借鉴它的 point sequencing
+- 借鉴它的 point record
+- 不直接把它当最终 runtime 或 kernel
+
+## 14. 推荐实施顺序
+
+### Phase 1: 收敛 Raman 资源对象
+
+先固定：
+
+- stage 资源
+- frame provider 资源
+- spectrometer 资源
+
+### Phase 2: 收敛 Raman drivers
+
+先完成：
+
+- stage driver
+- frame driver
+- spectrum driver
+
+### Phase 3: 收敛 composite actions
+
+再完成：
+
+- autofocus
+- XY correction
+- single spectrum acquisition wrapper
+
+### Phase 4: 收敛 tool surface
+
+分别整理：
+
+- planner-facing experiment tools
+- operator-facing maintenance tools
+
+### Phase 5: 校验能否推广到下一类设备
+
+只有当这套分层能平移到温控台、电化学或别的仪器时，才说明 Raman 样板没有长成特例。
+
+## 15. 结论
 
 `raman-hardware-adapter-contract.md` 应该收敛到下面这句话：
 

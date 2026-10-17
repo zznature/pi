@@ -1,616 +1,304 @@
-import { Type, type Static } from "typebox";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import type { ExperimentIntent, ProcedureId, ProcedureSpec } from "../schemas/index.ts";
-import { ExperimentIntentValidator, ProcedureSpecValidator, formatValidationErrors } from "../schemas/index.ts";
-import { summarizeProcedureProposal } from "../planner/procedure-spec-builder.ts";
-import { compileProcedureSpec } from "../kernel/compile-units.ts";
-import { getRamanLiveRuntime, getRamanPythonRuntimeConfigInfo, validateRuntimeAnchorState } from "../runtime/raman/index.ts";
-import { saveExperimentIntent } from "../store/index.ts";
+import { dispatch } from "../dispatch.ts";
+import {
+	getLabActivityState,
+	getLabCapabilities,
+	type LabActivityState,
+	type LabCapabilitiesState,
+} from "../lab-state.ts";
+import { getExperimentState } from "../run-store.ts";
+import {
+	AdvanceRunParamsSchema,
+	AnalyzeRunParamsSchema,
+	EmptyParamsSchema,
+	GetExperimentStateParamsSchema,
+	PlanNextExperimentParamsSchema,
+	PollRunParamsSchema,
+	RunExperimentParamsSchema,
+	RunPreflightParamsSchema,
+	StartRunParamsSchema,
+	type ToolResult,
+	ValidateExperimentSpecParamsSchema,
+	type ValidateExperimentSpecParams,
+	validateExperimentSpec,
+} from "../schemas.ts";
 
-const EmptyParamsSchema = Type.Object({}, { additionalProperties: false });
-
-const ExecutionModeSchema = Type.Union([
-	Type.Literal("simulation"),
-	Type.Literal("live-supervised"),
-]);
-
-const ProcedureSpecInputSchema = Type.Object(
-	{
-		procedureSpecId: Type.String(),
-		experimentId: Type.String(),
-		intentId: Type.String(),
-		procedureId: Type.Union([
-			Type.Literal("raman_single_point_probe"),
-			Type.Literal("raman_parameter_search"),
-			Type.Literal("raman_grid_mapping"),
-		]),
-		procedureVersion: Type.String(),
-		resources: Type.Array(
-			Type.Object(
-				{
-					resourceId: Type.String(),
-					role: Type.String(),
-				},
-				{ additionalProperties: false },
-			),
-		),
-		limits: Type.Record(Type.String(), Type.Unknown()),
-		plan: Type.Record(Type.String(), Type.Unknown()),
-		stoppingRules: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
-		domain: Type.Record(Type.String(), Type.Unknown()),
-	},
-	{ additionalProperties: true },
-);
-
-const ProcedureSpecParamsSchema = Type.Object(
-	{
-		spec: ProcedureSpecInputSchema,
-		executionMode: Type.Optional(ExecutionModeSchema),
-	},
-	{ additionalProperties: false },
-);
-
-const ProcedureSpecTemplateParamsSchema = Type.Object(
-	{
-		procedureId: Type.Union([
-			Type.Literal("raman_single_point_probe"),
-			Type.Literal("raman_parameter_search"),
-			Type.Literal("raman_grid_mapping"),
-		]),
-	},
-	{ additionalProperties: false },
-);
-
-const ExperimentIntentInputSchema = Type.Object(
-	{
-		intentId: Type.String({ minLength: 1 }),
-		experimentId: Type.String({ minLength: 1 }),
-		objective: Type.String({ minLength: 1 }),
-		hypothesis: Type.Optional(Type.String({ minLength: 1 })),
-		question: Type.Optional(Type.String({ minLength: 1 })),
-		constraints: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
-		successCriteria: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
-		evidenceRefs: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
-		notes: Type.Optional(Type.String({ minLength: 1 })),
-	},
-	{ additionalProperties: false },
-);
-
-const ExperimentIntentParamsSchema = Type.Object(
-	{
-		intent: ExperimentIntentInputSchema,
-	},
-	{ additionalProperties: false },
-);
-
-interface PlannerToolDetails {
-	status: "success" | "warning" | "error";
-	summary: string;
-	errorCode?: string;
-	retrySafe?: boolean;
-	stateAfter: Record<string, unknown>;
-}
-
-type ProcedureSpecParams = Static<typeof ProcedureSpecParamsSchema>;
-type ProcedureSpecTemplateParams = Static<typeof ProcedureSpecTemplateParamsSchema>;
-type ExperimentIntentParams = Static<typeof ExperimentIntentParamsSchema>;
-type ExecutionMode = Static<typeof ExecutionModeSchema>;
-
-function success(summary: string, stateAfter: Record<string, unknown>): { content: [{ type: "text"; text: string }]; details: PlannerToolDetails } {
-	return {
-		content: [{ type: "text", text: summary }],
-		details: {
-			status: "success",
-			summary,
-			stateAfter,
-		},
-	};
-}
-
-function warning(summary: string, stateAfter: Record<string, unknown>): { content: [{ type: "text"; text: string }]; details: PlannerToolDetails } {
-	return {
-		content: [{ type: "text", text: summary }],
-		details: {
-			status: "warning",
-			summary,
-			stateAfter,
-		},
-	};
-}
-
-function error(summary: string, errorCode: string, stateAfter: Record<string, unknown> = {}): { content: [{ type: "text"; text: string }]; details: PlannerToolDetails } {
-	return {
-		content: [{ type: "text", text: summary }],
-		details: {
-			status: "error",
-			summary,
-			errorCode,
-			retrySafe: true,
-			stateAfter,
-		},
-	};
-}
-
-function asProcedureSpec(params: ProcedureSpecParams): ProcedureSpec {
-	return params.spec as ProcedureSpec;
-}
-
-function validateProcedureSpec(spec: ProcedureSpec): { valid: boolean; issues: string[] } {
-	if (!ProcedureSpecValidator.Check(spec)) {
-		return {
-			valid: false,
-			issues: formatValidationErrors(ProcedureSpecValidator, spec),
-		};
-	}
-	return { valid: true, issues: [] };
-}
-
-function previewState(spec: ProcedureSpec): Record<string, unknown> {
-	const units = compileProcedureSpec(spec);
-	const preview = summarizeProcedureProposal(spec);
-	return {
-		valid: true,
-		procedureId: spec.procedureId,
-		procedureSpecId: spec.procedureSpecId,
-		unitCount: units.length,
-		estimatedRuntimeMs: preview.estimatedRuntimeMs,
-		estimatedRuntimeMinutes: Number((preview.estimatedRuntimeMs / 60_000).toFixed(2)),
-		savePath: preview.savePath,
-		requiresConfirmation: preview.requiresConfirmation,
-		risks: preview.risks,
-		limits: preview.limits,
-	};
-}
-
-function hasRequiredRamanRoles(spec: ProcedureSpec): boolean {
-	const roles = new Set(spec.resources.map((resource) => resource.role));
-	return roles.has("stage") && roles.has("frame_provider") && roles.has("spectrometer");
-}
-
-function resolveExecutionMode(params: ProcedureSpecParams): ExecutionMode {
-	return params.executionMode ?? "simulation";
-}
-
-function templateForProcedure(procedureId: ProcedureId): Record<string, unknown> {
-	const common = {
-		procedureSpecId: "replace-with-stable-procedure-spec-id",
-		experimentId: "replace-with-experiment-id",
-		intentId: "replace-with-recorded-intent-id",
-		procedureId,
-		procedureVersion: "0.1.0",
-		resources: [
-			{ resourceId: "stage-main", role: "stage" },
-			{ resourceId: "frame-main", role: "frame_provider" },
-			{ resourceId: "spectrometer-main", role: "spectrometer" },
-		],
-		limits: {
-			maxLaserPowerPercent: 25,
-			minObjectiveClearanceUm: 200,
-			xRangeUm: { minUm: 0, maxUm: 50_000 },
-			yRangeUm: { minUm: 0, maxUm: 50_000 },
-			zRangeUm: { minUm: 200, maxUm: 5_000 },
-		},
-		stoppingRules: {
-			maxRuntimeMinutes: 180,
-			maxUnits: 1,
-			stopOnError: true,
-			maxConsecutiveFailures: 1,
-		},
-		domain: {
-			raman: {
-				autofocus: {
-					enabled: true,
-					roi: { x: 492, y: 353, width: 225, height: 225 },
-					params: {
-						zStartUm: 1450,
-						zEndUm: 1550,
-						targetSpacingUm: 5,
-						minPoints: 5,
-						maxPoints: 25,
-						framesPerZ: 1,
-						finalVerificationFramesPerZ: 1,
-					},
-				},
-				acquisition: {
-					integrationTimeMs: 180_000,
-					laserPowerPercent: 25,
-					accumulations: 1,
-					saveFormat: "txt",
-					timeoutMs: 240_000,
-				},
-			},
-		},
-	};
-
-	if (procedureId === "raman_single_point_probe") {
-		return {
-			...common,
-			plan: {
-				kind: "current_position",
-				perPoint: [
-					{ kind: "move_to_point" },
-					{ kind: "autofocus" },
-					{ kind: "capture_frame" },
-					{ kind: "acquire_spectrum" },
-				],
-			},
-		};
-	}
-
-	if (procedureId === "raman_parameter_search") {
-		return {
-			...common,
-			stoppingRules: {
-				maxRuntimeMinutes: 60,
-				maxUnits: 3,
-				stopOnError: true,
-				maxConsecutiveFailures: 1,
-			},
-			plan: {
-				kind: "point_list",
-				points: [
-					{ xUm: 1_000, yUm: 2_000, zUm: 1_500 },
-					{ xUm: 1_000, yUm: 2_000, zUm: 1_500 },
-					{ xUm: 1_000, yUm: 2_000, zUm: 1_500 },
-				],
-				perPoint: [
-					{ kind: "move_to_point" },
-					{ kind: "autofocus" },
-					{ kind: "capture_frame" },
-					{ kind: "acquire_spectrum" },
-				],
-			},
-			domain: {
-				raman: {
-					...(common.domain.raman),
-					parameterSearch: {
-						maxAttempts: 3,
-						laserPowerPercentValues: [1, 5, 10],
-						integrationTimeMs: { min: 1_000, max: 10_000 },
-						accumulations: [1, 2],
-					},
-				},
-			},
-		};
-	}
-
-	return {
-		...common,
-		stoppingRules: {
-			maxRuntimeMinutes: 180,
-			maxUnits: 20,
-			stopOnError: false,
-			maxConsecutiveFailures: 20,
-		},
-		plan: {
-			kind: "point_list",
-			points: [
-				{ xUm: 2_375, yUm: 1_640, zUm: 1_510 },
-				{ xUm: 2_475, yUm: 1_640, zUm: 1_510 },
-				{ xUm: 2_575, yUm: 1_640, zUm: 1_510 },
-			],
-			perPoint: [
-				{ kind: "move_to_point" },
-				{ kind: "autofocus" },
-				{ kind: "capture_frame" },
-				{ kind: "acquire_spectrum" },
-			],
-		},
-	};
-}
-
-async function buildPreflightState(
-	spec: ProcedureSpec,
+function dispatchToolResult(
+	toolCallId: string,
+	toolName: Parameters<typeof dispatch>[0],
+	params: Parameters<typeof dispatch>[1],
 	cwd: string,
-	executionMode: ExecutionMode,
-): Promise<Record<string, unknown>> {
-	const preview = summarizeProcedureProposal(spec);
-	const forbiddenRisks = preview.risks.filter((risk) => risk.level === "forbidden");
-	const requiredRolesPresent = hasRequiredRamanRoles(spec);
-	const requestedModeSupported = executionMode === "simulation" || requiredRolesPresent;
-
-	if (executionMode === "simulation") {
-		return {
-			mode: executionMode,
-			procedureSpecId: spec.procedureSpecId,
-			procedureId: spec.procedureId,
-			unitCount: preview.unitCount,
-			estimatedRuntimeMs: preview.estimatedRuntimeMs,
-			estimatedRuntimeMinutes: Number((preview.estimatedRuntimeMs / 60_000).toFixed(2)),
-			readyForApproval: forbiddenRisks.length === 0 && requiredRolesPresent,
-			preflightReady: true,
-			controlAvailable: true,
-			requiresConfirmation: preview.requiresConfirmation,
-			risks: preview.risks,
-			limits: preview.limits,
-			savePath: preview.savePath,
-			requiredRolesPresent,
-			requestedModeSupported,
-			canProposeRun: true,
-		};
-	}
-
-	const runtime = getRamanLiveRuntime(cwd);
-	if (!runtime) {
-		return {
-			mode: executionMode,
-			procedureSpecId: spec.procedureSpecId,
-			procedureId: spec.procedureId,
-			unitCount: preview.unitCount,
-			estimatedRuntimeMs: preview.estimatedRuntimeMs,
-			estimatedRuntimeMinutes: Number((preview.estimatedRuntimeMs / 60_000).toFixed(2)),
-			readyForApproval: false,
-			preflightReady: false,
-			controlAvailable: false,
-			requiresConfirmation: preview.requiresConfirmation,
-			risks: preview.risks,
-			limits: preview.limits,
-			savePath: preview.savePath,
-			requiredRolesPresent,
-			requestedModeSupported,
-			realRuntimeRegistered: false,
-			canProposeRun: true,
-		};
-	}
-
-	const livePreflight = await runtime.preflight();
-	const anchorValidation = livePreflight.preflightReady && livePreflight.controlAvailable
-		? await validateRuntimeAnchorState(spec, runtime)
-		: { valid: false, details: { skipped: true, reason: "runtime_preflight_not_ready" } };
+): { content: [{ type: "text"; text: string }]; details: ToolResult } {
+	const result = dispatch(toolName, params, { cwd, commandId: toolCallId });
 	return {
-		mode: executionMode,
-		procedureSpecId: spec.procedureSpecId,
-		procedureId: spec.procedureId,
-		unitCount: preview.unitCount,
-		estimatedRuntimeMs: preview.estimatedRuntimeMs,
-		estimatedRuntimeMinutes: Number((preview.estimatedRuntimeMs / 60_000).toFixed(2)),
-		readyForApproval:
-			forbiddenRisks.length === 0 &&
-			requiredRolesPresent &&
-			requestedModeSupported &&
-			livePreflight.preflightReady &&
-			livePreflight.controlAvailable &&
-			anchorValidation.valid,
-		preflightReady: livePreflight.preflightReady,
-		controlAvailable: livePreflight.controlAvailable,
-		requiresConfirmation: preview.requiresConfirmation,
-		risks: preview.risks,
-		limits: preview.limits,
-		savePath: preview.savePath,
-		requiredRolesPresent,
-		requestedModeSupported,
-		realRuntimeRegistered: true,
-		livePreflightDetails: livePreflight.details ?? {},
-		stageAnchorValid: anchorValidation.valid,
-		stageAnchorDetails: anchorValidation.details,
-		canProposeRun: true,
+		content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+		details: result,
 	};
 }
+
+function createValidateSuccessResult(): ToolResult {
+	return {
+		status: "success",
+		summary: "ExperimentSpec is valid for schema checks.",
+		nextActions: ["Call run_preflight with the same ExperimentSpec."],
+		artifacts: [],
+		commandId: "validate-experiment-spec",
+		correlationId: "validate-experiment-spec",
+		stateAfter: { valid: true },
+		stopConditionMet: false,
+	};
+}
+
+function createValidateErrorResult(params: ValidateExperimentSpecParams): ToolResult {
+	const validation = validateExperimentSpec(params.spec);
+	const issues = validation.valid ? [] : validation.issues;
+	return {
+		status: "error",
+		summary: `ExperimentSpec failed validation with ${issues.length} issue(s).`,
+		nextActions: [
+			"Fix the reported schema issues.",
+			"Provide a valid plan payload matching plan.kind.",
+			"Call validate_experiment_spec again before any run.",
+		],
+		artifacts: [],
+		commandId: "validate-experiment-spec",
+		correlationId: "validate-experiment-spec",
+		stateAfter: { valid: false, issues },
+		errorCode: "invalid_experiment_spec",
+		retrySafe: true,
+		stopConditionMet: false,
+	};
+}
+
+function createLabCapabilitiesResult(state: LabCapabilitiesState): ToolResult {
+	return {
+		status: "success",
+		summary:
+			"Static lab capabilities loaded. Reuse this result until the capability picture changes.",
+		nextActions: [
+			"Draft an ExperimentSpec in simulation or dry_run mode within these capabilities.",
+			"Read current hardware coordinates before compiling a real hardware ExperimentSpec when they are missing.",
+			"Call validate_experiment_spec before any preflight or run.",
+		],
+		artifacts: [],
+		commandId: "get-lab-capabilities",
+		correlationId: "get-lab-capabilities",
+		stateAfter: state,
+		stopConditionMet: false,
+	};
+}
+
+function createLabStateResult(state: LabActivityState): ToolResult {
+	return {
+		status: "success",
+		summary:
+			state.activeRunId === null
+				? "Dynamic lab activity loaded. No run is currently active."
+				: `Dynamic lab activity loaded. Run ${state.activeRunId} is currently ${state.mode}.`,
+		nextActions:
+			state.activeRunId === null
+				? [
+						"Reuse get_lab_capabilities for static capability planning.",
+						"Call get_lab_state again only if active-run or pause/recovery state may have changed.",
+					]
+				: [
+						"Inspect the active run before planning or launching more work.",
+						"Call get_lab_state again only if active-run or pause/recovery state may have changed.",
+					],
+		artifacts: [],
+		commandId: "get-lab-state",
+		correlationId: "get-lab-state",
+		stateAfter: state,
+		stopConditionMet: false,
+	};
+}
+
+export const validateExperimentSpecTool = {
+	name: "validate_experiment_spec",
+	label: "Validate Experiment Spec",
+	description: "Validate an ExperimentSpec candidate against the schema and semantic rules.",
+	promptSnippet: "Validate a candidate ExperimentSpec without touching hardware",
+	promptGuidelines: [
+		"Use validate_experiment_spec before proposing any experiment run.",
+		"For real hardware planning, collect measured absolute coordinates before compiling a hardware ExperimentSpec.",
+		"Do not call hardware or execution tools when validate_experiment_spec returns an error.",
+	],
+	parameters: ValidateExperimentSpecParamsSchema,
+	executionMode: "sequential",
+	async execute(_toolCallId, params) {
+		const validation = validateExperimentSpec(params.spec);
+		const result = validation.valid ? createValidateSuccessResult() : createValidateErrorResult(params);
+		return {
+			content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+			details: result,
+		};
+	},
+} satisfies ToolDefinition<typeof ValidateExperimentSpecParamsSchema, ToolResult>;
 
 export const getLabCapabilitiesTool = {
 	name: "get_lab_capabilities",
 	label: "Get Lab Capabilities",
-	description: "Return the currently scaffolded LabAgents MVP rebuild capability surface.",
-	promptSnippet: "Inspect the currently available high-level lab capability surface",
+	description: "Return static lab capabilities, coordinate conventions, and gated hardware planning constraints.",
+	promptSnippet: "Inspect static lab capabilities and real hardware planning constraints",
 	promptGuidelines: [
-		"Use this before planning or validating a bounded run when you need to know which capability classes are already wired in the rebuild.",
+		"Use get_lab_capabilities once per planning context when static capabilities, coordinate conventions, or hardware surfaces matter.",
+		"Do not re-call get_lab_capabilities in the same context unless the operator reports a lab capability change.",
 	],
 	parameters: EmptyParamsSchema,
 	executionMode: "sequential",
-	async execute() {
-		return success("LabAgents MVP rebuild planner capabilities loaded.", {
-			source: "experiment-research",
-			stage: "phase10-bounded-search-and-mapping",
-			supportedProcedures: [
-				"raman_single_point_probe",
-				"raman_parameter_search",
-				"raman_grid_mapping",
-			],
-			liveSupportedProceduresWhenRuntimeRegistered: [
-				"raman_single_point_probe",
-				"raman_parameter_search",
-				"raman_grid_mapping",
-			],
-			plannerTools: [
-				"get_lab_capabilities",
-				"get_lab_state",
-				"record_experiment_intent",
-				"get_procedure_spec_template",
-				"validate_procedure_spec",
-				"run_preflight",
-				"propose_run",
-				"approve_and_start_run",
-			],
-			evaluation: {
-				ruleBasedGoodEnoughDecisions: true,
-				decisionKinds: [
-					"acceptable",
-					"continue_search_within_envelope",
-					"stop_and_request_user_decision",
-				],
-			},
-			runtimeContract: {
-				ramanResourcesDefined: true,
-				ramanActionsDefined: true,
-				actionResultContractDefined: true,
-				liveRuntimeRequiresRegistration: true,
-				liveSinglePointExecutionRequiresRegisteredRuntime: true,
-				liveParameterSearchExecutionRequiresRegisteredRuntime: true,
-				liveGridMappingExecutionRequiresRegisteredRuntime: true,
-			},
-		});
+	async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
+		const result = createLabCapabilitiesResult(getLabCapabilities());
+		return {
+			content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+			details: result,
+		};
 	},
-} satisfies ToolDefinition<typeof EmptyParamsSchema, PlannerToolDetails>;
-
-export const recordExperimentIntentTool = {
-	name: "record_experiment_intent",
-	label: "Record Experiment Intent",
-	description: "Persist the structured research intent before deriving bounded ProcedureSpecs.",
-	promptSnippet: "Record the user's structured ExperimentIntent before creating a bounded ProcedureSpec",
-	promptGuidelines: [
-		"Use this for non-trivial experiment requests before drafting a ProcedureSpec.",
-		"Store assumptions and constraints in the intent so the ProcedureSpec can reference intentId without carrying research memory.",
-	],
-	parameters: ExperimentIntentParamsSchema,
-	executionMode: "sequential",
-	async execute(_toolCallId, params: ExperimentIntentParams, _signal, _onUpdate, ctx) {
-		const intent = params.intent as ExperimentIntent;
-		if (!ExperimentIntentValidator.Check(intent)) {
-			return error("ExperimentIntent validation failed.", "invalid_experiment_intent", {
-				valid: false,
-				issues: formatValidationErrors(ExperimentIntentValidator, intent),
-			});
-		}
-		try {
-			const stored = saveExperimentIntent(ctx.cwd, intent);
-			return success(`ExperimentIntent ${intent.intentId} recorded for experiment ${intent.experimentId}.`, {
-				intentId: intent.intentId,
-				experimentId: intent.experimentId,
-				path: stored.path,
-				objective: intent.objective,
-				constraints: intent.constraints ?? {},
-				successCriteria: intent.successCriteria ?? [],
-			});
-		} catch (cause) {
-			const message = cause instanceof Error ? cause.message : String(cause);
-			return error(message, "experiment_intent_store_failed", {
-				intentId: intent.intentId,
-				experimentId: intent.experimentId,
-			});
-		}
-	},
-} satisfies ToolDefinition<typeof ExperimentIntentParamsSchema, PlannerToolDetails>;
-
-export const getProcedureSpecTemplateTool = {
-	name: "get_procedure_spec_template",
-	label: "Get Procedure Spec Template",
-	description: "Return the canonical minimal ProcedureSpec shape for a supported Raman procedure.",
-	promptSnippet: "Fetch the canonical ProcedureSpec template before drafting a bounded Raman run",
-	promptGuidelines: [
-		"Use this before manually drafting a ProcedureSpec for a Raman run.",
-		"Do not invent additional ProcedureSpec fields; adapt the returned template and then call validate_procedure_spec.",
-	],
-	parameters: ProcedureSpecTemplateParamsSchema,
-	executionMode: "sequential",
-	async execute(_toolCallId, params: ProcedureSpecTemplateParams) {
-		return success(`Canonical ProcedureSpec template loaded for ${params.procedureId}.`, {
-			procedureId: params.procedureId,
-			schemaVersion: "0.1.0",
-			template: templateForProcedure(params.procedureId),
-			notes: [
-				"ProcedureSpec supports plan.kind values current_position, point_list, and grid_scan.",
-				"Line scans should use point_list when one axis is fixed and pitchYUm would be zero.",
-				"Use limits only for maxLaserPowerPercent, minObjectiveClearanceUm, xRangeUm, yRangeUm, and zRangeUm.",
-				"Store the research goal with record_experiment_intent, then reference its intentId here.",
-			],
-		});
-	},
-} satisfies ToolDefinition<typeof ProcedureSpecTemplateParamsSchema, PlannerToolDetails>;
+} satisfies ToolDefinition<typeof EmptyParamsSchema, ToolResult>;
 
 export const getLabStateTool = {
 	name: "get_lab_state",
 	label: "Get Lab State",
-	description: "Return the current MVP rebuild extension state and planning mode.",
-	promptSnippet: "Inspect the current rebuild-mode lab state before planning the next step",
+	description: "Return dynamic lab activity such as active-run, paused, or recovering state.",
+	promptSnippet: "Inspect dynamic run activity before acting on a live or recently active experiment",
 	promptGuidelines: [
-		"Use this before validating or proposing a bounded run so the user can see the current planning and execution boundary.",
+		"Use get_lab_state only when current active-run or pause/recovery state may affect the next action.",
+		"Do not use get_lab_state as the default static capability lookup; use get_lab_capabilities for that.",
 	],
 	parameters: EmptyParamsSchema,
 	executionMode: "sequential",
 	async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
-		const runtimeConfig = getRamanPythonRuntimeConfigInfo(ctx.cwd);
-		const liveRuntimeRegistered = getRamanLiveRuntime(ctx.cwd) !== undefined;
-		return success("LabAgents planner proposal flow is active.", {
-			source: "experiment-research",
-			stage: "phase10-bounded-search-and-mapping",
-			canValidateProcedureSpecs: true,
-			canRunPreflight: true,
-			canExecuteSimulationRuns: true,
-			canExecuteLiveSinglePointRuns: liveRuntimeRegistered,
-			canExecuteLiveParameterSearchRuns: liveRuntimeRegistered,
-			canExecuteLiveGridMappingRuns: liveRuntimeRegistered,
-			runtimeConfig: {
-				source: runtimeConfig.source,
-				path: runtimeConfig.path,
-				enabled: runtimeConfig.enabled,
-			},
-			configuredResources: runtimeConfig.resources,
-			requiresApproval: true,
-			executionEntryPoint: "validate_procedure_spec -> run_preflight -> propose_run -> approve_and_start_run",
-			goodEnoughDecisionMode: "explicit_rules",
-			ramanRuntimeContractDefined: true,
-			nextMilestone: "verification and operator-facing refinement",
-		});
+		const result = createLabStateResult(getLabActivityState(ctx.cwd));
+		return {
+			content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+			details: result,
+		};
 	},
-} satisfies ToolDefinition<typeof EmptyParamsSchema, PlannerToolDetails>;
+} satisfies ToolDefinition<typeof EmptyParamsSchema, ToolResult>;
 
-export const validateProcedureSpecTool = {
-	name: "validate_procedure_spec",
-	label: "Validate Procedure Spec",
-	description: "Validate a bounded ProcedureSpec draft and summarize its proposed run envelope.",
-	promptSnippet: "Validate a bounded ProcedureSpec draft before preflight or approval",
+export const getExperimentStateTool = {
+	name: "get_experiment_state",
+	label: "Get Experiment State",
+	description: "Return an experiment/campaign record and its run history by experimentId.",
+	promptSnippet: "Inspect experiment run history and lineage before planning the next bounded run",
 	promptGuidelines: [
-		"Use validate_procedure_spec before run_preflight or propose_run.",
-		"Treat validation success as a bounded planning result, not execution approval.",
+		"Use get_experiment_state before multi-run planning.",
+		"Keep the same experimentId when compiling a follow-up ExperimentSpec.",
 	],
-	parameters: ProcedureSpecParamsSchema,
+	parameters: GetExperimentStateParamsSchema,
 	executionMode: "sequential",
-	async execute(_toolCallId, params: ProcedureSpecParams) {
-		const spec = asProcedureSpec(params);
-		const validation = validateProcedureSpec(spec);
-		if (!validation.valid) {
-			return error("ProcedureSpec validation failed.", "invalid_procedure_spec", {
-				valid: false,
-				issues: validation.issues,
-			});
-		}
-
-		return success("ProcedureSpec is valid for bounded planner proposal flow.", previewState(spec));
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		const state = getExperimentState(ctx.cwd, params.experimentId);
+		const result: ToolResult = {
+			status: "success",
+			summary: `Experiment ${params.experimentId} has ${state.runs.length} recorded run(s).`,
+			nextActions: ["Use analyze_run and plan_next_experiment before compiling the next bounded ExperimentSpec."],
+			artifacts: [],
+			experimentId: params.experimentId,
+			commandId: toolCallId,
+			correlationId: toolCallId,
+			stateAfter: state,
+			stopConditionMet: false,
+		};
+		return {
+			content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+			details: result,
+		};
 	},
-} satisfies ToolDefinition<typeof ProcedureSpecParamsSchema, PlannerToolDetails>;
+} satisfies ToolDefinition<typeof GetExperimentStateParamsSchema, ToolResult>;
 
 export const runPreflightTool = {
 	name: "run_preflight",
 	label: "Run Preflight",
-	description: "Check bounded run readiness before proposal approval.",
-	promptSnippet: "Run planner-side preflight checks before proposing an executable bounded run",
+	description: "Run simulation, dry-run, or hardware readiness preflight checks for an ExperimentSpec.",
+	promptSnippet: "Check whether a simulation, dry-run, or hardware ExperimentSpec is ready",
 	promptGuidelines: [
-		"Use run_preflight after validate_procedure_spec and before propose_run.",
-		"Do not treat preflight as execution approval; it only checks the current bounded proposal surface.",
+		"Use run_preflight after validate_experiment_spec succeeds and before run_experiment.",
+		"Do not use run_preflight to probe real hardware readiness with guessed coordinates or placeholder hardware specs.",
+		"For real Raman launch planning, include the planned hardwareExecution preview so preflight can report backend executability before the final launch call.",
 	],
-	parameters: ProcedureSpecParamsSchema,
+	parameters: RunPreflightParamsSchema,
 	executionMode: "sequential",
-	async execute(_toolCallId, params: ProcedureSpecParams, _signal, _onUpdate, ctx) {
-		const spec = asProcedureSpec(params);
-		const validation = validateProcedureSpec(spec);
-		if (!validation.valid) {
-			return error("ProcedureSpec preflight failed because the spec is invalid.", "invalid_procedure_spec", {
-				valid: false,
-				issues: validation.issues,
-			});
-		}
-
-		const state = await buildPreflightState(spec, ctx.cwd, resolveExecutionMode(params));
-		if (state.requiredRolesPresent !== true) {
-			return error("ProcedureSpec preflight failed because required Raman resources are missing.", "preflight_missing_resources", state);
-		}
-
-		if (state.requestedModeSupported !== true) {
-			return warning("Requested execution mode is not supported for this ProcedureSpec in the current MVP phase.", state);
-		}
-
-		if ((state.risks as Array<{ level: string }>).some((risk) => risk.level === "forbidden")) {
-			return warning("ProcedureSpec preflight found forbidden risks that must be resolved before approval.", state);
-		}
-
-		if (state.preflightReady !== true || state.controlAvailable !== true) {
-			return warning("ProcedureSpec preflight is waiting on live runtime readiness or control availability.", state);
-		}
-
-		if (state.stageAnchorValid === false) {
-			return warning("ProcedureSpec preflight found current stage position inconsistent with the approved autofocus envelope.", state);
-		}
-
-		return success("ProcedureSpec preflight is ready for supervised proposal approval.", state);
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		return dispatchToolResult(toolCallId, "run_preflight", params, ctx.cwd);
 	},
-} satisfies ToolDefinition<typeof ProcedureSpecParamsSchema, PlannerToolDetails>;
+} satisfies ToolDefinition<typeof RunPreflightParamsSchema, ToolResult>;
+
+export const runExperimentTool = {
+	name: "run_experiment",
+	label: "Run Experiment",
+	description: "Execute a validated simulation ExperimentSpec or a bounded hardware ExperimentSpec.",
+	promptSnippet: "Execute a simulation or bounded hardware ExperimentSpec and return run records and summary",
+	promptGuidelines: [
+		"Use run_experiment for simulation specs that passed preflight.",
+		"Use hardwareExecution for new hardware calls; legacy hardwarePilot is accepted only during migration.",
+		"For the Raman MVP, run_experiment blocks on backend executability plus the bounded collision and laser ceilings declared in the ExperimentSpec.",
+		"Set domain.raman.operationIntent explicitly for Raman specs; do not imply autofocus-only by omitting acquisition fields.",
+		"For Raman workflowBackend v2_bridge, autofocus motion is guarded again at runtime by bridge-side settled-position assertions.",
+	],
+	parameters: RunExperimentParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		return dispatchToolResult(toolCallId, "run_experiment", params, ctx.cwd);
+	},
+} satisfies ToolDefinition<typeof RunExperimentParamsSchema, ToolResult>;
+
+export const startRunTool = {
+	name: "start_run",
+	label: "Start Run",
+	description: "Admit and start a validated simulation ExperimentSpec under the async run lifecycle, returning a runId without executing units.",
+	promptSnippet: "Start a simulation run and return its runId without blocking on execution",
+	promptGuidelines: [
+		"Use start_run to begin a bounded simulation run that you will drive with advance_run.",
+		"start_run only reserves and starts the run; call advance_run to execute units.",
+	],
+	parameters: StartRunParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		return dispatchToolResult(toolCallId, "start_run", params, ctx.cwd);
+	},
+} satisfies ToolDefinition<typeof StartRunParamsSchema, ToolResult>;
+
+export const advanceRunTool = {
+	name: "advance_run",
+	label: "Advance Run",
+	description: "Execute up to maxUnits units of a running or paused run, stopping at the next safe unit boundary if an operator intent is present.",
+	promptSnippet: "Advance a started run by a bounded number of units, honoring operator intents at unit boundaries",
+	promptGuidelines: [
+		"Use advance_run to execute a started run incrementally so pause_run/abort_run can intervene between batches.",
+		"Set maxUnits to keep control returning to the planner; omit it to run to completion.",
+	],
+	parameters: AdvanceRunParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		return dispatchToolResult(toolCallId, "advance_run", params, ctx.cwd);
+	},
+} satisfies ToolDefinition<typeof AdvanceRunParamsSchema, ToolResult>;
+
+export const analyzeRunTool = {
+	name: "analyze_run",
+	label: "Analyze Run",
+	description: "Return deterministic quality metrics, anomalies, artifacts, and stopping-rule status for a completed run.",
+	promptSnippet: "Analyze a completed experiment run by runId",
+	promptGuidelines: ["Use analyze_run after run_experiment returns a runId."],
+	parameters: AnalyzeRunParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		return dispatchToolResult(toolCallId, "analyze_run", params, ctx.cwd);
+	},
+} satisfies ToolDefinition<typeof AnalyzeRunParamsSchema, ToolResult>;
+
+export const planNextExperimentTool = {
+	name: "plan_next_experiment",
+	label: "Plan Next Experiment",
+	description: "Return a constrained next-step strategy and lineage entry for a completed run.",
+	promptSnippet: "Choose repeat_same, refine_region, add_replicates, reduce_scope, or stop for the next bounded run",
+	promptGuidelines: [
+		"Use plan_next_experiment after analyze_run when the user asks what experiment should happen next.",
+		"Do not treat plan_next_experiment output as a full ExperimentSpec; compile the strategy into a bounded spec first.",
+	],
+	parameters: PlanNextExperimentParamsSchema,
+	executionMode: "sequential",
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
+		return dispatchToolResult(toolCallId, "plan_next_experiment", params, ctx.cwd);
+	},
+} satisfies ToolDefinition<typeof PlanNextExperimentParamsSchema, ToolResult>;
